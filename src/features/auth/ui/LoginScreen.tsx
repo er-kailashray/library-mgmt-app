@@ -2,7 +2,6 @@ import { clsx } from "clsx";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-	Alert,
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
@@ -35,8 +34,8 @@ export function LoginScreen() {
 		if (phoneErrorSubmit || passwordErrorSubmit) {
 			return;
 		}
-		Alert.alert("Valid input", "Login API is not wired yet. This screen is UI-only.");
-	}, [phoneErrorSubmit, passwordErrorSubmit]);
+		router.replace("/home");
+	}, [phoneErrorSubmit, passwordErrorSubmit, router]);
 
 	return (
 		<SafeAreaView style={styles.safe} className="auth-safe-area">
