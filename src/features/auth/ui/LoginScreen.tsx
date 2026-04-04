@@ -1,18 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import { clsx } from "clsx";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-	KeyboardAvoidingView,
-	Platform,
-	Pressable,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	View,
-} from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { loginApi, saveAuthData } from "@/services/api/auth.api";
 import { colors } from "@/shared/constants/theme";
 
 const PHONE_MIN = 10;
@@ -22,33 +15,40 @@ export function LoginScreen() {
 	const router = useRouter();
 	const [phone, setPhone] = useState("");
 	const [password, setPassword] = useState("");
+	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 	const [showErrors, setShowErrors] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [apiError, setApiError] = useState<string | null>(null);
 
 	const phoneError = phone.length > 0 && phone.length < PHONE_MIN;
 	const passwordError = password.length > 0 && password.length < PASSWORD_MIN;
 	const phoneErrorSubmit = phone.length < PHONE_MIN;
 	const passwordErrorSubmit = password.length < PASSWORD_MIN;
 
-	const onSubmit = useCallback(() => {
+	const onSubmit = useCallback(async () => {
 		setShowErrors(true);
 		if (phoneErrorSubmit || passwordErrorSubmit) {
 			return;
 		}
-		router.replace("/home");
-	}, [phoneErrorSubmit, passwordErrorSubmit, router]);
+
+		setApiError(null);
+		setIsSubmitting(true);
+
+		try {
+			const response = await loginApi({ phone, password });
+			await saveAuthData(response.token, response.user);
+			router.replace("/home");
+		} catch (error) {
+			setApiError("Unable to sign in. Please check your phone number and password.");
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [phone, password, phoneErrorSubmit, passwordErrorSubmit, router]);
 
 	return (
 		<SafeAreaView style={styles.safe} className="auth-safe-area">
-			<KeyboardAvoidingView
-				style={styles.flex}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-				className="auth-scroll">
-				<ScrollView
-					keyboardShouldPersistTaps="handled"
-					style={styles.flex}
-					contentContainerStyle={styles.scrollContent}
-					contentContainerClassName="auth-content"
-					showsVerticalScrollIndicator={false}>
+			<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined} className="auth-scroll">
+				<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} contentContainerClassName="auth-content" showsVerticalScrollIndicator={false}>
 					<View className="auth-brand-block">
 						<View className="auth-logo-wrap">
 							<View className="auth-logo-mark">
@@ -80,14 +80,8 @@ export function LoginScreen() {
 									Phone number
 								</Text>
 								<TextInput
-									style={[
-										styles.input,
-										((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError,
-									]}
-									className={clsx(
-										"auth-input",
-										(showErrors && phoneErrorSubmit) || phoneError ? "auth-input-error" : null,
-									)}
+									style={[styles.input, ((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError]}
+									className={clsx("auth-input", (showErrors && phoneErrorSubmit) || phoneError ? "auth-input-error" : null)}
 									placeholder="10-digit mobile number"
 									placeholderTextColor="rgba(0,0,0,0.35)"
 									keyboardType="phone-pad"
@@ -108,21 +102,20 @@ export function LoginScreen() {
 								<Text style={styles.label} className="auth-label">
 									Password
 								</Text>
-								<TextInput
-									style={[
-										styles.input,
-										((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError,
-									]}
-									className={clsx(
-										"auth-input",
-										(showErrors && passwordErrorSubmit) || passwordError ? "auth-input-error" : null,
-									)}
-									placeholder="••••••••"
-									placeholderTextColor="rgba(0,0,0,0.35)"
-									secureTextEntry
-									value={password}
-									onChangeText={setPassword}
-								/>
+								<View style={styles.passwordContainer}>
+									<TextInput
+										style={[styles.input, ((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError]}
+										className={clsx("auth-input", (showErrors && passwordErrorSubmit) || passwordError ? "auth-input-error" : null)}
+										placeholder="••••••••"
+										placeholderTextColor="rgba(0,0,0,0.35)"
+										secureTextEntry={!isPasswordVisible}
+										value={password}
+										onChangeText={setPassword}
+									/>
+									<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button" accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}>
+										<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={colors.mutedForeground} />
+									</Pressable>
+								</View>
 								{showErrors && passwordErrorSubmit ? (
 									<Text style={styles.fieldError} className="auth-error">
 										Password must be at least {PASSWORD_MIN} characters.
@@ -135,10 +128,11 @@ export function LoginScreen() {
 									Forgot password?
 								</Text>
 							</Pressable>
+							{apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
 
-							<Pressable accessibilityRole="button" style={styles.primaryButton} className={clsx("auth-button")} onPress={onSubmit}>
+							<Pressable accessibilityRole="button" style={[styles.primaryButton, isSubmitting && styles.disabledButton]} className={clsx("auth-button")} onPress={onSubmit} disabled={isSubmitting}>
 								<Text style={styles.primaryButtonText} className="auth-button-text">
-									Log in
+									{isSubmitting ? "Signing in..." : "Log in"}
 								</Text>
 							</Pressable>
 						</View>
@@ -209,6 +203,19 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		fontSize: 16,
 		color: colors.primary,
+		paddingRight: 50, // Make space for eye button
+	},
+	passwordContainer: {
+		position: "relative",
+	},
+	eyeButton: {
+		position: "absolute",
+		right: 12,
+		top: 0,
+		bottom: 0,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 8,
 	},
 	inputError: {
 		borderColor: colors.destructive,
@@ -232,10 +239,19 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.accent,
 		paddingVertical: 16,
 	},
+	disabledButton: {
+		opacity: 0.65,
+	},
 	primaryButtonText: {
 		fontSize: 16,
 		fontWeight: "700",
 		color: colors.primary,
+	},
+	apiError: {
+		marginTop: 12,
+		color: colors.destructive,
+		fontSize: 14,
+		fontWeight: "600",
 	},
 	linkMuted: {
 		color: colors.mutedForeground,

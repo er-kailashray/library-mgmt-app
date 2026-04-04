@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/PlaceholderScreen";
+import { SettingsScreen } from "@/features/settings/ui/SettingsScreen";
 
 export default function SettingsRoute() {
-	return <PlaceholderScreen title="Settings" subtitle="Library profile, seat layout, notifications, and account." />;
+	return <SettingsScreen />;
 }
