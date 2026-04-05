@@ -17,10 +17,12 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 
 export async function apiFetch<T = unknown>(path: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(buildUrl(path), {
+		...init,
 		headers: {
 			"Content-Type": "application/json",
+			Accept: "application/json",
+			...(init?.headers || {}),
 		},
-		...init,
 	});
 
 	return parseJsonResponse<T>(response);

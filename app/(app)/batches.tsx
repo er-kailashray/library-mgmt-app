@@ -1,10 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/PlaceholderScreen";
+import { BatchesScreen } from "@/features/batches/ui/BatchesScreen";
 
 export default function BatchesRoute() {
-	return (
-		<PlaceholderScreen
-			title="Batches"
-			subtitle="Create and manage daily time slots (e.g. morning, afternoon). Students will subscribe or pay per batch."
-		/>
-	);
+	return <BatchesScreen />;
 }

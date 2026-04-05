@@ -4,12 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import {
-	MOCK_LIBRARY_NAME,
-	MOCK_MONTH_EARNINGS_CENTS,
-	MOCK_OWNER_HAS_BATCHES,
-	MOCK_OWNER_NAME,
-} from "@/features/home/logic/home-flags";
+import { MOCK_LIBRARY_NAME, MOCK_MONTH_EARNINGS_CENTS, MOCK_OWNER_HAS_BATCHES, MOCK_OWNER_NAME } from "@/features/home/logic/home-flags";
 import { colors } from "@/shared/constants/theme";
 
 type MenuItem = {
@@ -48,13 +43,10 @@ export function HomeScreen() {
 			<View style={styles.headerWrapper}>
 				<View style={styles.header}>
 					<View style={styles.headerText}>
-						<Text style={styles.headerTitle}>{MOCK_OWNER_NAME}</Text>
-						<Text style={styles.headerSubtitle}>{MOCK_LIBRARY_NAME}</Text>
+						<Text style={styles.headerTitle}>{MOCK_LIBRARY_NAME}</Text>
+						<Text style={styles.headerSubtitle}>{MOCK_OWNER_NAME}</Text>
 					</View>
-					<Pressable
-						accessibilityRole="button"
-						style={styles.headerActionCircle}
-						onPress={() => router.push("/settings")}>
+					<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.push("/settings")}>
 						<Ionicons name="menu" size={24} color={colors.primary} />
 					</Pressable>
 				</View>
@@ -63,16 +55,8 @@ export function HomeScreen() {
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 				<View style={styles.summaryCard}>
 					<Text style={styles.summaryLabel}>This month (collections)</Text>
-					<Text style={styles.summaryValue}>
-						{MOCK_MONTH_EARNINGS_CENTS != null
-							? formatRupeeFromCents(MOCK_MONTH_EARNINGS_CENTS)
-							: "—"}
-					</Text>
-					<Text style={styles.summaryHint}>
-						{MOCK_OWNER_HAS_BATCHES
-							? "Tap Payments for breakdown & dues."
-							: "Set up batches to start tracking seat sales and renewals."}
-					</Text>
+					<Text style={styles.summaryValue}>{MOCK_MONTH_EARNINGS_CENTS != null ? formatRupeeFromCents(MOCK_MONTH_EARNINGS_CENTS) : "—"}</Text>
+					<Text style={styles.summaryHint}>{MOCK_OWNER_HAS_BATCHES ? "Tap Payments for breakdown & dues." : "Set up batches to start tracking seat sales and renewals."}</Text>
 				</View>
 
 				{showBatchSetupBanner ? (
@@ -83,14 +67,8 @@ export function HomeScreen() {
 							</View>
 							<Text style={styles.alertTitle}>Set up your batches first</Text>
 						</View>
-						<Text style={styles.alertCopy}>
-							Add the time slots you run each day (for example morning, afternoon, evening). Then you can assign
-							seats, see who paid for which batch, and get clearer earnings visibility.
-						</Text>
-						<Pressable
-							accessibilityRole="button"
-							style={styles.alertCta}
-							onPress={() => router.push("/batches")}>
+						<Text style={styles.alertCopy}>Add the time slots you run each day (for example morning, afternoon, evening). Then you can assign seats, see who paid for which batch, and get clearer earnings visibility.</Text>
+						<Pressable accessibilityRole="button" style={styles.alertCta} onPress={() => router.push("/batches")}>
 							<Text style={styles.alertCtaText}>Add batches</Text>
 							<Ionicons name="arrow-forward" size={18} color={colors.background} />
 						</Pressable>
@@ -100,12 +78,7 @@ export function HomeScreen() {
 				<Text style={styles.sectionTitle}>Menu</Text>
 				<View style={styles.menuGrid}>
 					{MENU.map((item) => (
-						<Pressable
-							key={item.key}
-							accessibilityRole="button"
-							accessibilityLabel={item.label}
-							style={({ pressed }) => [styles.menuCell, pressed && styles.menuCellPressed]}
-							onPress={() => router.push(item.href)}>
+						<Pressable key={item.key} accessibilityRole="button" accessibilityLabel={item.label} style={({ pressed }) => [styles.menuCell, pressed && styles.menuCellPressed]} onPress={() => router.push(item.href)}>
 							<View style={styles.menuIconCircle}>
 								<Ionicons name={item.icon} size={24} color={colors.accent} />
 							</View>
