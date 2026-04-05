@@ -157,6 +157,11 @@ export function SettingsScreen() {
 						</View>
 					</View>
 				))}
+
+				<View style={styles.footerBlock}>
+					<Text style={styles.footerText}>Powered by Kailash Ray</Text>
+					<Text style={styles.versionText}>v1.0.0</Text>
+				</View>
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -259,10 +264,10 @@ const styles = StyleSheet.create({
 		borderRadius: 20,
 		overflow: "hidden",
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.04,
-		shadowRadius: 12,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.08,
+		shadowRadius: 20,
+		elevation: 4,
 	},
 	optionRow: {
 		flexDirection: "row",
@@ -297,5 +302,21 @@ const styles = StyleSheet.create({
 	},
 	logoutText: {
 		color: colors.destructive,
+	},
+	footerBlock: {
+		alignItems: "center",
+		marginTop: 20,
+		marginBottom: 20,
+	},
+	footerText: {
+		fontFamily: "sans-medium",
+		fontSize: 14,
+		color: colors.mutedForeground,
+		marginBottom: 4,
+	},
+	versionText: {
+		fontFamily: "sans-bold",
+		fontSize: 12,
+		color: "rgba(0,0,0,0.25)",
 	},
 });

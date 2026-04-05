@@ -123,7 +123,7 @@ export function LoginScreen() {
 								) : null}
 							</View>
 
-							<Pressable accessibilityRole="button" onPress={() => {}}>
+							<Pressable accessibilityRole="button" onPress={() => { }}>
 								<Text style={styles.forgot} className="auth-forgot">
 									Forgot password?
 								</Text>
@@ -147,6 +147,10 @@ export function LoginScreen() {
 								Create library account
 							</Text>
 						</Pressable>
+					</View>
+
+					<View style={styles.poweredByBlock}>
+						<Text style={styles.poweredByText}>Powered by Kailash Ray</Text>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -185,11 +189,14 @@ const styles = StyleSheet.create({
 	},
 	card: {
 		backgroundColor: colors.card,
-		borderColor: colors.border,
-		borderWidth: StyleSheet.hairlineWidth * 2,
 		borderRadius: 24,
-		padding: 20,
+		padding: 24,
 		marginTop: 32,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.1,
+		shadowRadius: 20,
+		elevation: 5,
 	},
 	label: {
 		color: colors.primary,
@@ -261,5 +268,15 @@ const styles = StyleSheet.create({
 		color: colors.accent,
 		fontSize: 14,
 		fontWeight: "700",
+	},
+	poweredByBlock: {
+		alignItems: "center",
+		marginTop: 32,
+		paddingBottom: 20,
+	},
+	poweredByText: {
+		color: colors.mutedForeground,
+		fontSize: 13,
+		fontWeight: "600",
 	},
 });
