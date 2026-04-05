@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { useRouter, type Href } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -45,18 +45,22 @@ export function HomeScreen() {
 	return (
 		<SafeAreaView style={styles.safe} edges={["top"]}>
 			<StatusBar style="dark" />
-			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+			<View style={styles.headerWrapper}>
 				<View style={styles.header}>
 					<View style={styles.headerText}>
-						<Text style={styles.greeting}>Hello,</Text>
-						<Text style={styles.ownerName}>{MOCK_OWNER_NAME}</Text>
-						<Text style={styles.libraryName}>{MOCK_LIBRARY_NAME}</Text>
+						<Text style={styles.headerTitle}>{MOCK_OWNER_NAME}</Text>
+						<Text style={styles.headerSubtitle}>{MOCK_LIBRARY_NAME}</Text>
 					</View>
-					<View style={styles.avatar}>
-						<Ionicons name="library-outline" size={26} color={colors.primary} />
-					</View>
+					<Pressable
+						accessibilityRole="button"
+						style={styles.headerActionCircle}
+						onPress={() => router.push("/settings")}>
+						<Ionicons name="menu" size={24} color={colors.primary} />
+					</Pressable>
 				</View>
+			</View>
 
+			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 				<View style={styles.summaryCard}>
 					<Text style={styles.summaryLabel}>This month (collections)</Text>
 					<Text style={styles.summaryValue}>
@@ -73,26 +77,23 @@ export function HomeScreen() {
 
 				{showBatchSetupBanner ? (
 					<View style={styles.alertCard} accessibilityRole="alert">
-						<View style={styles.alertAccent} />
-						<View style={styles.alertBody}>
-							<View style={styles.alertTitleRow}>
-								<View style={styles.alertIconWrap}>
-									<Ionicons name="calendar-outline" size={22} color={colors.primary} />
-								</View>
-								<Text style={styles.alertTitle}>Set up your batches first</Text>
+						<View style={styles.alertTitleRow}>
+							<View style={styles.alertIconWrap}>
+								<Ionicons name="calendar-outline" size={22} color={colors.primary} />
 							</View>
-							<Text style={styles.alertCopy}>
-								Add the time slots you run each day (for example morning, afternoon, evening). Then you can assign
-								seats, see who paid for which batch, and get clearer earnings visibility.
-							</Text>
-							<Pressable
-								accessibilityRole="button"
-								style={styles.alertCta}
-								onPress={() => router.push("/batches")}>
-								<Text style={styles.alertCtaText}>Add batches</Text>
-								<Ionicons name="arrow-forward" size={18} color={colors.background} />
-							</Pressable>
+							<Text style={styles.alertTitle}>Set up your batches first</Text>
 						</View>
+						<Text style={styles.alertCopy}>
+							Add the time slots you run each day (for example morning, afternoon, evening). Then you can assign
+							seats, see who paid for which batch, and get clearer earnings visibility.
+						</Text>
+						<Pressable
+							accessibilityRole="button"
+							style={styles.alertCta}
+							onPress={() => router.push("/batches")}>
+							<Text style={styles.alertCtaText}>Add batches</Text>
+							<Ionicons name="arrow-forward" size={18} color={colors.background} />
+						</Pressable>
 					</View>
 				) : null}
 
@@ -125,43 +126,43 @@ const styles = StyleSheet.create({
 	},
 	scroll: {
 		paddingHorizontal: 20,
-		paddingBottom: 32,
+		paddingTop: 24,
+		paddingBottom: 40,
+	},
+	headerWrapper: {
+		backgroundColor: colors.background,
+		paddingTop: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: colors.border,
+		zIndex: 10,
 	},
 	header: {
 		flexDirection: "row",
-		alignItems: "flex-start",
+		alignItems: "center",
 		justifyContent: "space-between",
-		marginTop: 8,
-		marginBottom: 20,
+		paddingHorizontal: 20,
+		paddingBottom: 16,
 	},
 	headerText: {
 		flex: 1,
-		paddingRight: 12,
+		paddingRight: 16,
 	},
-	greeting: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: colors.mutedForeground,
-	},
-	ownerName: {
-		fontSize: 26,
-		fontWeight: "800",
+	headerTitle: {
+		fontFamily: "sans-extrabold",
+		fontSize: 22,
 		color: colors.primary,
-		marginTop: 2,
+		marginBottom: 2,
 	},
-	libraryName: {
-		fontSize: 15,
-		fontWeight: "600",
+	headerSubtitle: {
+		fontFamily: "sans-medium",
+		fontSize: 14,
 		color: colors.mutedForeground,
-		marginTop: 4,
 	},
-	avatar: {
-		width: 52,
-		height: 52,
-		borderRadius: 18,
-		backgroundColor: colors.card,
-		borderWidth: StyleSheet.hairlineWidth * 2,
-		borderColor: colors.border,
+	headerActionCircle: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: colors.muted,
 		alignItems: "center",
 		justifyContent: "center",
 	},
@@ -169,114 +170,118 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.accent,
 		borderRadius: 24,
 		padding: 20,
-		marginBottom: 20,
+		marginBottom: 32,
+		shadowColor: colors.accent,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.25,
+		shadowRadius: 16,
+		elevation: 6,
 	},
 	summaryLabel: {
-		fontSize: 15,
-		fontWeight: "600",
+		fontFamily: "sans-semibold",
+		fontSize: 13,
 		color: "rgba(255,255,255,0.85)",
+		textTransform: "uppercase",
+		letterSpacing: 0.5,
 	},
 	summaryValue: {
-		fontSize: 32,
-		fontWeight: "800",
+		fontFamily: "sans-extrabold",
+		fontSize: 34,
 		color: "#fff",
-		marginTop: 6,
+		marginTop: 8,
+		letterSpacing: -1,
 	},
 	summaryHint: {
-		fontSize: 14,
-		fontWeight: "500",
+		fontFamily: "sans-medium",
+		fontSize: 13,
 		color: "rgba(255,255,255,0.9)",
-		marginTop: 10,
-		lineHeight: 20,
+		marginTop: 12,
+		lineHeight: 18,
 	},
 	alertCard: {
-		flexDirection: "row",
 		backgroundColor: colors.card,
 		borderRadius: 20,
-		borderWidth: StyleSheet.hairlineWidth * 2,
-		borderColor: colors.border,
-		marginBottom: 24,
-		overflow: "hidden",
-	},
-	alertAccent: {
-		width: 5,
-		backgroundColor: colors.accent,
-	},
-	alertBody: {
-		flex: 1,
-		padding: 16,
-		paddingLeft: 14,
+		borderWidth: 0,
+		padding: 18,
+		marginBottom: 32,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.06,
+		shadowRadius: 16,
+		elevation: 3,
 	},
 	alertTitleRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 10,
-		marginBottom: 8,
+		gap: 12,
+		marginBottom: 12,
 	},
 	alertIconWrap: {
-		width: 40,
-		height: 40,
-		borderRadius: 12,
+		width: 44,
+		height: 44,
+		borderRadius: 14,
 		backgroundColor: colors.muted,
 		alignItems: "center",
 		justifyContent: "center",
 	},
 	alertTitle: {
+		fontFamily: "sans-bold",
 		flex: 1,
-		fontSize: 17,
-		fontWeight: "800",
+		fontSize: 16,
 		color: colors.primary,
 	},
 	alertCopy: {
+		fontFamily: "sans-medium",
 		fontSize: 14,
-		fontWeight: "500",
 		color: colors.mutedForeground,
-		lineHeight: 21,
-		marginBottom: 14,
+		lineHeight: 20,
+		marginBottom: 16,
 	},
 	alertCta: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
 		gap: 8,
-		alignSelf: "flex-start",
 		backgroundColor: colors.primary,
 		paddingVertical: 12,
-		paddingHorizontal: 18,
+		paddingHorizontal: 16,
 		borderRadius: 14,
+		alignSelf: "flex-start",
 	},
 	alertCtaText: {
-		fontSize: 15,
-		fontWeight: "800",
+		fontFamily: "sans-bold",
+		fontSize: 14,
 		color: colors.background,
 	},
 	sectionTitle: {
-		fontSize: 13,
-		fontWeight: "800",
-		letterSpacing: 1,
+		fontFamily: "sans-bold",
+		fontSize: 14,
+		letterSpacing: 1.2,
 		color: colors.mutedForeground,
 		textTransform: "uppercase",
-		marginBottom: 12,
+		marginBottom: 16,
 	},
 	menuGrid: {
 		flexDirection: "row",
 		flexWrap: "wrap",
-		gap: 12,
+		justifyContent: "space-between",
+		gap: 14,
 	},
 	menuCell: {
-		width: "48%",
-		flexGrow: 1,
-		maxWidth: "48%",
+		width: "47%",
 		backgroundColor: colors.card,
-		borderRadius: 18,
-		borderWidth: StyleSheet.hairlineWidth * 2,
-		borderColor: colors.border,
-		paddingVertical: 18,
-		paddingHorizontal: 14,
+		borderRadius: 20,
+		borderWidth: 0,
+		padding: 16,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.04,
+		shadowRadius: 12,
+		elevation: 2,
 	},
 	menuCellPressed: {
-		opacity: 0.92,
-		backgroundColor: colors.muted,
+		opacity: 0.8,
+		transform: [{ scale: 0.98 }],
 	},
 	menuIconCircle: {
 		width: 44,
@@ -288,15 +293,15 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	menuLabel: {
-		fontSize: 16,
-		fontWeight: "800",
+		fontFamily: "sans-bold",
+		fontSize: 15,
 		color: colors.primary,
+		marginBottom: 4,
 	},
 	menuHint: {
+		fontFamily: "sans-medium",
 		fontSize: 12,
-		fontWeight: "500",
 		color: colors.mutedForeground,
-		marginTop: 4,
 		lineHeight: 16,
 	},
 });
