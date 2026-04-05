@@ -276,14 +276,13 @@ const styles = StyleSheet.create({
     filterChipTextSelected: {
         color: colors.background,
     },
-    // Sparse Grid Cards Structure
     gridSeatCard: {
         flex: 1,
         minWidth: "21%", // Approximately fits 4 items per row cleanly with ~4% gap calculation. 
         maxWidth: "25%",
+        aspectRatio: 1, // Enforces geometric square
         backgroundColor: colors.card,
         borderRadius: 16,
-        paddingVertical: 18,
         alignItems: "center",
         justifyContent: "center",
         borderWidth: StyleSheet.hairlineWidth,
@@ -298,13 +297,16 @@ const styles = StyleSheet.create({
         fontFamily: "sans-extrabold",
         fontSize: 20,
         color: colors.primary,
-        marginBottom: 6,
+        textAlign: "center",
     },
     gridDotRow: {
+        position: "absolute",
+        bottom: 12,
         flexDirection: "row",
         flexWrap: "wrap",
         justifyContent: "center",
         gap: 4,
+        paddingHorizontal: 4,
     },
     gridDot: {
         width: 8,

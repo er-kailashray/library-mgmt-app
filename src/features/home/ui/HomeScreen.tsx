@@ -16,6 +16,7 @@ type MenuItem = {
 };
 
 const MENU: MenuItem[] = [
+	{ key: "admission", label: "Admission", hint: "Onboard new member", icon: "person-add-outline", href: "/admission" },
 	{ key: "seats", label: "Seats", hint: "Availability by batch", icon: "grid-outline", href: "/seats" },
 	{ key: "batches", label: "Batches", hint: "Daily time slots", icon: "layers-outline", href: "/batches" },
 	{ key: "members", label: "Members", hint: "Students & subs", icon: "people-outline", href: "/members" },
