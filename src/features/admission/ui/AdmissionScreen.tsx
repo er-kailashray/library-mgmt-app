@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontFamily: "sans-extrabold",
-        fontSize: 18,
+        fontSize: 14,
         color: colors.primary,
         marginBottom: 16,
         borderBottomWidth: 1,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     },
     gridSeatNumber: {
         fontFamily: "sans-extrabold",
-        fontSize: 16,
+        fontSize: 15,
         color: colors.primary,
         textAlign: "center",
     },
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 14,
-        fontSize: 16,
+        fontSize: 15,
         color: colors.primary,
     },
     errorBox: {

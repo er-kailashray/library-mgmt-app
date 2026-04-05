@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.background,
 		paddingHorizontal: 16,
 		paddingVertical: 14,
-		fontSize: 16,
+		fontSize: 15,
 		color: colors.primary,
 		paddingRight: 50, // Make space for eye button
 	},
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
 		opacity: 0.65,
 	},
 	primaryButtonText: {
-		fontSize: 16,
-		fontWeight: "700",
+		fontSize: 15,
+		fontFamily: "sans-bold",
 		color: colors.primary,
 	},
 	apiError: {

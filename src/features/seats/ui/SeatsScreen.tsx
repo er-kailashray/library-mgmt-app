@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     },
     gridSeatNumber: {
         fontFamily: "sans-extrabold",
-        fontSize: 20,
+        fontSize: 15,
         color: colors.primary,
         textAlign: "center",
     },

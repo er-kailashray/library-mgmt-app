@@ -109,7 +109,6 @@ export function SettingsScreen() {
 			</View>
 
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
 				{/* CENTERED PROFILE HEADER */}
 				<View style={styles.profileCenterBlock}>
 					<View style={styles.avatarHugeBackground}>
@@ -131,26 +130,11 @@ export function SettingsScreen() {
 						<Text style={styles.sectionTitle}>{group.title}</Text>
 						<View style={styles.groupCard}>
 							{group.items.map((item, iIndex) => (
-								<Pressable
-									key={`item-${gIndex}-${iIndex}`}
-									accessibilityRole="button"
-									style={({ pressed }) => [
-										styles.optionRow,
-										pressed && styles.optionRowPressed,
-										iIndex !== group.items.length - 1 && styles.optionRowBorder,
-									]}
-									onPress={item.onPress}
-									disabled={isLoggingOut && item.destructive}>
+								<Pressable key={`item-${gIndex}-${iIndex}`} accessibilityRole="button" style={({ pressed }) => [styles.optionRow, pressed && styles.optionRowPressed, iIndex !== group.items.length - 1 && styles.optionRowBorder]} onPress={item.onPress} disabled={isLoggingOut && item.destructive}>
 									<View style={[styles.iconCircle, item.destructive && styles.iconCircleDestructive]}>
-										<Ionicons
-											name={item.icon}
-											size={20}
-											color={item.destructive ? colors.destructive : colors.primary}
-										/>
+										<Ionicons name={item.icon} size={20} color={item.destructive ? colors.destructive : colors.primary} />
 									</View>
-									<Text style={[styles.optionText, item.destructive && styles.logoutText]}>
-										{item.label}
-									</Text>
+									<Text style={[styles.optionText, item.destructive && styles.logoutText]}>{item.label}</Text>
 									<Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
 								</Pressable>
 							))}
@@ -297,7 +281,7 @@ const styles = StyleSheet.create({
 	optionText: {
 		flex: 1,
 		fontFamily: "sans-semibold",
-		fontSize: 16,
+		fontSize: 15,
 		color: colors.primary,
 	},
 	logoutText: {

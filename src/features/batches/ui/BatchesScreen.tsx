@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     },
     batchName: {
         fontFamily: "sans-bold",
-        fontSize: 16,
+        fontSize: 15,
         color: colors.primary,
         marginBottom: 4,
     },
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     },
     priceText: {
         fontFamily: "sans-extrabold",
-        fontSize: 13,
+        fontSize: 12,
         color: colors.primary,
     },
     statsRow: {
