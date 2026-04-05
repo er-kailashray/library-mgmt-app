@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/shared/ui/PlaceholderScreen";
+import { SeatsScreen } from "@/features/seats/ui/SeatsScreen";
 
 export default function SeatsRoute() {
-	return <PlaceholderScreen title="Seats" subtitle="See which seats are free or taken in each batch." />;
+	return <SeatsScreen />;
 }
