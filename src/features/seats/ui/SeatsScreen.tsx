@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
@@ -8,6 +8,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
 import { colors } from "@/shared/constants/theme";
+
+const formatSeatNumber = (num: any) => {
+    const str = String(num || "");
+    const n = str.replace(/\D/g, "");
+    return `S-${n.padStart(3, "0")}`;
+};
 
 export function SeatsScreen() {
     const router = useRouter();
@@ -94,22 +100,40 @@ export function SeatsScreen() {
     };
 
     const renderSeatBlock = ({ item: seat }: { item: SeatMatrixSeat }) => {
-        const displayedBatches = seat.batches.filter(b =>
-            selectedBatchIds.length === 0 || selectedBatchIds.includes(b.batch_id)
-        );
+        const displayedBatches = seat.batches.filter((b) => selectedBatchIds.length === 0 || selectedBatchIds.includes(b.batch_id));
 
         if (displayedBatches.length === 0 && selectedBatchIds.length > 0) return null;
 
+        // If viewing "All" (no filter), determine overall status
+        // For simplicity, color it available only if all displayed are available
+        const allAvailable = displayedBatches.every((b) => b.available);
+        const anyAvailable = displayedBatches.some((b) => b.available);
+
+        let chairColor: string = colors.destructive;
+        if (allAvailable) {
+            chairColor = colors.success;
+        } else if (anyAvailable) {
+            chairColor = colors.accent;
+        }
+
         return (
             <Pressable style={styles.gridSeatCard} onPress={() => setSelectedSeat(seat)}>
-                <Text style={styles.gridSeatNumber}>{seat.seat_number}</Text>
+                <View style={styles.chairWrapper}>
+                    <MaterialCommunityIcons name="seat" size={28} color={chairColor} style={{ opacity: 0.9 }} />
+                </View>
+                <Text style={styles.gridSeatNumber}>{formatSeatNumber(seat.seat_number)}</Text>
+
                 <View style={styles.gridDotRow}>
-                    {displayedBatches.map(b => (
-                        <View
-                            key={b.batch_id}
-                            style={[styles.gridDot, b.available ? styles.dotAvailable : styles.dotOccupied]}
-                        />
-                    ))}
+                    {displayedBatches.length > 4 ? (
+                        <>
+                            {displayedBatches.slice(0, 3).map((b) => (
+                                <View key={b.batch_id} style={[styles.gridDot, b.available ? styles.dotAvailable : styles.dotOccupied]} />
+                            ))}
+                            <Text style={styles.moreBatchText}>+{displayedBatches.length - 3}</Text>
+                        </>
+                    ) : (
+                        displayedBatches.map((b) => <View key={b.batch_id} style={[styles.gridDot, b.available ? styles.dotAvailable : styles.dotOccupied]} />)
+                    )}
                 </View>
             </Pressable>
         );
@@ -158,7 +182,7 @@ export function SeatsScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Seat {selectedSeat?.seat_number}</Text>
+                            <Text style={styles.modalTitle}>Seat {formatSeatNumber(selectedSeat?.seat_number || "")}</Text>
                             <Pressable
                                 accessibilityRole="button"
                                 style={styles.modalCloseButton}
@@ -280,36 +304,50 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: "21%",
         maxWidth: "25%",
-        aspectRatio: 1,
+        paddingVertical: 12,
         backgroundColor: colors.card,
-        borderRadius: 16,
+        borderRadius: 20,
         alignItems: "center",
         justifyContent: "center",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
-        shadowRadius: 16,
-        elevation: 3,
+        shadowRadius: 20,
+        elevation: 4,
+    },
+    chairWrapper: {
+        marginBottom: 6,
+        backgroundColor: colors.background,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.05)",
     },
     gridSeatNumber: {
         fontFamily: "sans-extrabold",
-        fontSize: 15,
+        fontSize: 13,
         color: colors.primary,
         textAlign: "center",
+        marginBottom: 8,
     },
     gridDotRow: {
-        position: "absolute",
-        bottom: 12,
         flexDirection: "row",
-        flexWrap: "wrap",
+        alignItems: "center",
         justifyContent: "center",
-        gap: 4,
-        paddingHorizontal: 4,
+        gap: 3,
     },
     gridDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+    },
+    moreBatchText: {
+        fontSize: 10,
+        fontFamily: "sans-bold",
+        color: colors.mutedForeground,
     },
     dotAvailable: {
         backgroundColor: colors.success,
