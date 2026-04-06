@@ -5,3 +5,12 @@ export interface AuthUser {
 	phone: string;
 	role: string;
 }
+
+/** Registration Payload */
+export interface RegisterRequest {
+	name: string;
+	phone: string;
+	password: string;
+	library_name: string;
+	total_seats: string;
+}
