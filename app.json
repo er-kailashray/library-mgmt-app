@@ -14,9 +14,11 @@
       "backgroundColor": "#fff9e3"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kailashray.librum"
     },
     "android": {
+      "package": "com.kailashray.librum",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#fff9e3"
@@ -55,10 +57,19 @@
             "./assets/fonts/PlusJakartaSans-Light.ttf"
           ]
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cabf3b5e-488c-4015-abcc-edad42e1b9c4"
+      }
+    },
+    "owner": "erkailashray"
   }
 }

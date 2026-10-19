@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import type { ComponentProps } from "react";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
-import { colors } from "@/shared/constants/theme";
+import { useTheme } from "@/shared/providers/ThemeProvider";
 
 type Slide = {
 	key: string;
@@ -27,36 +27,37 @@ type Slide = {
 	body: string;
 };
 
-const SLIDES: Slide[] = [
-	{
-		key: "1",
-		icon: "library-outline",
-		iconBg: colors.accent,
-		title: "Welcome to Librum",
-		body: "Run your library from one calm place—balances, renewals, and members at a glance.",
-	},
-	{
-		key: "2",
-		icon: "people-outline",
-		iconBg: colors.subscription,
-		title: "Built for desks & shelves",
-		body: "Track who borrows what, stay ahead of due dates, and keep your desk uncluttered.",
-	},
-	{
-		key: "3",
-		icon: "sparkles-outline",
-		iconBg: colors.accent,
-		title: "Ready when you are",
-		body: "Sign in with your phone to sync, or create a new library in a few taps.",
-	},
-];
-
 export function OnboardingScreen() {
 	const router = useRouter();
+	const { theme } = useTheme();
 	const { width } = useWindowDimensions();
 	const listRef = useRef<FlatList<Slide>>(null);
 	const [index, setIndex] = useState(0);
-	const last = index === SLIDES.length - 1;
+	const last = index === 3 - 1; // Assuming 3 slides
+
+	const SLIDES: Slide[] = [
+		{
+			key: "1",
+			icon: "library-outline",
+			iconBg: theme.accent,
+			title: "Welcome to Librum",
+			body: "Run your library from one calm place—balances, renewals, and members at a glance.",
+		},
+		{
+			key: "2",
+			icon: "people-outline",
+			iconBg: theme.subscription,
+			title: "Built for desks & shelves",
+			body: "Track who borrows what, stay ahead of due dates, and keep your desk uncluttered.",
+		},
+		{
+			key: "3",
+			icon: "sparkles-outline",
+			iconBg: theme.accent,
+			title: "Ready when you are",
+			body: "Sign in with your phone to sync, or create a new library in a few taps.",
+		},
+	];
 
 	const finish = useCallback(async () => {
 		await setOnboardingComplete();
@@ -69,32 +70,34 @@ export function OnboardingScreen() {
 		if (next >= 0 && next < SLIDES.length) {
 			setIndex(next);
 		}
-	}, [width]);
+	}, [width, SLIDES.length]);
 
 	const goNext = useCallback(() => {
-		if (last) {
+		if (index === SLIDES.length - 1) {
 			void finish();
 			return;
 		}
 		listRef.current?.scrollToIndex({ index: index + 1, animated: true });
-	}, [finish, index, last]);
+	}, [finish, index, SLIDES.length]);
+
+	const styles = createStyles(theme);
 
 	const renderItem = useCallback(
 		({ item }: ListRenderItemInfo<Slide>) => (
 			<View style={[styles.page, { width }]}>
 				<View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-					<Ionicons name={item.icon} size={44} color={colors.primary} />
+					<Ionicons name={item.icon} size={44} color="#fff" />
 				</View>
 				<Text style={styles.title}>{item.title}</Text>
 				<Text style={styles.body}>{item.body}</Text>
 			</View>
 		),
-		[width],
+		[width, styles],
 	);
 
 	return (
 		<SafeAreaView style={styles.safe}>
-			<StatusBar style="dark" />
+			<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 			<View style={styles.topBar}>
 				<View style={styles.brandRow}>
 					<View style={styles.brandMark}>
@@ -130,17 +133,17 @@ export function OnboardingScreen() {
 					))}
 				</View>
 				<Pressable accessibilityRole="button" style={styles.primaryBtn} onPress={goNext}>
-					<Text style={styles.primaryBtnText}>{last ? "Get started" : "Next"}</Text>
+					<Text style={styles.primaryBtnText}>{index === SLIDES.length - 1 ? "Get started" : "Next"}</Text>
 				</Pressable>
 			</View>
 		</SafeAreaView>
 	);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: colors.background,
+		backgroundColor: theme.background,
 	},
 	list: {
 		flex: 1,
@@ -162,24 +165,24 @@ const styles = StyleSheet.create({
 		width: 40,
 		height: 40,
 		borderRadius: 14,
-		backgroundColor: colors.accent,
+		backgroundColor: theme.accent,
 		alignItems: "center",
 		justifyContent: "center",
 	},
 	brandLetter: {
+		fontFamily: "sans-extrabold",
 		fontSize: 20,
-		fontWeight: "800",
-		color: colors.background,
+		color: "#fff",
 	},
 	brandName: {
+		fontFamily: "sans-extrabold",
 		fontSize: 22,
-		fontWeight: "800",
-		color: colors.primary,
+		color: theme.primary,
 	},
 	skip: {
+		fontFamily: "sans-bold",
 		fontSize: 15,
-		fontWeight: "700",
-		color: colors.accent,
+		color: theme.accent,
 	},
 	page: {
 		flex: 1,
@@ -194,19 +197,24 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		marginBottom: 28,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.1,
+		shadowRadius: 16,
+		elevation: 4,
 	},
 	title: {
+		fontFamily: "sans-extrabold",
 		fontSize: 26,
-		fontWeight: "800",
-		color: colors.primary,
+		color: theme.primary,
 		textAlign: "center",
 		marginBottom: 12,
 	},
 	body: {
+		fontFamily: "sans-medium",
 		fontSize: 16,
-		fontWeight: "500",
 		lineHeight: 24,
-		color: colors.mutedForeground,
+		color: theme.mutedForeground,
 		textAlign: "center",
 		maxWidth: 320,
 	},
@@ -225,21 +233,26 @@ const styles = StyleSheet.create({
 		width: 8,
 		height: 8,
 		borderRadius: 4,
-		backgroundColor: "rgba(8, 17, 38, 0.15)",
+		backgroundColor: theme.muted,
 	},
 	dotActive: {
 		width: 22,
-		backgroundColor: colors.accent,
+		backgroundColor: theme.accent,
 	},
 	primaryBtn: {
 		alignItems: "center",
 		borderRadius: 16,
-		backgroundColor: colors.accent,
-		paddingVertical: 16,
+		backgroundColor: theme.accent,
+		paddingVertical: 18,
+		shadowColor: theme.accent,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.2,
+		shadowRadius: 10,
+		elevation: 4,
 	},
 	primaryBtnText: {
+		fontFamily: "sans-extrabold",
 		fontSize: 17,
-		fontWeight: "800",
-		color: colors.primary,
+		color: "#fff",
 	},
 });

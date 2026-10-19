@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "@/shared/constants/theme";
+import { useTheme } from "@/shared/providers/ThemeProvider";
 
 type Props = {
 	title: string;
@@ -12,12 +12,15 @@ type Props = {
 
 export function PlaceholderScreen({ title, subtitle = "This section will be wired to your library data soon." }: Props) {
 	const router = useRouter();
+	const { theme } = useTheme();
+
+	const styles = createStyles(theme);
 
 	return (
 		<SafeAreaView style={styles.safe} edges={["top"]}>
 			<View style={styles.top}>
 				<Pressable accessibilityRole="button" style={styles.back} onPress={() => router.back()} hitSlop={12}>
-					<Ionicons name="chevron-back" size={26} color={colors.primary} />
+					<Ionicons name="chevron-back" size={26} color={theme.primary} />
 					<Text style={styles.backText}>Back</Text>
 				</Pressable>
 			</View>
@@ -29,10 +32,10 @@ export function PlaceholderScreen({ title, subtitle = "This section will be wire
 	);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: colors.background,
+		backgroundColor: theme.background,
 	},
 	top: {
 		paddingHorizontal: 8,
@@ -47,9 +50,9 @@ const styles = StyleSheet.create({
 		gap: 4,
 	},
 	backText: {
+		fontFamily: "sans-bold",
 		fontSize: 16,
-		fontWeight: "700",
-		color: colors.primary,
+		color: theme.primary,
 	},
 	body: {
 		flex: 1,
@@ -57,15 +60,15 @@ const styles = StyleSheet.create({
 		paddingTop: 24,
 	},
 	title: {
+		fontFamily: "sans-extrabold",
 		fontSize: 26,
-		fontWeight: "800",
-		color: colors.primary,
+		color: theme.primary,
 	},
 	subtitle: {
+		fontFamily: "sans-medium",
 		marginTop: 12,
 		fontSize: 16,
-		fontWeight: "500",
-		color: colors.mutedForeground,
+		color: theme.mutedForeground,
 		lineHeight: 24,
 	},
 });

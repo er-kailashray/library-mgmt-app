@@ -14,10 +14,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors } from "@/shared/constants/theme";
+import { useTheme } from "@/shared/providers/ThemeProvider";
 
 export function OtpScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
     const { phone } = useLocalSearchParams<{ phone: string }>();
 
     const [otp, setOtp] = useState("");
@@ -31,14 +32,10 @@ export function OtpScreen() {
             return;
         }
 
-        // Dummy OTP validation
         setIsVerifying(true);
-
         // Simulate API call
         setTimeout(() => {
             if (otp === "000111") {
-                // Success -> Go to login or directly to home if token returned
-                // For now, let's go back to login so they can sign in with the new password
                 router.replace("/login");
             } else {
                 setError("Invalid OTP code. Use 000111 for testing.");
@@ -47,12 +44,14 @@ export function OtpScreen() {
         }, 1000);
     };
 
+    const styles = createStyles(theme);
+
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style="dark" />
+            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
             <View style={styles.header}>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={colors.primary} />
+                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
                 </Pressable>
                 <View>
                     <Text style={styles.title}>Verify Account</Text>
@@ -63,13 +62,13 @@ export function OtpScreen() {
             <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                 <View style={styles.content}>
                     <View style={styles.otpCard}>
-                        <Ionicons name="mail-unread-outline" size={48} color={colors.accent} style={{ alignSelf: "center", marginBottom: 20 }} />
+                        <Ionicons name="mail-unread-outline" size={48} color={theme.accent} style={{ alignSelf: "center", marginBottom: 20 }} />
                         <Text style={styles.instruction}>We've sent a 6-digit confirmation code to your mobile number.</Text>
 
                         <TextInput
                             style={[styles.otpInput, { letterSpacing: 8 }]}
                             placeholder="000000"
-                            placeholderTextColor="rgba(0,0,0,0.15)"
+                            placeholderTextColor={theme.mutedForeground + "4D"}
                             keyboardType="number-pad"
                             maxLength={6}
                             value={otp}
@@ -78,21 +77,21 @@ export function OtpScreen() {
 
                         {error && (
                             <View style={styles.errorBox}>
-                                <Ionicons name="alert-circle" size={18} color={colors.destructive} />
+                                <Ionicons name="alert-circle" size={18} color={theme.destructive} />
                                 <Text style={styles.errorText}>{error}</Text>
                             </View>
                         )}
 
                         <Pressable style={styles.submitButton} onPress={handleVerify} disabled={isVerifying}>
                             {isVerifying ? (
-                                <ActivityIndicator color="#fff" size="small" />
+                                <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
                             ) : (
                                 <Text style={styles.submitButtonText}>Verify & Complete</Text>
                             )}
                         </Pressable>
 
                         <Pressable style={styles.resendButton}>
-                            <Text style={styles.resendText}>Didn't receive code? <Text style={{ color: colors.accent }}>Resend</Text></Text>
+                            <Text style={styles.resendText}>Didn't receive code? <Text style={{ color: theme.accent }}>Resend</Text></Text>
                         </Pressable>
                     </View>
 
@@ -105,10 +104,10 @@ export function OtpScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
@@ -120,26 +119,28 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         gap: 16,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
     },
     backButton: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: colors.muted,
+        backgroundColor: theme.card,
         alignItems: "center",
         justifyContent: "center",
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     title: {
         fontFamily: "sans-extrabold",
         fontSize: 22,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 2,
     },
     subtitle: {
         fontFamily: "sans-medium",
         fontSize: 14,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
     content: {
         flex: 1,
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
         paddingTop: 40,
     },
     otpCard: {
-        backgroundColor: colors.card,
+        backgroundColor: theme.card,
         borderRadius: 24,
         padding: 32,
         shadowColor: "#000",
@@ -155,11 +156,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 20,
         elevation: 4,
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     instruction: {
         fontFamily: "sans-medium",
         fontSize: 15,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
         textAlign: "center",
         lineHeight: 22,
         marginBottom: 32,
@@ -167,21 +170,21 @@ const styles = StyleSheet.create({
     otpInput: {
         fontFamily: "sans-extrabold",
         fontSize: 32,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
         borderRadius: 20,
         paddingVertical: 20,
         textAlign: "center",
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 24,
     },
     submitButton: {
-        backgroundColor: colors.accent,
+        backgroundColor: theme.accent,
         padding: 20,
         borderRadius: 18,
         alignItems: "center",
-        shadowColor: colors.accent,
+        shadowColor: theme.accent,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
@@ -190,7 +193,7 @@ const styles = StyleSheet.create({
     submitButtonText: {
         fontFamily: "sans-extrabold",
         fontSize: 15,
-        color: "#fff",
+        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
     },
     resendButton: {
         marginTop: 24,
@@ -199,10 +202,10 @@ const styles = StyleSheet.create({
     resendText: {
         fontFamily: "sans-bold",
         fontSize: 14,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
     errorBox: {
-        backgroundColor: colors.destructive + "1A",
+        backgroundColor: theme.destructive + "1A",
         padding: 14,
         borderRadius: 16,
         flexDirection: "row",
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontFamily: "sans-semibold",
-        color: colors.destructive,
+        color: theme.destructive,
         fontSize: 14,
         flex: 1,
     },
@@ -224,6 +227,6 @@ const styles = StyleSheet.create({
     footerText: {
         fontFamily: "sans-medium",
         fontSize: 13,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
 });

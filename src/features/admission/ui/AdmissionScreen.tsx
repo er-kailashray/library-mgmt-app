@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -18,19 +18,30 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
-import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
-import { colors } from "@/shared/constants/theme";
+import { useApiData } from "@/shared/hooks/useApiData";
+import { useTheme } from "@/shared/providers/ThemeProvider";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+
+function formatRupee(amount: number): string {
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(amount);
+}
 
 export function AdmissionScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
 
-    const [batches, setBatches] = useState<MatrixBatchRef[]>([]);
-    const [seatsData, setSeatsData] = useState<SeatMatrixSeat[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data, isLoading, error, refetch: fetchData } = useApiData(getSeatMatrixApi, []);
+    const batches = data?.batches ?? [];
+    const seatsData = data?.seats ?? [];
 
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
+    const [assignMode, setAssignMode] = useState<"common" | "perBatch">("common");
     const [commonSeatId, setCommonSeatId] = useState<number | null>(null);
+    const [seatsByBatch, setSeatsByBatch] = useState<Record<number, number>>({});
 
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -38,42 +49,38 @@ export function AdmissionScreen() {
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const fetchData = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const response = await getSeatMatrixApi();
-            if (response.status) {
-                setBatches(response.data?.batches || []);
-                setSeatsData(response.data?.seats || []);
-            } else {
-                setError("Failed to fetch matrices.");
-            }
-        } catch (err: any) {
-            setError(err.message || "An error occurred.");
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    const seatAvailableForBatches = (seat: (typeof seatsData)[number], batchIds: number[]) =>
+        batchIds.every((bId) => seat.batches.find((sb) => sb.batch_id === bId)?.available === true);
 
-    useEffect(() => {
-        void fetchData();
-    }, [fetchData]);
+    const hasCommonSeatOption = useMemo(
+        () => selectedBatchIds.length > 0 && seatsData.some((seat) => seatAvailableForBatches(seat, selectedBatchIds)),
+        [selectedBatchIds, seatsData]
+    );
+
+    const totalMonthlyFee = useMemo(
+        () => selectedBatchIds.reduce((sum, bId) => sum + (parseFloat(batches.find((b) => b.id === bId)?.monthly_fee || "0") || 0), 0),
+        [selectedBatchIds, batches]
+    );
 
     const toggleBatch = (batchId: number) => {
         setSubmitError(null);
-        if (selectedBatchIds.includes(batchId)) {
-            setSelectedBatchIds((prev) => prev.filter((id) => id !== batchId));
-        } else {
-            setSelectedBatchIds((prev) => [...prev, batchId]);
-        }
-        // Reset seat selection if batches change to force re-evaluation
+        const nextSelected = selectedBatchIds.includes(batchId) ? selectedBatchIds.filter((id) => id !== batchId) : [...selectedBatchIds, batchId];
+        setSelectedBatchIds(nextSelected);
         setCommonSeatId(null);
+        setSeatsByBatch({});
+
+        const hasCommon = nextSelected.length > 0 && seatsData.some((seat) => seatAvailableForBatches(seat, nextSelected));
+        setAssignMode(hasCommon ? "common" : "perBatch");
     };
 
     const handleSeatSelect = (seatId: number) => {
         setSubmitError(null);
         setCommonSeatId(seatId);
+    };
+
+    const handlePerBatchSeatSelect = (batchId: number, seatId: number) => {
+        setSubmitError(null);
+        setSeatsByBatch((prev) => ({ ...prev, [batchId]: seatId }));
     };
 
     const handleSubmit = async () => {
@@ -90,16 +97,24 @@ export function AdmissionScreen() {
             setSubmitError("You must select at least one batch.");
             return;
         }
-        if (!commonSeatId) {
-            setSubmitError("Please select an available seat from the grid.");
-            return;
-        }
 
-        // Payload maps the SAME chosen central seat to ALL chosen batches
-        const allocationPayload = selectedBatchIds.map((bId) => ({
-            batch_id: bId,
-            seat_id: commonSeatId,
-        }));
+        let allocationPayload: { batch_id: number; seat_id: number }[];
+
+        if (assignMode === "common") {
+            if (!commonSeatId) {
+                setSubmitError("Please select an available seat from the grid.");
+                return;
+            }
+            allocationPayload = selectedBatchIds.map((bId) => ({ batch_id: bId, seat_id: commonSeatId }));
+        } else {
+            const missingBatchId = selectedBatchIds.find((bId) => !seatsByBatch[bId]);
+            if (missingBatchId) {
+                const missingBatchName = batches.find((b) => b.id === missingBatchId)?.name || "a batch";
+                setSubmitError(`Please select a seat for ${missingBatchName}.`);
+                return;
+            }
+            allocationPayload = selectedBatchIds.map((bId) => ({ batch_id: bId, seat_id: seatsByBatch[bId] }));
+        }
 
         try {
             setIsSubmitting(true);
@@ -117,13 +132,15 @@ export function AdmissionScreen() {
         }
     };
 
+    const styles = createStyles(theme);
+
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style="dark" />
+            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
             <View style={styles.headerWrapper}>
                 <View style={styles.header}>
                     <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={colors.primary} />
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
                     </Pressable>
                     <View style={styles.headerText}>
                         <Text style={styles.headerTitle}>New Admission</Text>
@@ -135,9 +152,17 @@ export function AdmissionScreen() {
             <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                 <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     {isLoading ? (
-                        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+                        <LoadingState />
                     ) : error ? (
-                        <Text style={{ textAlign: "center", marginTop: 20, color: colors.destructive }}>{error}</Text>
+                        <ErrorState message={error} onRetry={fetchData} />
+                    ) : batches.length === 0 ? (
+                        <EmptyState
+                            icon="calendar-outline"
+                            title="No batches set up yet"
+                            subtitle="You need at least one batch before you can admit a student — batches are what a seat gets booked against."
+                            actionLabel="Set up a batch"
+                            onAction={() => router.push("/batches")}
+                        />
                     ) : (
                         <>
                             {/* BATCH SELECTION */}
@@ -152,56 +177,116 @@ export function AdmissionScreen() {
                                                 style={[styles.filterChip, isSelected && styles.filterChipSelected]}
                                                 onPress={() => toggleBatch(b.id)}>
                                                 <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
-                                                    {b.name}
+                                                    {b.name} · {formatRupee(parseFloat(b.monthly_fee) || 0)}
                                                 </Text>
                                             </Pressable>
                                         );
                                     })}
                                 </View>
+
+                                {selectedBatchIds.length > 0 && (
+                                    <View style={styles.feeSummaryRow}>
+                                        <Text style={styles.feeSummaryLabel}>Total Monthly Fee</Text>
+                                        <Text style={styles.feeSummaryValue}>{formatRupee(totalMonthlyFee)}</Text>
+                                    </View>
+                                )}
                             </View>
 
-                            {/* UNIFIED SEAT GRID */}
+                            {/* SEAT ASSIGNMENT */}
                             {selectedBatchIds.length > 0 && (
                                 <View style={styles.sectionBlock}>
-                                    <Text style={styles.sectionTitle}>Assign Common Seat</Text>
-                                    <Text style={styles.gridInstruction}>
-                                        The grid shows all seats. Only seats available across ALL selected batches can be picked.
-                                    </Text>
+                                    <Text style={styles.sectionTitle}>Assign Seat</Text>
 
-                                    <View style={styles.unifiedGrid}>
-                                        {seatsData.map((seat) => {
-                                            // Check if this seat is available in ALL selected batches
-                                            const isFullyAvailable = selectedBatchIds.every((bId) => {
-                                                const match = seat.batches.find((sb) => sb.batch_id === bId);
-                                                return match?.available === true;
-                                            });
+                                    {selectedBatchIds.length > 1 && (
+                                        <View style={styles.modeToggleRow}>
+                                            <Pressable
+                                                style={[styles.modeToggleChip, assignMode === "common" && styles.modeToggleChipActive]}
+                                                onPress={() => {
+                                                    setAssignMode("common");
+                                                    setSeatsByBatch({});
+                                                }}>
+                                                <Text style={[styles.modeToggleText, assignMode === "common" && styles.modeToggleTextActive]}>Same seat for all</Text>
+                                            </Pressable>
+                                            <Pressable
+                                                style={[styles.modeToggleChip, assignMode === "perBatch" && styles.modeToggleChipActive]}
+                                                onPress={() => {
+                                                    setAssignMode("perBatch");
+                                                    setCommonSeatId(null);
+                                                }}>
+                                                <Text style={[styles.modeToggleText, assignMode === "perBatch" && styles.modeToggleTextActive]}>Different seat per batch</Text>
+                                            </Pressable>
+                                        </View>
+                                    )}
 
-                                            const isSelected = commonSeatId === seat.seat_id;
+                                    {assignMode === "common" ? (
+                                        <>
+                                            <Text style={styles.gridInstruction}>
+                                                {hasCommonSeatOption
+                                                    ? "The grid shows all seats. Only seats available across ALL selected batches can be picked."
+                                                    : 'No single seat is free across every selected batch — switch to "Different seat per batch" above.'}
+                                            </Text>
 
-                                            if (isFullyAvailable) {
-                                                // Selectable Seat
-                                                return (
-                                                    <Pressable
-                                                        key={seat.seat_id}
-                                                        style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
-                                                        onPress={() => handleSeatSelect(seat.seat_id)}>
-                                                        <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
-                                                            {seat.seat_number}
-                                                        </Text>
-                                                    </Pressable>
-                                                );
-                                            } else {
-                                                // Booked / Disabled Seat (visible so owner can see what is blocked)
-                                                return (
-                                                    <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
-                                                        <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
-                                                        {/* Overlay a small lock icon or line indicating it is booked */}
-                                                        <View style={styles.strikethrough} />
+                                            <View style={styles.unifiedGrid}>
+                                                {seatsData.map((seat) => {
+                                                    const isFullyAvailable = seatAvailableForBatches(seat, selectedBatchIds);
+                                                    const isSelected = commonSeatId === seat.seat_id;
+
+                                                    if (isFullyAvailable) {
+                                                        return (
+                                                            <Pressable
+                                                                key={seat.seat_id}
+                                                                style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
+                                                                onPress={() => handleSeatSelect(seat.seat_id)}>
+                                                                <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
+                                                                    {seat.seat_number}
+                                                                </Text>
+                                                            </Pressable>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
+                                                            <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
+                                                            <View style={styles.strikethrough} />
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        </>
+                                    ) : (
+                                        selectedBatchIds.map((bId) => {
+                                            const batch = batches.find((b) => b.id === bId);
+                                            return (
+                                                <View key={bId} style={styles.perBatchBlock}>
+                                                    <Text style={styles.perBatchLabel}>{batch?.name ?? "Batch"}</Text>
+                                                    <View style={styles.unifiedGrid}>
+                                                        {seatsData.map((seat) => {
+                                                            const isAvailable = seat.batches.find((sb) => sb.batch_id === bId)?.available === true;
+                                                            const isSelected = seatsByBatch[bId] === seat.seat_id;
+
+                                                            if (isAvailable) {
+                                                                return (
+                                                                    <Pressable
+                                                                        key={seat.seat_id}
+                                                                        style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
+                                                                        onPress={() => handlePerBatchSeatSelect(bId, seat.seat_id)}>
+                                                                        <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
+                                                                            {seat.seat_number}
+                                                                        </Text>
+                                                                    </Pressable>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
+                                                                    <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
+                                                                    <View style={styles.strikethrough} />
+                                                                </View>
+                                                            );
+                                                        })}
                                                     </View>
-                                                );
-                                            }
-                                        })}
-                                    </View>
+                                                </View>
+                                            );
+                                        })
+                                    )}
                                 </View>
                             )}
 
@@ -213,7 +298,7 @@ export function AdmissionScreen() {
                                     <TextInput
                                         style={styles.inputField}
                                         placeholder="e.g. John Doe"
-                                        placeholderTextColor="rgba(0,0,0,0.3)"
+                                        placeholderTextColor={theme.mutedForeground + "80"}
                                         value={name}
                                         onChangeText={setName}
                                         autoCapitalize="words"
@@ -224,7 +309,7 @@ export function AdmissionScreen() {
                                     <TextInput
                                         style={styles.inputField}
                                         placeholder="10-digit mobile number"
-                                        placeholderTextColor="rgba(0,0,0,0.3)"
+                                        placeholderTextColor={theme.mutedForeground + "80"}
                                         value={phone}
                                         onChangeText={setPhone}
                                         keyboardType="phone-pad"
@@ -233,17 +318,16 @@ export function AdmissionScreen() {
                                 </View>
                             </View>
 
-                            {/* SUBMIT */}
                             {submitError && (
                                 <View style={styles.errorBox}>
-                                    <Ionicons name="alert-circle" size={18} color={colors.destructive} />
+                                    <Ionicons name="alert-circle" size={18} color={theme.destructive} />
                                     <Text style={styles.errorText}>{submitError}</Text>
                                 </View>
                             )}
 
                             <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? (
-                                    <ActivityIndicator color={colors.background} size="small" />
+                                    <ActivityIndicator color="#fff" size="small" />
                                 ) : (
                                     <Text style={styles.submitButtonText}>Confirm Admission</Text>
                                 )}
@@ -256,19 +340,19 @@ export function AdmissionScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
     },
     headerWrapper: {
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         paddingTop: 8,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
         zIndex: 10,
     },
     header: {
@@ -284,21 +368,23 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontFamily: "sans-extrabold",
         fontSize: 22,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 2,
     },
     headerSubtitle: {
         fontFamily: "sans-medium",
         fontSize: 14,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
     headerActionCircle: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: colors.muted,
+        backgroundColor: theme.card,
         alignItems: "center",
         justifyContent: "center",
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     scroll: {
         paddingHorizontal: 20,
@@ -306,7 +392,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     sectionBlock: {
-        backgroundColor: colors.card,
+        backgroundColor: theme.card,
         padding: 20,
         borderRadius: 24,
         marginBottom: 24,
@@ -315,14 +401,16 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 20,
         elevation: 4,
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     sectionTitle: {
         fontFamily: "sans-extrabold",
         fontSize: 14,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
         paddingBottom: 10,
     },
     chipRowWrap: {
@@ -333,27 +421,84 @@ const styles = StyleSheet.create({
     filterChip: {
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
     },
     filterChipSelected: {
-        backgroundColor: colors.accent,
-        borderColor: colors.accent,
+        backgroundColor: theme.accent,
+        borderColor: theme.accent,
     },
     filterChipText: {
         fontFamily: "sans-bold",
         fontSize: 14,
-        color: colors.primary,
+        color: theme.primary,
     },
     filterChipTextSelected: {
         color: "#fff",
     },
+    feeSummaryRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: theme.border,
+    },
+    feeSummaryLabel: {
+        fontFamily: "sans-bold",
+        fontSize: 13,
+        color: theme.mutedForeground,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    feeSummaryValue: {
+        fontFamily: "sans-extrabold",
+        fontSize: 18,
+        color: theme.accent,
+    },
+    modeToggleRow: {
+        flexDirection: "row",
+        gap: 10,
+        marginBottom: 16,
+    },
+    modeToggleChip: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 14,
+        alignItems: "center",
+        backgroundColor: theme.background,
+        borderWidth: 1,
+        borderColor: theme.border,
+    },
+    modeToggleChipActive: {
+        backgroundColor: theme.primary,
+        borderColor: theme.primary,
+    },
+    modeToggleText: {
+        fontFamily: "sans-bold",
+        fontSize: 12,
+        color: theme.mutedForeground,
+        textAlign: "center",
+    },
+    modeToggleTextActive: {
+        color: theme.background,
+    },
+    perBatchBlock: {
+        marginBottom: 20,
+    },
+    perBatchLabel: {
+        fontFamily: "sans-bold",
+        fontSize: 13,
+        color: theme.primary,
+        marginBottom: 10,
+    },
     gridInstruction: {
         fontFamily: "sans-medium",
         fontSize: 13,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
         marginBottom: 16,
         lineHeight: 18,
     },
@@ -366,43 +511,44 @@ const styles = StyleSheet.create({
     gridSeatBox: {
         width: "21%",
         paddingVertical: 18,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
         alignItems: "center",
         justifyContent: "center",
     },
     gridSeatBoxSelected: {
-        backgroundColor: colors.accent,
-        borderColor: colors.accent,
+        backgroundColor: theme.accent,
+        borderColor: theme.accent,
     },
     gridSeatNumber: {
         fontFamily: "sans-extrabold",
         fontSize: 15,
-        color: colors.primary,
+        color: theme.primary,
         textAlign: "center",
     },
     gridSeatNumberSelected: {
-        color: colors.background,
+        color: "#fff",
     },
     gridSeatBoxDisabled: {
-        backgroundColor: colors.muted,
-        borderColor: colors.muted,
-        opacity: 0.8,
+        backgroundColor: theme.muted,
+        borderColor: theme.border,
+        opacity: 0.6,
     },
     gridSeatNumberDisabled: {
         fontFamily: "sans-extrabold",
-        fontSize: 16,
-        color: "rgba(0,0,0,0.25)",
+        fontSize: 15,
+        color: theme.mutedForeground,
         textAlign: "center",
     },
     strikethrough: {
         position: "absolute",
         width: "80%",
         height: 2,
-        backgroundColor: "rgba(0,0,0,0.15)",
+        backgroundColor: theme.mutedForeground,
         transform: [{ rotate: "-45deg" }],
+        opacity: 0.3,
     },
     inputWrap: {
         marginBottom: 16,
@@ -410,24 +556,24 @@ const styles = StyleSheet.create({
     inputLabel: {
         fontFamily: "sans-bold",
         fontSize: 13,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 8,
         textTransform: "uppercase",
         letterSpacing: 1,
     },
     inputField: {
         fontFamily: "sans-medium",
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 15,
-        color: colors.primary,
+        color: theme.primary,
     },
     errorBox: {
-        backgroundColor: colors.destructive + "1A",
+        backgroundColor: theme.destructive + "1A",
         padding: 14,
         borderRadius: 16,
         flexDirection: "row",
@@ -437,16 +583,16 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontFamily: "sans-semibold",
-        color: colors.destructive,
+        color: theme.destructive,
         fontSize: 14,
         flex: 1,
     },
     submitButton: {
-        backgroundColor: colors.accent,
+        backgroundColor: theme.accent,
         padding: 20,
         borderRadius: 18,
         alignItems: "center",
-        shadowColor: colors.accent,
+        shadowColor: theme.accent,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.2,
         shadowRadius: 12,

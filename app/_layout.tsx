@@ -1,16 +1,16 @@
-import "react-native-gesture-handler";
 import "@/global.css";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { View } from "react-native";
+import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { getOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
 import { BootstrapProvider } from "@/shared/providers/BootstrapProvider";
-import { colors } from "@/shared/constants/theme";
+import { ThemeProvider, useTheme } from "@/shared/providers/ThemeProvider";
 
 export { ErrorBoundary } from "expo-router";
 
@@ -70,16 +70,26 @@ export default function RootLayout() {
 
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
-			<BootstrapProvider onboardingComplete={bootstrap.onboardingComplete}>
-				<View style={{ flex: 1, backgroundColor: colors.background }}>
-					<Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-						<Stack.Screen name="index" />
-						<Stack.Screen name="onboarding" />
-						<Stack.Screen name="(auth)" />
-						<Stack.Screen name="(app)" />
-					</Stack>
-				</View>
-			</BootstrapProvider>
+			<ThemeProvider>
+				<RootContent onboardingComplete={bootstrap.onboardingComplete} />
+			</ThemeProvider>
 		</GestureHandlerRootView>
+	);
+}
+
+function RootContent({ onboardingComplete }: { onboardingComplete: boolean }) {
+	const { theme } = useTheme();
+
+	return (
+		<BootstrapProvider onboardingComplete={onboardingComplete}>
+			<View style={{ flex: 1, backgroundColor: theme.background }}>
+				<Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
+					<Stack.Screen name="index" />
+					<Stack.Screen name="onboarding" />
+					<Stack.Screen name="(auth)" />
+					<Stack.Screen name="(app)" />
+				</Stack>
+			</View>
+		</BootstrapProvider>
 	);
 }

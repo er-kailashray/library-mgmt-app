@@ -6,6 +6,7 @@ export enum PaymentStatus {
 
 export interface Payment {
     id: string;
+    member_id: number | string;
     member_name: string;
     amount: number;
     date: string;
@@ -13,37 +14,28 @@ export interface Payment {
     method: string;
 }
 
-export const DUMMY_PAYMENTS: Payment[] = [
-    {
-        id: "p1",
-        member_name: "Kailash Ray",
-        amount: 1500,
-        date: "2024-04-01",
-        status: PaymentStatus.PAID,
-        method: "UPI (PhonePe)",
-    },
-    {
-        id: "p2",
-        member_name: "Arun Kumar",
-        amount: 1200,
-        date: "2024-04-02",
-        status: PaymentStatus.PENDING,
-        method: "—",
-    },
-    {
-        id: "p3",
-        member_name: "Suresh Raina",
-        amount: 1500,
-        date: "2024-03-25",
-        status: PaymentStatus.PAID,
-        method: "Cash",
-    },
-    {
-        id: "p4",
-        member_name: "Hardik Pandya",
-        amount: 1000,
-        date: "2024-04-05",
-        status: PaymentStatus.PARTIAL,
-        method: "UPI (Google Pay)",
-    },
-];
+export interface PaymentsResponse {
+    status: boolean;
+    data: Payment[];
+}
+
+export type PaymentMode = "cash" | "upi" | "bank_transfer";
+
+export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+    cash: "Cash",
+    upi: "UPI",
+    bank_transfer: "Bank Transfer",
+};
+
+export interface CreatePaymentRequest {
+    member_id: number | string;
+    amount: number;
+    payment_mode?: PaymentMode;
+    notes?: string;
+}
+
+export interface CreatePaymentResponse {
+    status: boolean;
+    message?: string;
+    data: Payment;
+}

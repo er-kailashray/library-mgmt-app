@@ -1,18 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import { clsx } from "clsx";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { loginApi, saveAuthData } from "@/services/api/auth.api";
-import { colors } from "@/shared/constants/theme";
+import { useTheme } from "@/shared/providers/ThemeProvider";
 
 const PHONE_MIN = 10;
 const PASSWORD_MIN = 6;
 
 export function LoginScreen() {
 	const router = useRouter();
+	const { theme } = useTheme();
 	const [phone, setPhone] = useState("");
 	const [password, setPassword] = useState("");
 	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -45,45 +46,35 @@ export function LoginScreen() {
 		}
 	}, [phone, password, phoneErrorSubmit, passwordErrorSubmit, router]);
 
+	const styles = createStyles(theme);
+
 	return (
-		<SafeAreaView style={styles.safe} className="auth-safe-area">
-			<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined} className="auth-scroll">
-				<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} contentContainerClassName="auth-content" showsVerticalScrollIndicator={false}>
-					<View className="auth-brand-block">
-						<View className="auth-logo-wrap">
-							<View className="auth-logo-mark">
-								<Text style={styles.logoLetter} className="auth-logo-mark-text">
-									L
-								</Text>
+		<SafeAreaView style={styles.safe} edges={["top"]}>
+			<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+			<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+				<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+					<View style={styles.brandBlock}>
+						<View style={styles.logoWrap}>
+							<View style={styles.logoMark}>
+								<Text style={styles.logoLetter}>L</Text>
 							</View>
 							<View>
-								<Text style={styles.wordmark} className="auth-wordmark">
-									Librum
-								</Text>
-								<Text style={styles.wordmarkSub} className="auth-wordmark-sub">
-									Library Pro
-								</Text>
+								<Text style={styles.wordmark}>Librum</Text>
+								<Text style={styles.wordmarkSub}>Library Pro</Text>
 							</View>
 						</View>
-						<Text style={styles.screenTitle} className="auth-title">
-							Welcome back
-						</Text>
-						<Text style={styles.screenSubtitle} className="auth-subtitle">
-							Sign in with your phone number and password.
-						</Text>
+						<Text style={styles.screenTitle}>Welcome back</Text>
+						<Text style={styles.screenSubtitle}>Sign in with your phone number and password.</Text>
 					</View>
 
-					<View style={styles.card} className="auth-card">
-						<View className="auth-form">
-							<View className="auth-field">
-								<Text style={styles.label} className="auth-label">
-									Phone number
-								</Text>
+					<View style={styles.card}>
+						<View style={styles.form}>
+							<View style={styles.field}>
+								<Text style={styles.label}>Phone number</Text>
 								<TextInput
 									style={[styles.input, ((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError]}
-									className={clsx("auth-input", (showErrors && phoneErrorSubmit) || phoneError ? "auth-input-error" : null)}
 									placeholder="10-digit mobile number"
-									placeholderTextColor="rgba(0,0,0,0.35)"
+									placeholderTextColor={theme.mutedForeground + "80"}
 									keyboardType="phone-pad"
 									maxLength={15}
 									autoCapitalize="none"
@@ -92,60 +83,51 @@ export function LoginScreen() {
 									onChangeText={setPhone}
 								/>
 								{showErrors && phoneErrorSubmit ? (
-									<Text style={styles.fieldError} className="auth-error">
+									<Text style={styles.fieldError}>
 										Enter at least {PHONE_MIN} digits.
 									</Text>
 								) : null}
 							</View>
 
-							<View className="auth-field">
-								<Text style={styles.label} className="auth-label">
-									Password
-								</Text>
+							<View style={styles.field}>
+								<Text style={styles.label}>Password</Text>
 								<View style={styles.passwordContainer}>
 									<TextInput
 										style={[styles.input, ((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError]}
-										className={clsx("auth-input", (showErrors && passwordErrorSubmit) || passwordError ? "auth-input-error" : null)}
 										placeholder="••••••••"
-										placeholderTextColor="rgba(0,0,0,0.35)"
+										placeholderTextColor={theme.mutedForeground + "80"}
 										secureTextEntry={!isPasswordVisible}
 										value={password}
 										onChangeText={setPassword}
 									/>
-									<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button" accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}>
-										<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={colors.mutedForeground} />
+									<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button">
+										<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={theme.mutedForeground} />
 									</Pressable>
 								</View>
 								{showErrors && passwordErrorSubmit ? (
-									<Text style={styles.fieldError} className="auth-error">
+									<Text style={styles.fieldError}>
 										Password must be at least {PASSWORD_MIN} characters.
 									</Text>
 								) : null}
 							</View>
 
 							<Pressable accessibilityRole="button" onPress={() => { }}>
-								<Text style={styles.forgot} className="auth-forgot">
-									Forgot password?
-								</Text>
+								<Text style={styles.forgot}>Forgot password?</Text>
 							</Pressable>
 							{apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
 
-							<Pressable accessibilityRole="button" style={[styles.primaryButton, isSubmitting && styles.disabledButton]} className={clsx("auth-button")} onPress={onSubmit} disabled={isSubmitting}>
-								<Text style={styles.primaryButtonText} className="auth-button-text">
+							<Pressable accessibilityRole="button" style={[styles.primaryButton, isSubmitting && styles.disabledButton]} onPress={onSubmit} disabled={isSubmitting}>
+								<Text style={styles.primaryButtonText}>
 									{isSubmitting ? "Signing in..." : "Log in"}
 								</Text>
 							</Pressable>
 						</View>
 					</View>
 
-					<View className="auth-link-row">
-						<Text style={styles.linkMuted} className="auth-link-copy">
-							New here?
-						</Text>
+					<View style={styles.linkRow}>
+						<Text style={styles.linkMuted}>New here?</Text>
 						<Pressable accessibilityRole="button" onPress={() => router.push("/register")}>
-							<Text style={styles.linkAccent} className="auth-link">
-								Create library account
-							</Text>
+							<Text style={styles.linkAccent}>Create library account</Text>
 						</Pressable>
 					</View>
 
@@ -158,10 +140,10 @@ export function LoginScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: colors.background,
+		backgroundColor: theme.background,
 	},
 	flex: {
 		flex: 1,
@@ -172,111 +154,174 @@ const styles = StyleSheet.create({
 		paddingBottom: 40,
 		paddingTop: 32,
 	},
+	brandBlock: {
+		alignItems: "center",
+		marginBottom: 32,
+	},
+	logoWrap: {
+		alignItems: "center",
+		gap: 12,
+		marginBottom: 24,
+	},
+	logoMark: {
+		width: 64,
+		height: 64,
+		borderRadius: 20,
+		backgroundColor: theme.accent,
+		alignItems: "center",
+		justifyContent: "center",
+		shadowColor: theme.accent,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.2,
+		shadowRadius: 8,
+		elevation: 4,
+	},
 	logoLetter: {
-		color: colors.background,
+		fontFamily: "sans-extrabold",
+		fontSize: 32,
+		color: "#fff",
 	},
 	wordmark: {
-		color: colors.primary,
+		fontFamily: "sans-extrabold",
+		fontSize: 28,
+		color: theme.primary,
+		letterSpacing: -0.5,
+		textAlign: "center",
 	},
 	wordmarkSub: {
-		color: colors.mutedForeground,
+		fontFamily: "sans-medium",
+		fontSize: 15,
+		color: theme.mutedForeground,
+		marginTop: -2,
+		textAlign: "center",
 	},
 	screenTitle: {
-		color: colors.primary,
+		fontFamily: "sans-extrabold",
+		fontSize: 28,
+		color: theme.primary,
+		marginBottom: 8,
+		textAlign: "center",
 	},
 	screenSubtitle: {
-		color: colors.mutedForeground,
+		fontFamily: "sans-medium",
+		fontSize: 16,
+		color: theme.mutedForeground,
+		lineHeight: 22,
+		textAlign: "center",
 	},
 	card: {
-		backgroundColor: colors.card,
+		backgroundColor: theme.card,
 		borderRadius: 24,
 		padding: 24,
-		marginTop: 32,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.1,
+		shadowOpacity: 0.08,
 		shadowRadius: 20,
-		elevation: 5,
+		elevation: 4,
+		borderWidth: 1.5,
+		borderColor: theme.border,
+	},
+	form: {
+		gap: 20,
+	},
+	field: {
+		gap: 8,
 	},
 	label: {
-		color: colors.primary,
+		fontFamily: "sans-bold",
+		fontSize: 13,
+		color: theme.primary,
+		textTransform: "uppercase",
+		letterSpacing: 1,
 	},
 	input: {
+		fontFamily: "sans-medium",
 		borderRadius: 16,
-		borderWidth: StyleSheet.hairlineWidth * 2,
-		borderColor: "rgba(0,0,0,0.1)",
-		backgroundColor: colors.background,
+		borderWidth: 1.5,
+		borderColor: theme.border,
+		backgroundColor: theme.background,
 		paddingHorizontal: 16,
 		paddingVertical: 14,
 		fontSize: 15,
-		color: colors.primary,
-		paddingRight: 50, // Make space for eye button
+		color: theme.primary,
 	},
 	passwordContainer: {
 		position: "relative",
 	},
 	eyeButton: {
 		position: "absolute",
-		right: 12,
+		right: 4,
 		top: 0,
 		bottom: 0,
 		justifyContent: "center",
 		alignItems: "center",
-		paddingHorizontal: 8,
+		width: 44,
 	},
 	inputError: {
-		borderColor: colors.destructive,
+		borderColor: theme.destructive,
 	},
 	fieldError: {
-		color: colors.destructive,
+		fontFamily: "sans-semibold",
+		color: theme.destructive,
 		fontSize: 12,
-		marginTop: 4,
+		marginTop: 2,
 	},
 	forgot: {
-		color: colors.accent,
-		marginTop: 8,
-		alignSelf: "flex-end",
+		fontFamily: "sans-bold",
+		color: theme.accent,
 		fontSize: 14,
-		fontWeight: "600",
+		textAlign: "right",
 	},
 	primaryButton: {
-		marginTop: 8,
-		alignItems: "center",
+		backgroundColor: theme.accent,
+		paddingVertical: 18,
 		borderRadius: 16,
-		backgroundColor: colors.accent,
-		paddingVertical: 16,
+		alignItems: "center",
+		marginTop: 8,
+		shadowColor: theme.accent,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.2,
+		shadowRadius: 10,
+		elevation: 4,
 	},
 	disabledButton: {
-		opacity: 0.65,
+		opacity: 0.6,
 	},
 	primaryButtonText: {
-		fontSize: 15,
-		fontFamily: "sans-bold",
-		color: colors.primary,
+		fontFamily: "sans-extrabold",
+		fontSize: 16,
+		color: "#fff",
 	},
 	apiError: {
-		marginTop: 12,
-		color: colors.destructive,
+		fontFamily: "sans-semibold",
+		color: theme.destructive,
 		fontSize: 14,
-		fontWeight: "600",
+		textAlign: "center",
+	},
+	linkRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 6,
+		marginTop: 24,
 	},
 	linkMuted: {
-		color: colors.mutedForeground,
+		fontFamily: "sans-medium",
+		color: theme.mutedForeground,
 		fontSize: 14,
 	},
 	linkAccent: {
-		color: colors.accent,
+		fontFamily: "sans-bold",
+		color: theme.accent,
 		fontSize: 14,
-		fontWeight: "700",
 	},
 	poweredByBlock: {
 		alignItems: "center",
 		marginTop: 32,
-		paddingBottom: 20,
 	},
 	poweredByText: {
-		color: colors.mutedForeground,
+		fontFamily: "sans-medium",
+		color: theme.mutedForeground,
 		fontSize: 13,
-		fontWeight: "600",
 	},
 });

@@ -16,10 +16,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { registerApi } from "@/features/auth/logic/auth-register.api";
-import { colors } from "@/shared/constants/theme";
+import { useTheme } from "@/shared/providers/ThemeProvider";
 
 export function RegisterScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
 
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -57,7 +58,6 @@ export function RegisterScreen() {
                 total_seats: totalSeats,
             });
 
-            // On success, go to OTP screen
             router.push({
                 pathname: "/otp",
                 params: { phone }
@@ -69,12 +69,14 @@ export function RegisterScreen() {
         }
     };
 
+    const styles = createStyles(theme);
+
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style="dark" />
+            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
             <View style={styles.header}>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={colors.primary} />
+                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
                 </Pressable>
                 <View>
                     <Text style={styles.title}>Create Account</Text>
@@ -93,7 +95,7 @@ export function RegisterScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. Yash Library"
-                                placeholderTextColor="rgba(0,0,0,0.3)"
+                                placeholderTextColor={theme.mutedForeground + "4D"}
                                 value={libraryName}
                                 onChangeText={setLibraryName}
                             />
@@ -104,7 +106,7 @@ export function RegisterScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. 50"
-                                placeholderTextColor="rgba(0,0,0,0.3)"
+                                placeholderTextColor={theme.mutedForeground + "4D"}
                                 keyboardType="numeric"
                                 value={totalSeats}
                                 onChangeText={setTotalSeats}
@@ -120,7 +122,7 @@ export function RegisterScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. Kailash Ray"
-                                placeholderTextColor="rgba(0,0,0,0.3)"
+                                placeholderTextColor={theme.mutedForeground + "4D"}
                                 value={name}
                                 onChangeText={setName}
                             />
@@ -131,7 +133,7 @@ export function RegisterScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="10-digit mobile number"
-                                placeholderTextColor="rgba(0,0,0,0.3)"
+                                placeholderTextColor={theme.mutedForeground + "4D"}
                                 keyboardType="phone-pad"
                                 maxLength={15}
                                 value={phone}
@@ -144,7 +146,7 @@ export function RegisterScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Min 6 characters"
-                                placeholderTextColor="rgba(0,0,0,0.3)"
+                                placeholderTextColor={theme.mutedForeground + "4D"}
                                 secureTextEntry
                                 value={password}
                                 onChangeText={setPassword}
@@ -154,14 +156,14 @@ export function RegisterScreen() {
 
                     {error && (
                         <View style={styles.errorBox}>
-                            <Ionicons name="alert-circle" size={18} color={colors.destructive} />
+                            <Ionicons name="alert-circle" size={18} color={theme.destructive} />
                             <Text style={styles.errorText}>{error}</Text>
                         </View>
                     )}
 
                     <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleRegister} disabled={isSubmitting}>
                         {isSubmitting ? (
-                            <ActivityIndicator color="#fff" size="small" />
+                            <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
                         ) : (
                             <Text style={styles.submitButtonText}>Register & Send OTP</Text>
                         )}
@@ -177,10 +179,10 @@ export function RegisterScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
@@ -192,26 +194,28 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         gap: 16,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
     },
     backButton: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: colors.muted,
+        backgroundColor: theme.card,
         alignItems: "center",
         justifyContent: "center",
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     title: {
         fontFamily: "sans-extrabold",
         fontSize: 22,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 2,
     },
     subtitle: {
         fontFamily: "sans-medium",
         fontSize: 14,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
     scroll: {
         paddingHorizontal: 20,
@@ -219,7 +223,7 @@ const styles = StyleSheet.create({
         paddingBottom: 48,
     },
     formCard: {
-        backgroundColor: colors.card,
+        backgroundColor: theme.card,
         borderRadius: 24,
         padding: 24,
         marginBottom: 24,
@@ -228,13 +232,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 20,
         elevation: 4,
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     sectionTitle: {
         fontFamily: "sans-extrabold",
         fontSize: 14,
         textTransform: "uppercase",
         letterSpacing: 1,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
         marginBottom: 20,
     },
     inputGroup: {
@@ -243,7 +249,7 @@ const styles = StyleSheet.create({
     label: {
         fontFamily: "sans-bold",
         fontSize: 13,
-        color: colors.primary,
+        color: theme.primary,
         marginBottom: 8,
         textTransform: "uppercase",
         letterSpacing: 0.5,
@@ -251,20 +257,20 @@ const styles = StyleSheet.create({
     input: {
         fontFamily: "sans-medium",
         fontSize: 15,
-        backgroundColor: colors.background,
+        backgroundColor: theme.background,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 14,
-        color: colors.primary,
+        color: theme.primary,
     },
     submitButton: {
-        backgroundColor: colors.accent,
+        backgroundColor: theme.accent,
         padding: 20,
         borderRadius: 18,
         alignItems: "center",
-        shadowColor: colors.accent,
+        shadowColor: theme.accent,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
@@ -274,10 +280,10 @@ const styles = StyleSheet.create({
     submitButtonText: {
         fontFamily: "sans-extrabold",
         fontSize: 15,
-        color: "#fff",
+        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
     },
     errorBox: {
-        backgroundColor: colors.destructive + "1A",
+        backgroundColor: theme.destructive + "1A",
         padding: 14,
         borderRadius: 16,
         flexDirection: "row",
@@ -287,7 +293,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontFamily: "sans-semibold",
-        color: colors.destructive,
+        color: theme.destructive,
         fontSize: 14,
         flex: 1,
     },
@@ -298,6 +304,6 @@ const styles = StyleSheet.create({
     footerText: {
         fontFamily: "sans-medium",
         fontSize: 13,
-        color: colors.mutedForeground,
+        color: theme.mutedForeground,
     },
 });
