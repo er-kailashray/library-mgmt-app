@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { registerApi } from "@/features/auth/logic/auth-register.api";
+import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 export function RegisterScreen() {
@@ -224,14 +225,9 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     formCard: {
         backgroundColor: theme.card,
-        borderRadius: 24,
+        borderRadius: RADIUS.md,
         padding: 24,
         marginBottom: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 4,
         borderWidth: 1.5,
         borderColor: theme.border,
     },
@@ -260,7 +256,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         backgroundColor: theme.background,
         borderWidth: 1,
         borderColor: theme.border,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         paddingHorizontal: 16,
         paddingVertical: 14,
         color: theme.primary,
@@ -268,13 +264,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     submitButton: {
         backgroundColor: theme.accent,
         padding: 20,
-        borderRadius: 18,
+        borderRadius: RADIUS.md,
         alignItems: "center",
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 4,
         marginTop: 8,
     },
     submitButtonText: {
@@ -285,7 +276,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     errorBox: {
         backgroundColor: theme.destructive + "1A",
         padding: 14,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,

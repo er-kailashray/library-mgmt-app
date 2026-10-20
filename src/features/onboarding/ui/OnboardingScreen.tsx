@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
+import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 type Slide = {
@@ -164,7 +165,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	brandMark: {
 		width: 40,
 		height: 40,
-		borderRadius: 14,
+		borderRadius: RADIUS.sm,
 		backgroundColor: theme.accent,
 		alignItems: "center",
 		justifyContent: "center",
@@ -193,15 +194,10 @@ const createStyles = (theme: any) => StyleSheet.create({
 	iconWrap: {
 		width: 112,
 		height: 112,
-		borderRadius: 36,
+		borderRadius: RADIUS.lg,
 		alignItems: "center",
 		justifyContent: "center",
 		marginBottom: 28,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.1,
-		shadowRadius: 16,
-		elevation: 4,
 	},
 	title: {
 		fontFamily: "sans-extrabold",
@@ -241,14 +237,9 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	primaryBtn: {
 		alignItems: "center",
-		borderRadius: 16,
+		borderRadius: RADIUS.md,
 		backgroundColor: theme.accent,
 		paddingVertical: 18,
-		shadowColor: theme.accent,
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.2,
-		shadowRadius: 10,
-		elevation: 4,
 	},
 	primaryBtnText: {
 		fontFamily: "sans-extrabold",

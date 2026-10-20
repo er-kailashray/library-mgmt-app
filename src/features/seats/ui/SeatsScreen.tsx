@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { SeatMatrixSeat } from "@/features/seats/types/seats.types";
+import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -54,16 +55,13 @@ export function SeatsScreen() {
 
             let statusText = "Available";
             let statusColor = theme.success;
-            let statusEmoji = "✅";
 
             if (occupiedInBatch >= physicalSeatsCount && physicalSeatsCount > 0) {
                 statusText = "Full";
                 statusColor = theme.destructive;
-                statusEmoji = "🔴";
             } else if (occupiedInBatch >= physicalSeatsCount * 0.8) {
                 statusText = "Almost Full";
-                statusColor = "#F97316"; // Orange
-                statusEmoji = "⚠️";
+                statusColor = theme.warning;
             }
 
             return {
@@ -73,7 +71,6 @@ export function SeatsScreen() {
                 total: physicalSeatsCount,
                 statusText,
                 statusColor,
-                statusEmoji,
             };
         });
 
@@ -83,10 +80,10 @@ export function SeatsScreen() {
         return (
             <View style={styles.headerSection}>
                 {/* 1. SEATS SUMMARY WIDGET */}
-                <View style={[styles.summaryCard, { backgroundColor: "#1A1A1A" }]}>
+                <View style={styles.summaryCard}>
                     <View style={styles.summaryTop}>
-                        <Text style={[styles.summaryTitle, { color: "rgba(255,255,255,0.6)" }]}>SEAT CAPACITY</Text>
-                        <Text style={[styles.summaryPhysical, { color: "#fff" }]}>{physicalSeatsCount} Total</Text>
+                        <Text style={styles.summaryTitle}>SEAT CAPACITY</Text>
+                        <Text style={styles.summaryPhysical}>{physicalSeatsCount} Total</Text>
                     </View>
 
                     <Text style={styles.summaryTotalEnrolled}>
@@ -148,14 +145,14 @@ export function SeatsScreen() {
         let borderColor = theme.success + "30";
 
         if (!anyAvailable) {
-            // Fully Booked (Visible light translucent grey to match airy vibe)
-            textColor = "#A1A1AA"; // Significantly brighter grey text for visibility
-            bgTint = "rgba(255,255,255,0.08)"; // Slightly brighter soft grey tint
-            borderColor = "rgba(255,255,255,0.2)";
+            // Fully Booked
+            textColor = theme.mutedForeground;
+            bgTint = theme.muted;
+            borderColor = theme.border;
         } else if (!allAvailable) {
-            // Partially Booked (Blue)
-            bgTint = "#3B82F6" + "15";
-            borderColor = "#3B82F6" + "30";
+            // Partially Booked
+            bgTint = theme.warning + "15";
+            borderColor = theme.warning + "30";
         }
 
         return (
@@ -328,7 +325,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         backgroundColor: theme.card,
-        borderRadius: 20,
+        borderRadius: RADIUS.sm,
         borderWidth: 1,
         borderColor: theme.border,
     },
@@ -374,13 +371,9 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     modalContent: {
         backgroundColor: theme.background,
-        borderRadius: 28,
+        borderRadius: RADIUS.lg,
         padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 8,
+        ...FLOATING_SHADOW,
         borderWidth: 1.5,
         borderColor: theme.border,
     },
@@ -422,7 +415,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         justifyContent: "space-between",
         backgroundColor: theme.card,
         padding: 16,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         borderWidth: 1,
         borderColor: theme.border,
     },
@@ -434,7 +427,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     statusBadge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
+        borderRadius: RADIUS.sm,
     },
     statusText: {
         fontFamily: "sans-bold",
@@ -446,16 +439,13 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginBottom: 8,
     },
     summaryCard: {
-        backgroundColor: "#1A1A1A",
-        borderRadius: 20,
+        backgroundColor: theme.card,
+        borderRadius: RADIUS.md,
         padding: 20,
         marginHorizontal: 20,
         marginBottom: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 6,
+        borderWidth: 1,
+        borderColor: theme.border,
     },
     summaryTop: {
         flexDirection: "row",
@@ -466,14 +456,14 @@ const createStyles = (theme: any) => StyleSheet.create({
     summaryTitle: {
         fontFamily: "sans-bold",
         fontSize: 11,
-        color: "rgba(255,255,255,0.6)",
+        color: theme.mutedForeground,
         textTransform: "uppercase",
         letterSpacing: 1,
     },
     summaryPhysical: {
         fontFamily: "sans-bold",
         fontSize: 12,
-        color: "#fff",
+        color: theme.primary,
     },
     summaryTotalEnrolled: {
         fontFamily: "sans-extrabold",
@@ -485,12 +475,12 @@ const createStyles = (theme: any) => StyleSheet.create({
     summaryTotalSuffix: {
         fontFamily: "sans-medium",
         fontSize: 14,
-        color: "rgba(255,255,255,0.6)",
+        color: theme.mutedForeground,
         letterSpacing: 0,
     },
     progressContainer: {
         height: 6,
-        backgroundColor: "rgba(255,255,255,0.1)",
+        backgroundColor: theme.muted,
         borderRadius: 3,
         overflow: "hidden",
         marginBottom: 20,
@@ -504,18 +494,18 @@ const createStyles = (theme: any) => StyleSheet.create({
         gap: 12,
     },
     miniBatchCard: {
-        backgroundColor: "rgba(255,255,255,0.05)",
+        backgroundColor: theme.background,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        borderRadius: 12,
+        borderRadius: RADIUS.md,
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.1)",
+        borderColor: theme.border,
         minWidth: 90,
     },
     miniBatchName: {
         fontFamily: "sans-bold",
         fontSize: 11,
-        color: "rgba(255,255,255,0.6)",
+        color: theme.mutedForeground,
         marginBottom: 6,
     },
     miniBatchStatusRow: {
@@ -531,14 +521,14 @@ const createStyles = (theme: any) => StyleSheet.create({
     miniBatchRatio: {
         fontFamily: "sans-extrabold",
         fontSize: 14,
-        color: "#fff",
+        color: theme.primary,
     },
     gridSeatCard: {
         flex: 1,
         minWidth: "21%",
         maxWidth: "25%",
         aspectRatio: 1,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,

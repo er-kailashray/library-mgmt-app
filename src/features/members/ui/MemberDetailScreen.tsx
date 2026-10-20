@@ -10,6 +10,7 @@ import { ID_PROOF_TYPE_LABELS, ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType }
 import { deactivateMemberApi, getMemberDetailApi, getMemberIdProofSource, updateMemberApi, uploadMemberIdProofApi } from "@/features/members/logic/members.api";
 import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
+import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -505,7 +506,7 @@ const createStyles = (theme: any) =>
         badge: {
             paddingHorizontal: 14,
             paddingVertical: 6,
-            borderRadius: 10,
+            borderRadius: RADIUS.sm,
         },
         badgeText: {
             fontFamily: "sans-extrabold",
@@ -531,7 +532,7 @@ const createStyles = (theme: any) =>
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: theme.card,
-            borderRadius: 18,
+            borderRadius: RADIUS.md,
             padding: 16,
             marginBottom: 12,
             borderWidth: 1.5,
@@ -567,7 +568,7 @@ const createStyles = (theme: any) =>
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: theme.card,
-            borderRadius: 18,
+            borderRadius: RADIUS.md,
             padding: 16,
             borderWidth: 1.5,
             borderColor: theme.border,
@@ -613,7 +614,7 @@ const createStyles = (theme: any) =>
         },
         idProofSaveBtn: {
             backgroundColor: theme.accent,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingVertical: 14,
             alignItems: "center",
             marginTop: 16,
@@ -635,8 +636,8 @@ const createStyles = (theme: any) =>
         },
         editModalSheet: {
             backgroundColor: theme.background,
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
+            borderTopLeftRadius: RADIUS.lg,
+            borderTopRightRadius: RADIUS.lg,
             padding: 24,
             paddingBottom: 32,
         },
@@ -659,7 +660,7 @@ const createStyles = (theme: any) =>
             backgroundColor: theme.card,
             borderWidth: 1,
             borderColor: theme.border,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingHorizontal: 16,
             paddingVertical: 14,
             fontSize: 15,
@@ -678,7 +679,7 @@ const createStyles = (theme: any) =>
         },
         editSaveBtn: {
             backgroundColor: theme.accent,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingVertical: 16,
             alignItems: "center",
             marginTop: 8,
@@ -707,7 +708,7 @@ const createStyles = (theme: any) =>
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingVertical: 14,
         },
         whatsappBtn: {
@@ -729,7 +730,7 @@ const createStyles = (theme: any) =>
             justifyContent: "center",
             gap: 8,
             backgroundColor: theme.destructive + "15",
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingVertical: 16,
             marginTop: 20,
             borderWidth: 1.5,
@@ -745,7 +746,7 @@ const createStyles = (theme: any) =>
             alignItems: "center",
             gap: 8,
             backgroundColor: theme.card,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingVertical: 16,
             paddingHorizontal: 16,
             marginTop: 20,

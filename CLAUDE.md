@@ -59,9 +59,3 @@ App-wide theme is a React context (`useTheme()` → `{ theme, mode, setMode, isD
 Screens consume theme values via `useTheme().theme` and build their `StyleSheet.create(...)` styles from them (typically through a local `createStyles(theme)` function), rather than using nativewind `className` props — even though nativewind/Tailwind is wired up at the build level (`babel.config.js`, `metro.config.js`, `global.css`, `postcss.config.mjs`). When adding new screens, match the existing `StyleSheet` + `useTheme()` pattern already used throughout `src/features/*/ui/*Screen.tsx` rather than introducing className-based styling, unless asked otherwise.
 
 Fonts are the "PlusJakartaSans" family, loaded once in `app/_layout.tsx` under keys `sans-regular` / `sans-bold` / `sans-medium` / `sans-semibold` / `sans-extrabold` / `sans-light`, referenced in styles via `fontFamily`.
-
-### Mock/placeholder data
-
-Several features are still backed by hardcoded mock data pending backend wiring (e.g. `src/features/home/logic/home-flags.ts`'s `MOCK_OWNER_HAS_BATCHES`/`MOCK_MONTH_EARNINGS_CENTS`, `members.types.ts`'s `DUMMY_MEMBERS`). These are explicitly called out in comments as temporary — when a real endpoint becomes available, replace the mock and remove the flag/constant rather than branching on both.
-
-`src/shared/ui/PlaceholderScreen.tsx` is a generic "coming soon" screen (title + subtitle + back button) used for sections not yet wired to real data.

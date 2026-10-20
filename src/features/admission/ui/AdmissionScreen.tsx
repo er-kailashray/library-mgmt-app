@@ -11,6 +11,7 @@ import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admi
 import { uploadMemberIdProofApi } from "@/features/members/logic/members.api";
 import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
+import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -484,13 +485,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     sectionBlock: {
         backgroundColor: theme.card,
         padding: 20,
-        borderRadius: 24,
+        borderRadius: RADIUS.md,
         marginBottom: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 4,
         borderWidth: 1.5,
         borderColor: theme.border,
     },
@@ -512,7 +508,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         backgroundColor: theme.background,
-        borderRadius: 20,
+        borderRadius: RADIUS.sm,
         borderWidth: 1,
         borderColor: theme.border,
     },
@@ -557,7 +553,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     modeToggleChip: {
         flex: 1,
         paddingVertical: 10,
-        borderRadius: 14,
+        borderRadius: RADIUS.md,
         alignItems: "center",
         backgroundColor: theme.background,
         borderWidth: 1,
@@ -602,7 +598,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         width: "21%",
         paddingVertical: 18,
         backgroundColor: theme.background,
-        borderRadius: 12,
+        borderRadius: RADIUS.md,
         borderWidth: 1,
         borderColor: theme.border,
         alignItems: "center",
@@ -656,7 +652,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         backgroundColor: theme.background,
         borderWidth: 1,
         borderColor: theme.border,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 15,
@@ -665,7 +661,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     errorBox: {
         backgroundColor: theme.destructive + "1A",
         padding: 14,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
@@ -680,13 +676,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     submitButton: {
         backgroundColor: theme.accent,
         padding: 20,
-        borderRadius: 18,
+        borderRadius: RADIUS.md,
         alignItems: "center",
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 4,
     },
     submitButtonText: {
         fontFamily: "sans-extrabold",

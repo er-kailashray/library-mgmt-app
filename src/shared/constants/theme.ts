@@ -8,6 +8,7 @@ export interface Theme {
 	accent: string;
 	border: string;
 	success: string;
+	warning: string;
 	destructive: string;
 	subscription: string;
 	primarySurface: string;
@@ -23,6 +24,7 @@ export const light: Theme = {
 	accent: "#E26D4D",
 	border: "rgba(0, 0, 0, 0.05)",
 	success: "#10B981",
+	warning: "#B45309",
 	destructive: "#EF4444",
 	subscription: "#14B8A6",
 	primarySurface: "#171614",
@@ -38,6 +40,7 @@ export const dark: Theme = {
 	accent: "#E26D4D",
 	border: "rgba(255, 255, 255, 0.1)",
 	success: "#10B981",
+	warning: "#B45309",
 	destructive: "#EF4444",
 	subscription: "#14B8A6",
 	primarySurface: "#1C1917",

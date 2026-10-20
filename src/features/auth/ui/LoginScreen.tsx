@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { loginApi, saveAuthData } from "@/services/api/auth.api";
+import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 const PHONE_MIN = 10;
@@ -166,15 +167,12 @@ const createStyles = (theme: any) => StyleSheet.create({
 	logoMark: {
 		width: 64,
 		height: 64,
-		borderRadius: 20,
+		borderRadius: RADIUS.sm,
 		backgroundColor: theme.accent,
 		alignItems: "center",
 		justifyContent: "center",
+		...FLOATING_SHADOW,
 		shadowColor: theme.accent,
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 8,
-		elevation: 4,
 	},
 	logoLetter: {
 		fontFamily: "sans-extrabold",
@@ -211,13 +209,8 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	card: {
 		backgroundColor: theme.card,
-		borderRadius: 24,
+		borderRadius: RADIUS.md,
 		padding: 24,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.08,
-		shadowRadius: 20,
-		elevation: 4,
 		borderWidth: 1.5,
 		borderColor: theme.border,
 	},
@@ -236,7 +229,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	input: {
 		fontFamily: "sans-medium",
-		borderRadius: 16,
+		borderRadius: RADIUS.md,
 		borderWidth: 1.5,
 		borderColor: theme.border,
 		backgroundColor: theme.background,
@@ -275,14 +268,9 @@ const createStyles = (theme: any) => StyleSheet.create({
 	primaryButton: {
 		backgroundColor: theme.accent,
 		paddingVertical: 18,
-		borderRadius: 16,
+		borderRadius: RADIUS.md,
 		alignItems: "center",
 		marginTop: 8,
-		shadowColor: theme.accent,
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.2,
-		shadowRadius: 10,
-		elevation: 4,
 	},
 	disabledButton: {
 		opacity: 0.6,

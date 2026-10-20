@@ -8,6 +8,7 @@ import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
 import { getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
+import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
@@ -365,13 +366,8 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	groupCard: {
 		backgroundColor: theme.card,
-		borderRadius: 24,
+		borderRadius: RADIUS.md,
 		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.08,
-		shadowRadius: 20,
-		elevation: 4,
 		borderWidth: 1.5,
 		borderColor: theme.border,
 	},
@@ -396,7 +392,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	segmentControl: {
 		flexDirection: "row",
 		backgroundColor: theme.background,
-		borderRadius: 14,
+		borderRadius: RADIUS.sm,
 		padding: 3, // Reduced padding
 		gap: 2, // Reduced gap
 		borderWidth: 1,
@@ -405,7 +401,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	segment: {
 		paddingHorizontal: 10, // Reduced padding
 		paddingVertical: 6, // Reduced padding
-		borderRadius: 10,
+		borderRadius: RADIUS.sm,
 	},
 	segmentActive: {
 		backgroundColor: theme.accent,
@@ -429,7 +425,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	iconCircle: {
 		width: 44,
 		height: 44,
-		borderRadius: 14,
+		borderRadius: RADIUS.sm,
 		backgroundColor: theme.background,
 		alignItems: "center",
 		justifyContent: "center",
@@ -478,8 +474,8 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	editModalSheet: {
 		backgroundColor: theme.background,
-		borderTopLeftRadius: 24,
-		borderTopRightRadius: 24,
+		borderTopLeftRadius: RADIUS.lg,
+		borderTopRightRadius: RADIUS.lg,
 		padding: 24,
 		paddingBottom: 32,
 	},
@@ -502,7 +498,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		backgroundColor: theme.card,
 		borderWidth: 1,
 		borderColor: theme.border,
-		borderRadius: 16,
+		borderRadius: RADIUS.md,
 		paddingHorizontal: 16,
 		paddingVertical: 14,
 		fontSize: 15,
@@ -518,7 +514,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	editSaveBtn: {
 		backgroundColor: theme.accent,
-		borderRadius: 16,
+		borderRadius: RADIUS.md,
 		paddingVertical: 16,
 		alignItems: "center",
 		marginTop: 8,

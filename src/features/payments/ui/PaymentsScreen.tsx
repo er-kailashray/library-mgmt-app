@@ -25,6 +25,7 @@ import { Member } from "@/features/members/types/members.types";
 import { createPaymentApi, getPaymentsApi } from "@/features/payments/logic/payments-api";
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode } from "@/features/payments/types/payments.types";
 import { remindAllOverdueApi } from "@/features/reminders/logic/reminders-api";
+import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -244,12 +245,12 @@ export function PaymentsScreen() {
             </View>
 
             <View style={styles.summaryRow}>
-                <View style={[styles.summaryCard, { backgroundColor: theme.accent }]}>
+                <View style={styles.summaryCard}>
                     <Text style={styles.summaryLabel}>Total Collected</Text>
-                    <Text style={styles.summaryValue}>₹{totalCollection.toLocaleString("en-IN")}</Text>
+                    <Text style={[styles.summaryValue, { color: theme.accent }]}>₹{totalCollection.toLocaleString("en-IN")}</Text>
                 </View>
-                <View style={[styles.summaryCard, { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border }]}>
-                    <Text style={[styles.summaryLabel, { color: theme.mutedForeground }]}>Pending</Text>
+                <View style={styles.summaryCard}>
+                    <Text style={styles.summaryLabel}>Pending</Text>
                     <Text style={[styles.summaryValue, { color: theme.primary }]}>₹{pendingAmount.toLocaleString("en-IN")}</Text>
                 </View>
             </View>
@@ -348,17 +349,15 @@ const createStyles = (theme: any) => StyleSheet.create({
     summaryCard: {
         flex: 1,
         padding: 20,
-        borderRadius: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 16,
-        elevation: 4,
+        borderRadius: RADIUS.md,
+        backgroundColor: theme.card,
+        borderWidth: 1.5,
+        borderColor: theme.border,
     },
     summaryLabel: {
         fontFamily: "sans-bold",
         fontSize: 12,
-        color: "rgba(255,255,255,0.7)",
+        color: theme.mutedForeground,
         textTransform: "uppercase",
         letterSpacing: 0.5,
         marginBottom: 4,
@@ -366,7 +365,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     summaryValue: {
         fontFamily: "sans-extrabold",
         fontSize: 22,
-        color: "#fff",
+        color: theme.primary,
     },
     remindAllBtn: {
         flexDirection: "row",
@@ -376,7 +375,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginHorizontal: 20,
         marginBottom: 20,
         paddingVertical: 12,
-        borderRadius: 14,
+        borderRadius: RADIUS.md,
         backgroundColor: theme.accent + "15",
         borderWidth: 1,
         borderColor: theme.accent + "30",
@@ -405,7 +404,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     filterBtn: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 10,
+        borderRadius: RADIUS.sm,
         backgroundColor: theme.card,
         borderWidth: 1,
         borderColor: theme.border,
@@ -423,7 +422,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: theme.card,
-        borderRadius: 20,
+        borderRadius: RADIUS.md,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1.5,
@@ -432,7 +431,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     paymentIconBox: {
         width: 48,
         height: 48,
-        borderRadius: 14,
+        borderRadius: RADIUS.sm,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -502,7 +501,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     input: {
         backgroundColor: theme.card,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontFamily: "sans-medium",
@@ -527,7 +526,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     modeChip: {
         flex: 1,
         paddingVertical: 12,
-        borderRadius: 14,
+        borderRadius: RADIUS.md,
         alignItems: "center",
         backgroundColor: theme.card,
         borderWidth: 1.5,
@@ -551,8 +550,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     memberPickerSheet: {
         backgroundColor: theme.background,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: RADIUS.lg,
+        borderTopRightRadius: RADIUS.lg,
         padding: 24,
         position: "absolute",
         bottom: 0,
@@ -586,15 +585,10 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     primaryButton: {
         backgroundColor: theme.accent,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         paddingVertical: 16,
         alignItems: "center",
         marginTop: 12,
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
     },
     primaryButtonText: {
         fontFamily: "sans-extrabold",
@@ -611,11 +605,8 @@ const createStyles = (theme: any) => StyleSheet.create({
         backgroundColor: theme.accent,
         alignItems: "center",
         justifyContent: "center",
+        ...FLOATING_SHADOW,
         shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
     },
     emptyText: {
         fontFamily: "sans-bold",

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
@@ -54,13 +55,13 @@ const createStyles = (theme: Theme) =>
         },
         previewWrap: {
             position: "relative",
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             overflow: "hidden",
         },
         preview: {
             width: "100%",
             height: 160,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             backgroundColor: theme.card,
         },
         removeBtn: {
@@ -79,7 +80,7 @@ const createStyles = (theme: Theme) =>
             bottom: 8,
             right: 8,
             backgroundColor: "rgba(0,0,0,0.6)",
-            borderRadius: 12,
+            borderRadius: RADIUS.sm,
             paddingHorizontal: 10,
             paddingVertical: 6,
         },
@@ -94,7 +95,7 @@ const createStyles = (theme: Theme) =>
             justifyContent: "center",
             gap: 8,
             backgroundColor: theme.card,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             borderWidth: 1,
             borderColor: theme.border,
             borderStyle: "dashed",

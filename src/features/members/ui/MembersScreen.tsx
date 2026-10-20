@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
+import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -178,7 +179,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: theme.card,
-        borderRadius: 16,
+        borderRadius: RADIUS.lg,
         paddingHorizontal: 16,
         height: 52,
         borderWidth: 1.5,
@@ -198,7 +199,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     filterChip: {
         paddingHorizontal: 20,
         paddingVertical: 10,
-        borderRadius: 12,
+        borderRadius: RADIUS.md,
         backgroundColor: theme.card,
         borderWidth: 1.5,
         borderColor: theme.border,
@@ -224,16 +225,11 @@ const createStyles = (theme: any) => StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: theme.card,
-        borderRadius: 24,
+        borderRadius: RADIUS.md,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1.5,
         borderColor: theme.border,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-        elevation: 2,
     },
     avatarSmall: {
         width: 52,
@@ -260,7 +256,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     badge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 10,
+        borderRadius: RADIUS.sm,
     },
     badgeText: {
         fontFamily: "sans-extrabold",
@@ -278,10 +274,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         backgroundColor: theme.accent,
         alignItems: "center",
         justifyContent: "center",
+        ...FLOATING_SHADOW,
         shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
     },
 });

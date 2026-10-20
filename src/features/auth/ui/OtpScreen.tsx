@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 export function OtpScreen() {
@@ -149,13 +150,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     otpCard: {
         backgroundColor: theme.card,
-        borderRadius: 24,
+        borderRadius: RADIUS.md,
         padding: 32,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 4,
         borderWidth: 1.5,
         borderColor: theme.border,
     },
@@ -173,7 +169,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         backgroundColor: theme.background,
         borderWidth: 1,
         borderColor: theme.border,
-        borderRadius: 20,
+        borderRadius: RADIUS.md,
         paddingVertical: 20,
         textAlign: "center",
         color: theme.primary,
@@ -182,13 +178,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     submitButton: {
         backgroundColor: theme.accent,
         padding: 20,
-        borderRadius: 18,
+        borderRadius: RADIUS.md,
         alignItems: "center",
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 4,
     },
     submitButtonText: {
         fontFamily: "sans-extrabold",
@@ -207,7 +198,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     errorBox: {
         backgroundColor: theme.destructive + "1A",
         padding: 14,
-        borderRadius: 16,
+        borderRadius: RADIUS.md,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,

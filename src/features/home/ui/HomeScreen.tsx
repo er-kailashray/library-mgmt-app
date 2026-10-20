@@ -7,8 +7,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
 import { getDashboardApi } from "@/features/home/logic/home-api";
+import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { StatTile } from "@/shared/ui/StatTile";
 
 type MenuItem = {
 	key: string;
@@ -77,6 +79,19 @@ export function HomeScreen() {
 			</View>
 
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+				{dashboard && (
+					<View style={styles.statsRow}>
+						<StatTile label="Seats Filled" value={`${dashboard.occupied_seats}/${dashboard.total_seats}`} icon="grid-outline" />
+						<StatTile label="Members" value={String(dashboard.total_members)} icon="people-outline" />
+						<StatTile
+							label="Occupancy"
+							value={dashboard.total_seats > 0 ? `${Math.round((dashboard.occupied_seats / dashboard.total_seats) * 100)}%` : "—"}
+							icon="pie-chart-outline"
+							accentColor={theme.accent}
+						/>
+					</View>
+				)}
+
 				{showBatchSetupBanner ? (
 					<View style={styles.alertCard} accessibilityRole="alert">
 						<View style={styles.alertTitleRow}>
@@ -92,6 +107,51 @@ export function HomeScreen() {
 						</Pressable>
 					</View>
 				) : null}
+
+				{dashboard && (
+					<Pressable style={styles.duesCard} onPress={() => router.push("/renewals")}>
+						<View style={styles.duesHeaderRow}>
+							<Text style={styles.duesTitle}>Dues & Renewals</Text>
+							{dashboard.critical_dues_count > 0 && (
+								<View style={styles.duesCriticalBadge}>
+									<Text style={styles.duesCriticalBadgeText}>{dashboard.critical_dues_count} critical</Text>
+								</View>
+							)}
+						</View>
+
+						{dashboard.due_members_count > 0 ? (
+							<>
+								<Text style={styles.duesBigNumber}>
+									{dashboard.due_members_count} <Text style={styles.duesBigNumberSuffix}>member{dashboard.due_members_count === 1 ? "" : "s"} due</Text>
+								</Text>
+								<View style={styles.duesBreakdownRow}>
+									<View style={styles.duesBreakdownItem}>
+										<Text style={styles.duesBreakdownValue}>{dashboard.overdue_summary.two_months_plus}</Text>
+										<Text style={styles.duesBreakdownLabel}>2+ months</Text>
+									</View>
+									<View style={styles.duesBreakdownItem}>
+										<Text style={styles.duesBreakdownValue}>{dashboard.overdue_summary.one_month}</Text>
+										<Text style={styles.duesBreakdownLabel}>1 month</Text>
+									</View>
+									<View style={styles.duesBreakdownItem}>
+										<Text style={styles.duesBreakdownValue}>{dashboard.overdue_summary.due_this_week}</Text>
+										<Text style={styles.duesBreakdownLabel}>Due this week</Text>
+									</View>
+								</View>
+							</>
+						) : (
+							<Text style={styles.duesAllCaughtUp}>All caught up - no dues pending.</Text>
+						)}
+
+						{(dashboard.upcoming_renewals > 0 || dashboard.this_month_dues_count > 0) && (
+							<Text style={styles.duesFooterText}>
+								{dashboard.this_month_dues_count > 0 ? `${dashboard.this_month_dues_count} due this month` : ""}
+								{dashboard.this_month_dues_count > 0 && dashboard.upcoming_renewals > 0 ? " · " : ""}
+								{dashboard.upcoming_renewals > 0 ? `${dashboard.upcoming_renewals} renewing soon` : ""}
+							</Text>
+						)}
+					</Pressable>
+				)}
 
 				<Pressable style={styles.summaryCard} onPress={() => router.push("/payments")}>
 					<Text style={styles.summaryLabel}>This month (collections)</Text>
@@ -117,6 +177,33 @@ export function HomeScreen() {
 
 					{showBatchSetupBanner && <Text style={styles.summaryHint}>Set up batches to start tracking seat sales and renewals.</Text>}
 				</Pressable>
+
+				{dashboard && (
+					<>
+						<Text style={styles.sectionTitle}>Recent Payments</Text>
+						<View style={styles.recentCard}>
+							{dashboard.recent_payments.length > 0 ? (
+								dashboard.recent_payments.map((payment, index) => (
+									<View key={`${payment.name}-${index}`} style={[styles.recentRow, index !== dashboard.recent_payments.length - 1 && styles.recentRowBorder]}>
+										<View style={styles.recentIconCircle}>
+											<Ionicons name="checkmark-circle" size={18} color={theme.success} />
+										</View>
+										<View style={styles.recentInfo}>
+											<Text style={styles.recentName}>{payment.name}</Text>
+											<Text style={styles.recentMeta}>
+												{payment.seat ? `Seat ${payment.seat} · ` : ""}
+												{payment.time_ago}
+											</Text>
+										</View>
+										<Text style={styles.recentAmount}>{formatRupee(payment.amount)}</Text>
+									</View>
+								))
+							) : (
+								<Text style={styles.recentEmptyText}>No payments yet.</Text>
+							)}
+						</View>
+					</>
+				)}
 
 				<Text style={styles.sectionTitle}>Menu</Text>
 				<View style={styles.menuGrid}>
@@ -184,47 +271,44 @@ const createStyles = (theme: any) =>
 			justifyContent: "center",
 		},
 		summaryCard: {
-			backgroundColor: theme.accent,
-			borderRadius: 24,
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
 			padding: 20,
 			marginBottom: 32,
-			shadowColor: theme.accent,
-			shadowOffset: { width: 0, height: 8 },
-			shadowOpacity: 0.25,
-			shadowRadius: 16,
-			elevation: 6,
+			borderWidth: 1,
+			borderColor: theme.border,
 		},
 		summaryLabel: {
 			fontFamily: "sans-semibold",
 			fontSize: 13,
-			color: "rgba(255,255,255,0.85)",
+			color: theme.mutedForeground,
 			textTransform: "uppercase",
 			letterSpacing: 0.5,
 		},
 		summaryValue: {
 			fontFamily: "sans-extrabold",
 			fontSize: 34,
-			color: "#fff",
+			color: theme.accent,
 			marginTop: 8,
 			letterSpacing: -1,
 		},
 		summaryHint: {
 			fontFamily: "sans-medium",
 			fontSize: 13,
-			color: "rgba(255,255,255,0.9)",
+			color: theme.mutedForeground,
 			marginTop: 12,
 			lineHeight: 18,
 		},
 		progressContainer: {
 			height: 6,
-			backgroundColor: "rgba(255,255,255,0.25)",
+			backgroundColor: theme.muted,
 			borderRadius: 3,
 			overflow: "hidden",
 			marginTop: 16,
 		},
 		progressBar: {
 			height: "100%",
-			backgroundColor: "#fff",
+			backgroundColor: theme.accent,
 			borderRadius: 3,
 		},
 		summarySecondaryRow: {
@@ -239,26 +323,27 @@ const createStyles = (theme: any) =>
 		summarySecondaryLabel: {
 			fontFamily: "sans-bold",
 			fontSize: 11,
-			color: "rgba(255,255,255,0.7)",
+			color: theme.mutedForeground,
 			letterSpacing: 0.5,
 			marginBottom: 2,
 		},
 		summarySecondaryValue: {
 			fontFamily: "sans-extrabold",
 			fontSize: 16,
-			color: "#fff",
+			color: theme.primary,
+		},
+		statsRow: {
+			flexDirection: "row",
+			gap: 10,
+			marginBottom: 24,
 		},
 		alertCard: {
 			backgroundColor: theme.card,
-			borderRadius: 20,
-			borderWidth: 0,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
 			padding: 18,
 			marginBottom: 32,
-			shadowColor: "#000",
-			shadowOffset: { width: 0, height: 6 },
-			shadowOpacity: 0.06,
-			shadowRadius: 16,
-			elevation: 3,
 		},
 		alertTitleRow: {
 			flexDirection: "row",
@@ -269,7 +354,7 @@ const createStyles = (theme: any) =>
 		alertIconWrap: {
 			width: 44,
 			height: 44,
-			borderRadius: 14,
+			borderRadius: RADIUS.sm,
 			backgroundColor: theme.muted,
 			alignItems: "center",
 			justifyContent: "center",
@@ -295,13 +380,135 @@ const createStyles = (theme: any) =>
 			backgroundColor: theme.primary,
 			paddingVertical: 12,
 			paddingHorizontal: 16,
-			borderRadius: 14,
+			borderRadius: RADIUS.sm,
 			alignSelf: "flex-start",
 		},
 		alertCtaText: {
 			fontFamily: "sans-bold",
 			fontSize: 14,
 			color: theme.background,
+		},
+		duesCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
+			padding: 18,
+			marginBottom: 32,
+		},
+		duesHeaderRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			marginBottom: 12,
+		},
+		duesTitle: {
+			fontFamily: "sans-bold",
+			fontSize: 15,
+			color: theme.primary,
+		},
+		duesCriticalBadge: {
+			backgroundColor: theme.destructive + "15",
+			paddingHorizontal: 10,
+			paddingVertical: 4,
+			borderRadius: RADIUS.sm,
+		},
+		duesCriticalBadgeText: {
+			fontFamily: "sans-bold",
+			fontSize: 11,
+			color: theme.destructive,
+			textTransform: "uppercase",
+		},
+		duesBigNumber: {
+			fontFamily: "sans-extrabold",
+			fontSize: 24,
+			color: theme.primary,
+			marginBottom: 14,
+		},
+		duesBigNumberSuffix: {
+			fontFamily: "sans-medium",
+			fontSize: 14,
+			color: theme.mutedForeground,
+		},
+		duesAllCaughtUp: {
+			fontFamily: "sans-medium",
+			fontSize: 14,
+			color: theme.mutedForeground,
+		},
+		duesBreakdownRow: {
+			flexDirection: "row",
+			justifyContent: "space-between",
+		},
+		duesBreakdownItem: {
+			alignItems: "flex-start",
+		},
+		duesBreakdownValue: {
+			fontFamily: "sans-extrabold",
+			fontSize: 17,
+			color: theme.primary,
+			marginBottom: 2,
+		},
+		duesBreakdownLabel: {
+			fontFamily: "sans-medium",
+			fontSize: 11,
+			color: theme.mutedForeground,
+		},
+		duesFooterText: {
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			marginTop: 14,
+		},
+		recentCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			overflow: "hidden",
+			marginBottom: 32,
+			borderWidth: 1,
+			borderColor: theme.border,
+		},
+		recentRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			padding: 16,
+		},
+		recentRowBorder: {
+			borderBottomWidth: StyleSheet.hairlineWidth,
+			borderBottomColor: theme.border,
+		},
+		recentIconCircle: {
+			width: 36,
+			height: 36,
+			borderRadius: RADIUS.sm,
+			backgroundColor: theme.success + "15",
+			alignItems: "center",
+			justifyContent: "center",
+			marginRight: 12,
+		},
+		recentInfo: {
+			flex: 1,
+		},
+		recentName: {
+			fontFamily: "sans-bold",
+			fontSize: 14,
+			color: theme.primary,
+		},
+		recentMeta: {
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			marginTop: 2,
+		},
+		recentAmount: {
+			fontFamily: "sans-extrabold",
+			fontSize: 14,
+			color: theme.success,
+		},
+		recentEmptyText: {
+			fontFamily: "sans-medium",
+			fontSize: 13,
+			color: theme.mutedForeground,
+			padding: 18,
 		},
 		sectionTitle: {
 			fontFamily: "sans-bold",
@@ -320,14 +527,10 @@ const createStyles = (theme: any) =>
 		menuCell: {
 			width: "47%",
 			backgroundColor: theme.card,
-			borderRadius: 20,
-			borderWidth: 0,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
 			padding: 16,
-			shadowColor: "#000",
-			shadowOffset: { width: 0, height: 6 },
-			shadowOpacity: 0.04,
-			shadowRadius: 12,
-			elevation: 2,
 		},
 		menuCellPressed: {
 			opacity: 0.8,
@@ -336,7 +539,7 @@ const createStyles = (theme: any) =>
 		menuIconCircle: {
 			width: 44,
 			height: 44,
-			borderRadius: 14,
+			borderRadius: RADIUS.sm,
 			backgroundColor: theme.muted,
 			alignItems: "center",
 			justifyContent: "center",

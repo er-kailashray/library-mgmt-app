@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
@@ -85,7 +86,7 @@ const createStyles = (theme: Theme) =>
             alignItems: "center",
             justifyContent: "space-between",
             backgroundColor: theme.card,
-            borderRadius: 16,
+            borderRadius: RADIUS.md,
             paddingHorizontal: 16,
             paddingVertical: 14,
             borderWidth: 1,
@@ -105,8 +106,8 @@ const createStyles = (theme: Theme) =>
         },
         sheet: {
             backgroundColor: theme.background,
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
+            borderTopLeftRadius: RADIUS.lg,
+            borderTopRightRadius: RADIUS.lg,
             padding: 24,
             position: "absolute",
             bottom: 0,
