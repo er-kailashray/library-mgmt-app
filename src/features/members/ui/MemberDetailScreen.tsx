@@ -15,16 +15,9 @@ import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { PhotoPickerSlot } from "@/shared/ui/PhotoPickerSlot";
 import { SelectField } from "@/shared/ui/SelectField";
+import { getInitials } from "@/shared/utils/text";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 
-function getInitials(name: string): string {
-    return name
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
-}
 
 export function MemberDetailScreen() {
     const router = useRouter();

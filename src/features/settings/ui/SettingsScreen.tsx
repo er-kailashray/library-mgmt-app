@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
-import { getStoredAuthUser } from "@/services/api/auth.api";
+import { getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { getInitials } from "@/shared/utils/text";
 
 interface SettingsItem {
 	icon: keyof typeof Ionicons.glyphMap;
@@ -39,6 +40,40 @@ export function SettingsScreen() {
 		void loadUser();
 	}, []);
 
+	const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+	const [editProfileName, setEditProfileName] = useState("");
+	const [editProfilePhone, setEditProfilePhone] = useState("");
+	const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+	const openEditProfile = useCallback(() => {
+		if (!user) return;
+		setEditProfileName(user.name);
+		setEditProfilePhone(user.phone);
+		setIsEditProfileVisible(true);
+	}, [user]);
+
+	const handleSaveProfile = useCallback(async () => {
+		if (!editProfileName.trim()) {
+			Alert.alert("Error", "Please enter your name.");
+			return;
+		}
+		if (editProfilePhone.trim().length < 10) {
+			Alert.alert("Error", "Please enter a valid 10-digit phone number.");
+			return;
+		}
+		try {
+			setIsSavingProfile(true);
+			const response = await updateProfileApi({ name: editProfileName.trim(), phone: editProfilePhone.trim() });
+			await updateStoredAuthUser(response.user);
+			setUser(response.user);
+			setIsEditProfileVisible(false);
+		} catch (err: any) {
+			Alert.alert("Error", err.message || "Failed to update profile.");
+		} finally {
+			setIsSavingProfile(false);
+		}
+	}, [editProfileName, editProfilePhone]);
+
 	const onLogout = useCallback(async () => {
 		Alert.alert("Logout", "Are you sure you want to log out?", [
 			{ text: "Cancel", style: "cancel" },
@@ -64,17 +99,17 @@ export function SettingsScreen() {
 				{
 					icon: "business-outline",
 					label: "Edit Library Name & Seats",
-					onPress: () => Alert.alert("Library Profile", "Coming soon!"),
+					onPress: () => router.push("/library-profile"),
 				},
 				{
 					icon: "images-outline",
 					label: "Manage Photos",
-					onPress: () => Alert.alert("Gallery", "Coming soon!"),
+					onPress: () => router.push("/library-photos"),
 				},
 				{
 					icon: "star-outline",
 					label: "Amenities (AC, Wi-Fi, Water)",
-					onPress: () => Alert.alert("Amenities", "Coming soon!"),
+					onPress: () => router.push("/library-amenities"),
 				},
 			],
 		},
@@ -82,9 +117,9 @@ export function SettingsScreen() {
 			title: "Account Options",
 			items: [
 				{
-					icon: "call-outline",
-					label: "Update Contact Numbers",
-					onPress: () => Alert.alert("Contact Info", "Coming soon!"),
+					icon: "person-circle-outline",
+					label: "Edit Profile (Name & Number)",
+					onPress: openEditProfile,
 				},
 				{
 					icon: "log-out-outline",
@@ -115,13 +150,20 @@ export function SettingsScreen() {
 			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 				<View style={styles.profileCenterBlock}>
 					<View style={styles.avatarHugeBackground}>
-						<Ionicons name="library" size={54} color="#fff" />
+						<Text style={styles.avatarHugeText}>{getInitials(dashboard?.library_name || "My Library")}</Text>
 					</View>
 					<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
 					{user && (
-						<Text style={styles.ownerSubtitle}>
-							{user.name} • {user.phone}
-						</Text>
+						<View style={styles.ownerInfoRow}>
+							<View style={styles.ownerInfoPill}>
+								<Ionicons name="person-outline" size={14} color={theme.mutedForeground} />
+								<Text style={styles.ownerInfoText}>{user.name}</Text>
+							</View>
+							<View style={styles.ownerInfoPill}>
+								<Ionicons name="call-outline" size={14} color={theme.mutedForeground} />
+								<Text style={styles.ownerInfoText}>{user.phone}</Text>
+							</View>
+						</View>
 					)}
 				</View>
 
@@ -168,6 +210,41 @@ export function SettingsScreen() {
 					<Text style={styles.versionText}>v1.0.0</Text>
 				</View>
 			</ScrollView>
+
+			<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
+				<Pressable style={styles.editModalOverlay} onPress={() => setIsEditProfileVisible(false)} />
+				<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
+					<View style={styles.editModalSheet}>
+						<Text style={styles.editModalTitle}>Edit Profile</Text>
+
+						<Text style={styles.inputLabel}>Your Name</Text>
+						<TextInput
+							style={styles.inputField}
+							value={editProfileName}
+							onChangeText={setEditProfileName}
+							autoCapitalize="words"
+							placeholder="e.g. Asha Owner"
+							placeholderTextColor={theme.mutedForeground + "80"}
+						/>
+
+						<Text style={styles.inputLabel}>Phone Number</Text>
+						<TextInput
+							style={styles.inputField}
+							value={editProfilePhone}
+							onChangeText={setEditProfilePhone}
+							keyboardType="phone-pad"
+							maxLength={15}
+							placeholder="10-digit mobile number"
+							placeholderTextColor={theme.mutedForeground + "80"}
+						/>
+						<Text style={styles.inputHint}>This is the number you use to log in.</Text>
+
+						<Pressable style={[styles.editSaveBtn, isSavingProfile && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSavingProfile}>
+							{isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+						</Pressable>
+					</View>
+				</KeyboardAvoidingView>
+			</Modal>
 		</SafeAreaView>
 	);
 }
@@ -240,19 +317,39 @@ const createStyles = (theme: any) => StyleSheet.create({
 		shadowRadius: 16,
 		elevation: 8,
 	},
+	avatarHugeText: {
+		fontFamily: "sans-extrabold",
+		fontSize: 36,
+		color: "#fff",
+	},
 	libraryHugeName: {
 		fontFamily: "sans-extrabold",
 		fontSize: 28,
 		color: theme.primary,
 		textAlign: "center",
 		lineHeight: 34,
-		marginBottom: 8,
+		marginBottom: 12,
 	},
-	ownerSubtitle: {
+	ownerInfoRow: {
+		flexDirection: "row",
+		justifyContent: "center",
+		gap: 10,
+	},
+	ownerInfoPill: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 6,
+		backgroundColor: theme.card,
+		borderWidth: 1,
+		borderColor: theme.border,
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+	},
+	ownerInfoText: {
 		fontFamily: "sans-bold",
-		fontSize: 15,
+		fontSize: 13,
 		color: theme.mutedForeground,
-		textAlign: "center",
 	},
 	section: {
 		marginBottom: 32,
@@ -345,14 +442,13 @@ const createStyles = (theme: any) => StyleSheet.create({
 		borderColor: theme.destructive + "30",
 	},
 	optionText: {
+		flex: 1,
 		fontFamily: "sans-bold",
-		fontSize: 15, // Slightly smaller font for better fit
+		fontSize: 15,
 		color: theme.primary,
-		minWidth: 80, // Ensure label doesn't shrink too much
 	},
 	logoutText: {
 		color: theme.destructive,
-		flex: 1,
 	},
 	footerBlock: {
 		alignItems: "center",
@@ -369,5 +465,67 @@ const createStyles = (theme: any) => StyleSheet.create({
 		fontFamily: "sans-bold",
 		fontSize: 12,
 		color: theme.mutedForeground + "80",
+	},
+	editModalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+	},
+	editModalSheetWrap: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
+	},
+	editModalSheet: {
+		backgroundColor: theme.background,
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		padding: 24,
+		paddingBottom: 32,
+	},
+	editModalTitle: {
+		fontFamily: "sans-extrabold",
+		fontSize: 18,
+		color: theme.primary,
+		marginBottom: 20,
+	},
+	inputLabel: {
+		fontFamily: "sans-bold",
+		fontSize: 13,
+		color: theme.primary,
+		marginBottom: 8,
+		textTransform: "uppercase",
+		letterSpacing: 1,
+	},
+	inputField: {
+		fontFamily: "sans-medium",
+		backgroundColor: theme.card,
+		borderWidth: 1,
+		borderColor: theme.border,
+		borderRadius: 16,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		fontSize: 15,
+		color: theme.primary,
+		marginBottom: 16,
+	},
+	inputHint: {
+		fontFamily: "sans-medium",
+		fontSize: 12,
+		color: theme.mutedForeground,
+		marginTop: -10,
+		marginBottom: 16,
+	},
+	editSaveBtn: {
+		backgroundColor: theme.accent,
+		borderRadius: 16,
+		paddingVertical: 16,
+		alignItems: "center",
+		marginTop: 8,
+	},
+	editSaveBtnText: {
+		fontFamily: "sans-extrabold",
+		fontSize: 15,
+		color: "#fff",
 	},
 });

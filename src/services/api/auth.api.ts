@@ -18,6 +18,15 @@ export async function loginApi(payload: LoginRequest): Promise<LoginResponse> {
 	return apiPost<LoginResponse>("/api/login", payload);
 }
 
+export async function updateProfileApi(payload: { name: string; phone: string }): Promise<{ message: string; user: AuthUser }> {
+	const token = await getStoredAuthToken();
+	if (!token) throw new Error("No auth token");
+
+	return apiPost<{ message: string; user: AuthUser }>("/api/me/update", payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+}
+
 export async function logoutApi(): Promise<void> {
 	await apiFetch("/api/logout", {
 		method: "POST",
@@ -32,6 +41,10 @@ export async function saveAuthData(token: string, user: AuthUser): Promise<void>
 		[STORAGE_KEYS.authToken, token],
 		[STORAGE_KEYS.authUser, JSON.stringify(user)],
 	]);
+}
+
+export async function updateStoredAuthUser(user: AuthUser): Promise<void> {
+	await AsyncStorage.setItem(STORAGE_KEYS.authUser, JSON.stringify(user));
 }
 
 export async function clearAuthData(): Promise<void> {

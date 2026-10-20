@@ -10,15 +10,7 @@ import { Member } from "@/features/members/types/members.types";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
-
-function getInitials(name: string): string {
-    return name
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
-}
+import { getInitials } from "@/shared/utils/text";
 
 export function MembersScreen() {
     const router = useRouter();
