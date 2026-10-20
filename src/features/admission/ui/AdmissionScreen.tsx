@@ -9,6 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
 import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { uploadMemberIdProofApi } from "@/features/members/logic/members.api";
+import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -46,6 +47,7 @@ export function AdmissionScreen() {
 
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
+    const [gender, setGender] = useState<Gender | null>(null);
 
     const [idProofType, setIdProofType] = useState<IdProofType | null>(null);
     const [idProofFrontUri, setIdProofFrontUri] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export function AdmissionScreen() {
             const { memberId } = await createAdmissionApi({
                 name: name.trim(),
                 phone: phone.trim(),
+                gender: gender ?? undefined,
                 allocations: allocationPayload,
             });
 
@@ -374,6 +377,7 @@ export function AdmissionScreen() {
                                         maxLength={15}
                                     />
                                 </View>
+                                <SelectField label="Gender (Optional)" placeholder="Select gender" value={gender} options={GENDER_OPTIONS} onChange={setGender} />
                             </View>
 
                             {/* ID PROOF (OPTIONAL) */}

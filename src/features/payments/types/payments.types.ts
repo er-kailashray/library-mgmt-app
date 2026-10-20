@@ -8,6 +8,7 @@ export interface Payment {
     id: string;
     member_id: number | string;
     member_name: string;
+    member_status: "active" | "inactive";
     amount: number;
     date: string;
     status: PaymentStatus;

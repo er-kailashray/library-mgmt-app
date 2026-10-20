@@ -4,6 +4,19 @@ export enum MemberStatus {
     EXPIRED = "EXPIRED",
 }
 
+export type Gender = "male" | "female" | "other";
+
+export const GENDER_LABELS: Record<Gender, string> = {
+    male: "Male",
+    female: "Female",
+    other: "Other",
+};
+
+export const GENDER_OPTIONS: { value: Gender; label: string }[] = (Object.keys(GENDER_LABELS) as Gender[]).map((value) => ({
+    value,
+    label: GENDER_LABELS[value],
+}));
+
 export interface Member {
     id: number | string;
     name: string;
@@ -31,6 +44,7 @@ export interface MemberDetail {
     id: number | string;
     name: string;
     phone: string;
+    gender: Gender | null;
     status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     due_amount: number | null;

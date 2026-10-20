@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { ID_PROOF_TYPE_LABELS, ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { deactivateMemberApi, getMemberDetailApi, getMemberIdProofSource, updateMemberApi, uploadMemberIdProofApi } from "@/features/members/logic/members.api";
+import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -118,16 +119,18 @@ export function MemberDetailScreen() {
         }
     }, [member, newIdProofType, newIdProofFrontUri, newIdProofBackUri, refetch]);
 
-    // Editing name/phone
+    // Editing name/phone/gender
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editName, setEditName] = useState("");
     const [editPhone, setEditPhone] = useState("");
+    const [editGender, setEditGender] = useState<Gender | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     const openEditModal = useCallback(() => {
         if (!member) return;
         setEditName(member.name);
         setEditPhone(member.phone);
+        setEditGender(member.gender);
         setIsEditModalVisible(true);
     }, [member]);
 
@@ -141,9 +144,13 @@ export function MemberDetailScreen() {
             Alert.alert("Error", "Please enter a valid 10-digit phone number.");
             return;
         }
+        if (member.status === "inactive" && editPhone.trim() !== member.phone) {
+            Alert.alert("Error", "Phone number can't be changed for a member who has left.");
+            return;
+        }
         try {
             setIsSavingEdit(true);
-            await updateMemberApi(member.id, { name: editName.trim(), phone: editPhone.trim() });
+            await updateMemberApi(member.id, { name: editName.trim(), phone: editPhone.trim(), gender: editGender });
             setIsEditModalVisible(false);
             await refetch();
         } catch (err: any) {
@@ -151,7 +158,7 @@ export function MemberDetailScreen() {
         } finally {
             setIsSavingEdit(false);
         }
-    }, [member, editName, editPhone, refetch]);
+    }, [member, editName, editPhone, editGender, refetch]);
 
     const handleWhatsAppRemind = useCallback(async () => {
         if (!member) return;
@@ -226,18 +233,24 @@ export function MemberDetailScreen() {
             ) : (
                 <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                     <View style={styles.profileBlock}>
-                        <View style={[styles.avatar, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
-                            <Text style={[styles.avatarText, { color: getStatusColor(member.payment_status) }]}>{getInitials(member.name)}</Text>
-                        </View>
-                        <View style={styles.nameRow}>
+                        <Pressable accessibilityRole="button" style={styles.editIconBtn} onPress={openEditModal}>
+                            <Ionicons name="pencil" size={14} color={theme.mutedForeground} />
+                        </Pressable>
+                        <View style={[styles.profileContent, member.status === "inactive" && styles.profileBlockFaded]}>
+                            <View style={[styles.avatar, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
+                                <Text style={[styles.avatarText, { color: getStatusColor(member.payment_status) }]}>{getInitials(member.name)}</Text>
+                            </View>
                             <Text style={styles.memberName}>{member.name}</Text>
-                            <Pressable accessibilityRole="button" style={styles.editIconBtn} onPress={openEditModal}>
-                                <Ionicons name="pencil" size={14} color={theme.mutedForeground} />
-                            </Pressable>
-                        </View>
-                        <Text style={styles.memberPhone}>{member.phone}</Text>
-                        <View style={[styles.badge, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
-                            <Text style={[styles.badgeText, { color: getStatusColor(member.payment_status) }]}>{member.payment_status}</Text>
+                            <Text style={styles.memberPhone}>{member.phone}</Text>
+                            {member.status === "inactive" ? (
+                                <View style={[styles.badge, { backgroundColor: theme.mutedForeground + "15" }]}>
+                                    <Text style={[styles.badgeText, { color: theme.mutedForeground }]}>Left</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.badge, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
+                                    <Text style={[styles.badgeText, { color: getStatusColor(member.payment_status) }]}>{member.payment_status}</Text>
+                                </View>
+                            )}
                         </View>
                     </View>
 
@@ -340,16 +353,23 @@ export function MemberDetailScreen() {
                         </View>
                     )}
 
-                    <Pressable style={[styles.leaveButton, isDeactivating && { opacity: 0.7 }]} onPress={handleMarkAsLeft} disabled={isDeactivating}>
-                        {isDeactivating ? (
-                            <ActivityIndicator color={theme.destructive} size="small" />
-                        ) : (
-                            <>
-                                <Ionicons name="exit-outline" size={18} color={theme.destructive} />
-                                <Text style={styles.leaveButtonText}>Mark as Left</Text>
-                            </>
-                        )}
-                    </Pressable>
+                    {member.status === "inactive" ? (
+                        <View style={styles.inactiveNotice}>
+                            <Ionicons name="exit-outline" size={18} color={theme.mutedForeground} />
+                            <Text style={styles.inactiveNoticeText}>This member has left and their seat has been freed.</Text>
+                        </View>
+                    ) : (
+                        <Pressable style={[styles.leaveButton, isDeactivating && { opacity: 0.7 }]} onPress={handleMarkAsLeft} disabled={isDeactivating}>
+                            {isDeactivating ? (
+                                <ActivityIndicator color={theme.destructive} size="small" />
+                            ) : (
+                                <>
+                                    <Ionicons name="exit-outline" size={18} color={theme.destructive} />
+                                    <Text style={styles.leaveButtonText}>Mark as Left</Text>
+                                </>
+                            )}
+                        </Pressable>
+                    )}
                 </ScrollView>
             )}
 
@@ -378,14 +398,20 @@ export function MemberDetailScreen() {
 
                         <Text style={styles.inputLabel}>Phone Number</Text>
                         <TextInput
-                            style={styles.inputField}
+                            style={[styles.inputField, member?.status === "inactive" && styles.inputFieldDisabled]}
                             value={editPhone}
                             onChangeText={setEditPhone}
                             keyboardType="phone-pad"
                             maxLength={15}
                             placeholder="10-digit mobile number"
                             placeholderTextColor={theme.mutedForeground + "80"}
+                            editable={member?.status !== "inactive"}
                         />
+                        {member?.status === "inactive" && (
+                            <Text style={styles.inputHint}>Phone can&apos;t be changed once a member has left - it&apos;s used to recognize them if they rejoin.</Text>
+                        )}
+
+                        <SelectField label="Gender (Optional)" placeholder="Select gender" value={editGender} options={GENDER_OPTIONS} onChange={setEditGender} />
 
                         <Pressable style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={isSavingEdit}>
                             {isSavingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
@@ -437,6 +463,13 @@ const createStyles = (theme: any) =>
         profileBlock: {
             alignItems: "center",
             marginBottom: 32,
+            position: "relative",
+        },
+        profileContent: {
+            alignItems: "center",
+        },
+        profileBlockFaded: {
+            opacity: 0.6,
         },
         avatar: {
             width: 88,
@@ -450,18 +483,16 @@ const createStyles = (theme: any) =>
             fontFamily: "sans-extrabold",
             fontSize: 28,
         },
-        nameRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 4,
-        },
         memberName: {
             fontFamily: "sans-extrabold",
             fontSize: 22,
             color: theme.primary,
+            marginBottom: 4,
         },
         editIconBtn: {
+            position: "absolute",
+            top: 0,
+            right: 0,
             width: 28,
             height: 28,
             borderRadius: 14,
@@ -470,6 +501,7 @@ const createStyles = (theme: any) =>
             borderColor: theme.border,
             alignItems: "center",
             justifyContent: "center",
+            zIndex: 1,
         },
         memberPhone: {
             fontFamily: "sans-bold",
@@ -641,6 +673,16 @@ const createStyles = (theme: any) =>
             color: theme.primary,
             marginBottom: 16,
         },
+        inputFieldDisabled: {
+            opacity: 0.6,
+        },
+        inputHint: {
+            fontFamily: "sans-medium",
+            fontSize: 12,
+            color: theme.mutedForeground,
+            marginTop: -10,
+            marginBottom: 16,
+        },
         editSaveBtn: {
             backgroundColor: theme.accent,
             borderRadius: 16,
@@ -704,5 +746,23 @@ const createStyles = (theme: any) =>
             fontFamily: "sans-extrabold",
             fontSize: 15,
             color: theme.destructive,
+        },
+        inactiveNotice: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            backgroundColor: theme.card,
+            borderRadius: 16,
+            paddingVertical: 16,
+            paddingHorizontal: 16,
+            marginTop: 20,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+        },
+        inactiveNoticeText: {
+            flex: 1,
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            color: theme.mutedForeground,
         },
     });

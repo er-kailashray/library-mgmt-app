@@ -11,6 +11,7 @@ export async function createAdmissionApi(payload: CreateAdmissionRequest): Promi
         {
             name: payload.name,
             phone: payload.phone,
+            gender: payload.gender,
             allocations: payload.allocations,
         },
         { headers: { Authorization: `Bearer ${token}` } }

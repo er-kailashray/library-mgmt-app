@@ -1,5 +1,5 @@
 import { IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
-import { MemberDetailResponse, MembersResponse } from "@/features/members/types/members.types";
+import { Gender, MemberDetailResponse, MembersResponse } from "@/features/members/types/members.types";
 import { getStoredAuthToken } from "@/services/api/auth.api";
 import { apiFetch, apiPost, apiUrl } from "@/services/api/client";
 import { uploadImage } from "@/shared/utils/image-upload";
@@ -50,7 +50,10 @@ export async function deactivateMemberApi(id: number | string): Promise<{ status
     });
 }
 
-export async function updateMemberApi(id: number | string, payload: { name: string; phone: string }): Promise<{ status: boolean; message?: string }> {
+export async function updateMemberApi(
+    id: number | string,
+    payload: { name: string; phone: string; gender?: Gender | null }
+): Promise<{ status: boolean; message?: string }> {
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");
 

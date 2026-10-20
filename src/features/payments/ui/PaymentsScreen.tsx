@@ -118,24 +118,36 @@ export function PaymentsScreen() {
 
     const styles = createStyles(theme);
 
-    const renderPaymentItem = ({ item }: { item: Payment }) => (
-        <Pressable style={styles.paymentCard} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
-            <View style={[styles.paymentIconBox, { backgroundColor: item.status === "PAID" ? theme.success + "15" : theme.accent + "15" }]}>
-                <Ionicons name={item.status === "PAID" ? "checkmark-circle" : "time"} size={24} color={item.status === "PAID" ? theme.success : theme.accent} />
-            </View>
-            <View style={styles.paymentInfo}>
-                <Text style={styles.paymentName}>{item.member_name}</Text>
-                <Text style={styles.paymentDate}>{item.date}</Text>
-            </View>
-            <View style={styles.paymentAmountBlock}>
-                <Text style={[styles.paymentAmount, { color: item.status === "PAID" ? theme.success : theme.accent }]}>
-                    {item.status === "PAID" ? "+" : ""}
-                    ₹{item.amount}
-                </Text>
-                <Text style={styles.paymentStatus}>{item.status}</Text>
-            </View>
-        </Pressable>
-    );
+    const renderPaymentItem = ({ item }: { item: Payment }) => {
+        const hasLeft = item.member_status === "inactive";
+        return (
+            <Pressable
+                style={[styles.paymentCard, hasLeft && styles.paymentCardFaded]}
+                onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
+                <View style={[styles.paymentIconBox, { backgroundColor: item.status === "PAID" ? theme.success + "15" : theme.accent + "15" }]}>
+                    <Ionicons name={item.status === "PAID" ? "checkmark-circle" : "time"} size={24} color={item.status === "PAID" ? theme.success : theme.accent} />
+                </View>
+                <View style={styles.paymentInfo}>
+                    <View style={styles.paymentNameRow}>
+                        <Text style={styles.paymentName}>{item.member_name}</Text>
+                        {hasLeft && (
+                            <View style={styles.leftBadge}>
+                                <Text style={styles.leftBadgeText}>Left</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={styles.paymentDate}>{item.date}</Text>
+                </View>
+                <View style={styles.paymentAmountBlock}>
+                    <Text style={[styles.paymentAmount, { color: item.status === "PAID" ? theme.success : theme.accent }]}>
+                        {item.status === "PAID" ? "+" : ""}
+                        ₹{item.amount}
+                    </Text>
+                    <Text style={styles.paymentStatus}>{item.status}</Text>
+                </View>
+            </Pressable>
+        );
+    };
 
     if (showPaymentForm) {
         return (
@@ -424,14 +436,35 @@ const createStyles = (theme: any) => StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
+    paymentCardFaded: {
+        opacity: 0.55,
+    },
     paymentInfo: {
         flex: 1,
         marginLeft: 16,
+    },
+    paymentNameRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
     },
     paymentName: {
         fontFamily: "sans-extrabold",
         fontSize: 16,
         color: theme.primary,
+    },
+    leftBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+        backgroundColor: theme.mutedForeground + "20",
+    },
+    leftBadgeText: {
+        fontFamily: "sans-bold",
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        color: theme.mutedForeground,
     },
     paymentDate: {
         fontFamily: "sans-medium",

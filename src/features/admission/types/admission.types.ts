@@ -1,3 +1,5 @@
+import { Gender } from "@/features/members/types/members.types";
+
 export interface AdmissionAllocation {
     batch_id: number;
     seat_id: number;
@@ -23,6 +25,7 @@ export const ID_PROOF_TYPE_OPTIONS: { value: IdProofType; label: string }[] = (O
 export interface CreateAdmissionRequest {
     name: string;
     phone: string;
+    gender?: Gender;
     allocations: AdmissionAllocation[];
 }
 
