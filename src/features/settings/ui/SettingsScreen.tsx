@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
@@ -26,6 +26,7 @@ interface SettingsGroup {
 export function SettingsScreen() {
 	const router = useRouter();
 	const { theme, mode, setMode } = useTheme();
+	const insets = useSafeAreaInsets();
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const { data: dashboard } = useApiData(getDashboardApi, []);
@@ -111,7 +112,7 @@ export function SettingsScreen() {
 				</View>
 			</View>
 
-			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 				<View style={styles.profileCenterBlock}>
 					<View style={styles.avatarHugeBackground}>
 						<Ionicons name="library" size={54} color="#fff" />

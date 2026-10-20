@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createBatchApi, getBatchesApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
@@ -36,6 +36,7 @@ function formatTimeDisplay(t: string): string {
 export function BatchesScreen() {
 	const router = useRouter();
 	const { theme } = useTheme();
+	const insets = useSafeAreaInsets();
 
 	const { data: batches, isLoading, error, refetch: fetchBatches } = useApiData(getBatchesApi, []);
 
@@ -127,7 +128,7 @@ export function BatchesScreen() {
 				</View>
 			</View>
 
-			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 				<View style={styles.summaryContainer}>
 					<Text style={styles.sectionTitle}>Active Batches ({batchList.length})</Text>
 				</View>

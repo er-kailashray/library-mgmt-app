@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, type Href } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useCallback } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -40,8 +41,17 @@ export function HomeScreen() {
 	const router = useRouter();
 	const { theme, isDark } = useTheme();
 
-	const { data: dashboard } = useApiData(getDashboardApi, []);
-	const { data: batches } = useApiData(getBatchesApi, []);
+	const { data: dashboard, refetch: refetchDashboard } = useApiData(getDashboardApi, []);
+	const { data: batches, refetch: refetchBatches } = useApiData(getBatchesApi, []);
+
+	// Refresh whenever Home regains focus (e.g. coming back after adding a batch) - Expo Router
+	// keeps this screen mounted in the stack, so the initial-mount fetch alone would go stale.
+	useFocusEffect(
+		useCallback(() => {
+			void refetchDashboard();
+			void refetchBatches();
+		}, [refetchDashboard, refetchBatches])
+	);
 
 	// Only resolve once batches have actually loaded, to avoid flashing the banner before we know.
 	const showBatchSetupBanner = batches !== null && batches.length === 0;
@@ -67,6 +77,22 @@ export function HomeScreen() {
 			</View>
 
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+				{showBatchSetupBanner ? (
+					<View style={styles.alertCard} accessibilityRole="alert">
+						<View style={styles.alertTitleRow}>
+							<View style={styles.alertIconWrap}>
+								<Ionicons name="calendar-outline" size={20} color={theme.primary} />
+							</View>
+							<Text style={styles.alertTitle}>Set up your batches first</Text>
+						</View>
+						<Text style={styles.alertCopy}>Add the time slots you run each day — morning, afternoon, evening. Then you can assign seats and track who paid.</Text>
+						<Pressable accessibilityRole="button" style={styles.alertCta} onPress={() => router.push("/batches")}>
+							<Text style={styles.alertCtaText}>Add batches</Text>
+							<Ionicons name="arrow-forward" size={16} color={theme.background} />
+						</Pressable>
+					</View>
+				) : null}
+
 				<Pressable style={styles.summaryCard} onPress={() => router.push("/payments")}>
 					<Text style={styles.summaryLabel}>This month (collections)</Text>
 					<Text style={styles.summaryValue}>{dashboard ? formatRupee(dashboard.monthly_collection) : "—"}</Text>
@@ -89,24 +115,8 @@ export function HomeScreen() {
 						</>
 					)}
 
-					<Text style={styles.summaryHint}>{showBatchSetupBanner ? "Set up batches to start tracking seat sales and renewals." : "Tap Payments for breakdown & dues."}</Text>
+					{showBatchSetupBanner && <Text style={styles.summaryHint}>Set up batches to start tracking seat sales and renewals.</Text>}
 				</Pressable>
-
-				{showBatchSetupBanner ? (
-					<View style={styles.alertCard} accessibilityRole="alert">
-						<View style={styles.alertTitleRow}>
-							<View style={styles.alertIconWrap}>
-								<Ionicons name="calendar-outline" size={22} color={theme.primary} />
-							</View>
-							<Text style={styles.alertTitle}>Set up your batches first</Text>
-						</View>
-						<Text style={styles.alertCopy}>Add the time slots you run each day (for example morning, afternoon, evening). Then you can assign seats, see who paid for which batch, and get clearer earnings visibility.</Text>
-						<Pressable accessibilityRole="button" style={styles.alertCta} onPress={() => router.push("/batches")}>
-							<Text style={styles.alertCtaText}>Add batches</Text>
-							<Ionicons name="arrow-forward" size={18} color={theme.background} />
-						</Pressable>
-					</View>
-				) : null}
 
 				<Text style={styles.sectionTitle}>Menu</Text>
 				<View style={styles.menuGrid}>
@@ -267,15 +277,15 @@ const createStyles = (theme: any) =>
 		alertTitle: {
 			fontFamily: "sans-bold",
 			flex: 1,
-			fontSize: 16,
+			fontSize: 15,
 			color: theme.primary,
 		},
 		alertCopy: {
 			fontFamily: "sans-medium",
-			fontSize: 14,
+			fontSize: 13,
 			color: theme.mutedForeground,
-			lineHeight: 20,
-			marginBottom: 16,
+			lineHeight: 18,
+			marginBottom: 14,
 		},
 		alertCta: {
 			flexDirection: "row",

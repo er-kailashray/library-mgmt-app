@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { getUpcomingRenewalsApi, remindAllUpcomingRenewalsApi } from "@/features/renewals/logic/renewals-api";
@@ -29,9 +29,16 @@ function buildRenewalMessage(renewal: UpcomingRenewal): string {
 export function RenewalsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
 
     const { data, isLoading, error, refetch } = useApiData(getUpcomingRenewalsApi, []);
     const renewals = data?.renewals ?? [];
+
+    useFocusEffect(
+        useCallback(() => {
+            void refetch();
+        }, [refetch])
+    );
 
     const [sendingMemberId, setSendingMemberId] = useState<number | null>(null);
     const [isSendingBulk, setIsSendingBulk] = useState(false);
@@ -90,7 +97,7 @@ export function RenewalsScreen() {
             ) : renewals.length === 0 ? (
                 <EmptyState icon="refresh-outline" title="No renewals coming up" subtitle="You'll see members here as their membership gets close to renewing." />
             ) : (
-                <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                     <Pressable style={[styles.remindAllBtn, isSendingBulk && { opacity: 0.7 }]} onPress={handleRemindAll} disabled={isSendingBulk}>
                         {isSendingBulk ? (
                             <ActivityIndicator color={theme.accent} size="small" />

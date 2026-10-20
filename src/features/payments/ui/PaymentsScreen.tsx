@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import {
@@ -18,7 +18,7 @@ import {
     TouchableWithoutFeedback,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
@@ -32,12 +32,19 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 export function PaymentsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const [showPaymentForm, setShowPaymentForm] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "pending">("all");
 
     const { data, isLoading, error, refetch: fetchPayments } = useApiData(getPaymentsApi, []);
     const payments = data ?? [];
+
+    useFocusEffect(
+        useCallback(() => {
+            void fetchPayments();
+        }, [fetchPayments])
+    );
 
     // Form State
     const [members, setMembers] = useState<Member[]>([]);
@@ -112,7 +119,7 @@ export function PaymentsScreen() {
     const styles = createStyles(theme);
 
     const renderPaymentItem = ({ item }: { item: Payment }) => (
-        <Pressable style={styles.paymentCard} onPress={() => router.push(`/members/${item.member_id}`)}>
+        <Pressable style={styles.paymentCard} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
             <View style={[styles.paymentIconBox, { backgroundColor: item.status === "PAID" ? theme.success + "15" : theme.accent + "15" }]}>
                 <Ionicons name={item.status === "PAID" ? "checkmark-circle" : "time"} size={24} color={item.status === "PAID" ? theme.success : theme.accent} />
             </View>
@@ -146,7 +153,7 @@ export function PaymentsScreen() {
                             </View>
                         </View>
 
-                        <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
+                        <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>Member</Text>
                                 <Pressable style={styles.input} onPress={() => setMemberPickerVisible(true)}>
@@ -271,10 +278,10 @@ export function PaymentsScreen() {
                     <EmptyState icon="search-outline" title="No transactions found" subtitle="Try adjusting your search or filters." />
                 )
             ) : (
-                <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} />
+                <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} />
             )}
 
-            <Pressable style={styles.fab} onPress={openPaymentForm}>
+            <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
                 <Ionicons name="add" size={32} color={theme.background} />
             </Pressable>
         </SafeAreaView>

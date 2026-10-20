@@ -34,6 +34,9 @@ export interface MemberDetail {
     status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     due_amount: number | null;
+    id_proof_type: "aadhaar" | "pan" | "voter_id_dl" | "student_id" | "other" | null;
+    has_id_proof_front: boolean;
+    has_id_proof_back: boolean;
     allocations: MemberAllocation[];
 }
 

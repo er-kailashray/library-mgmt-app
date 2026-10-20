@@ -4,6 +4,11 @@ function buildUrl(path: string) {
 	return `${baseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
+/** For callers that need the full URL directly, e.g. an authenticated <Image> source. */
+export function apiUrl(path: string) {
+	return buildUrl(path);
+}
+
 async function parseJsonResponse<T>(response: Response): Promise<T> {
 	const text = await response.text();
 	const json = text.length ? JSON.parse(text) : null;

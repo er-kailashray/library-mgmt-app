@@ -1,14 +1,20 @@
 import { getStoredAuthToken } from "@/services/api/auth.api";
 import { apiPost } from "@/services/api/client";
-import { CreateAdmissionRequest } from "../types/admission.types";
+import { CreateAdmissionRequest, CreateAdmissionResult } from "../types/admission.types";
 
-export async function createAdmissionApi(payload: CreateAdmissionRequest): Promise<void> {
+export async function createAdmissionApi(payload: CreateAdmissionRequest): Promise<CreateAdmissionResult> {
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");
 
-    await apiPost("/api/admission", payload, {
-        headers: {
-            Authorization: `Bearer ${token}`,
+    const response = await apiPost<{ data: { id: number } }>(
+        "/api/admission",
+        {
+            name: payload.name,
+            phone: payload.phone,
+            allocations: payload.allocations,
         },
-    });
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    return { memberId: response.data.id };
 }

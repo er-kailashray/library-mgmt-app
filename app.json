@@ -59,7 +59,14 @@
         }
       ],
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Librum uses your photo library to attach a member's ID proof at admission.",
+          "cameraPermission": "Librum uses your camera to photograph a member's ID proof at admission."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

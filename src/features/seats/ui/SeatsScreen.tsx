@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { SeatMatrixSeat } from "@/features/seats/types/seats.types";
@@ -20,8 +20,15 @@ const formatSeatNumber = (num: any) => {
 export function SeatsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
 
     const { data, isLoading, error, refetch: fetchData } = useApiData(getSeatMatrixApi, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void fetchData();
+        }, [fetchData])
+    );
     const batchesFilter = data?.batches ?? [];
     const seats = data?.seats ?? [];
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
@@ -198,7 +205,7 @@ export function SeatsScreen() {
                     keyExtractor={(item) => item.seat_id.toString()}
                     renderItem={renderSeatBlock}
                     ListHeaderComponent={renderFilterHeader}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
                     columnWrapperStyle={styles.columnWrapper}
                     showsVerticalScrollIndicator={false}
                     numColumns={4}

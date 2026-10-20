@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getAttendanceRosterApi, markAttendanceApi } from "@/features/attendance/logic/attendance-api";
 import { AttendanceStatus } from "@/features/attendance/types/attendance.types";
@@ -19,8 +19,15 @@ function formatDateLabel(dateStr: string): string {
 export function AttendanceScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
 
     const { data: roster, isLoading, error, refetch, setData } = useApiData(() => getAttendanceRosterApi(), []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void refetch();
+        }, [refetch])
+    );
 
     const handleMark = useCallback(
         async (batchId: number, memberId: number, status: AttendanceStatus) => {
@@ -75,7 +82,7 @@ export function AttendanceScreen() {
                     onAction={() => router.push("/batches")}
                 />
             ) : (
-                <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                     {roster.batches.map((batch) => {
                         const presentCount = batch.members.filter((m) => m.status === "present").length;
                         return (

@@ -1,26 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useCallback, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
+import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
+import { uploadMemberIdProofApi } from "@/features/members/logic/members.api";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { PhotoPickerSlot } from "@/shared/ui/PhotoPickerSlot";
+import { SelectField } from "@/shared/ui/SelectField";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", {
@@ -33,10 +27,17 @@ function formatRupee(amount: number): string {
 export function AdmissionScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
 
     const { data, isLoading, error, refetch: fetchData } = useApiData(getSeatMatrixApi, []);
     const batches = data?.batches ?? [];
     const seatsData = data?.seats ?? [];
+
+    useFocusEffect(
+        useCallback(() => {
+            void fetchData();
+        }, [fetchData])
+    );
 
     const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
     const [assignMode, setAssignMode] = useState<"common" | "perBatch">("common");
@@ -46,8 +47,43 @@ export function AdmissionScreen() {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
 
+    const [idProofType, setIdProofType] = useState<IdProofType | null>(null);
+    const [idProofFrontUri, setIdProofFrontUri] = useState<string | null>(null);
+    const [idProofBackUri, setIdProofBackUri] = useState<string | null>(null);
+
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const pickIdProofImage = useCallback(async (side: IdProofSide, source: "camera" | "gallery") => {
+        const permission =
+            source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (!permission.granted) {
+            Alert.alert("Permission needed", `Please allow ${source === "camera" ? "camera" : "photo library"} access to attach an ID proof.`);
+            return;
+        }
+
+        const result =
+            source === "camera"
+                ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true })
+                : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true });
+
+        if (!result.canceled && result.assets[0]) {
+            (side === "front" ? setIdProofFrontUri : setIdProofBackUri)(result.assets[0].uri);
+            setSubmitError(null);
+        }
+    }, []);
+
+    const handleAddIdProofPhoto = useCallback(
+        (side: IdProofSide) => {
+            Alert.alert(`Add ${side === "front" ? "Front" : "Back"} Photo`, undefined, [
+                { text: "Take Photo", onPress: () => pickIdProofImage(side, "camera") },
+                { text: "Choose from Gallery", onPress: () => pickIdProofImage(side, "gallery") },
+                { text: "Cancel", style: "cancel" },
+            ]);
+        },
+        [pickIdProofImage]
+    );
 
     const seatAvailableForBatches = (seat: (typeof seatsData)[number], batchIds: number[]) =>
         batchIds.every((bId) => seat.batches.find((sb) => sb.batch_id === bId)?.available === true);
@@ -97,6 +133,14 @@ export function AdmissionScreen() {
             setSubmitError("You must select at least one batch.");
             return;
         }
+        if ((idProofFrontUri || idProofBackUri) && !idProofType) {
+            setSubmitError("Please select which ID type this photo is for.");
+            return;
+        }
+        if (idProofType && !idProofFrontUri) {
+            setSubmitError("Please add a front photo of the selected ID proof.");
+            return;
+        }
 
         let allocationPayload: { batch_id: number; seat_id: number }[];
 
@@ -118,11 +162,25 @@ export function AdmissionScreen() {
 
         try {
             setIsSubmitting(true);
-            await createAdmissionApi({
+            const { memberId } = await createAdmissionApi({
                 name: name.trim(),
                 phone: phone.trim(),
                 allocations: allocationPayload,
             });
+
+            if (idProofType && idProofFrontUri) {
+                try {
+                    await uploadMemberIdProofApi(memberId, idProofType, "front", idProofFrontUri);
+                    if (idProofBackUri) {
+                        await uploadMemberIdProofApi(memberId, idProofType, "back", idProofBackUri);
+                    }
+                } catch {
+                    Alert.alert("Admission confirmed", "Admission was created, but the ID proof photo failed to upload. You can add it from the member's profile.");
+                    router.back();
+                    return;
+                }
+            }
+
             Alert.alert("Success", "Admission confirmed correctly!");
             router.back();
         } catch (err: any) {
@@ -150,7 +208,7 @@ export function AdmissionScreen() {
             </View>
 
             <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     {isLoading ? (
                         <LoadingState />
                     ) : error ? (
@@ -316,6 +374,34 @@ export function AdmissionScreen() {
                                         maxLength={15}
                                     />
                                 </View>
+                            </View>
+
+                            {/* ID PROOF (OPTIONAL) */}
+                            <View style={styles.sectionBlock}>
+                                <Text style={styles.sectionTitle}>ID Proof (Optional)</Text>
+                                <SelectField
+                                    label="ID Type"
+                                    placeholder="Select ID type"
+                                    value={idProofType}
+                                    options={ID_PROOF_TYPE_OPTIONS}
+                                    onChange={(type) => {
+                                        setIdProofType(type);
+                                        setSubmitError(null);
+                                    }}
+                                />
+
+                                <PhotoPickerSlot
+                                    label="Front Side"
+                                    uri={idProofFrontUri}
+                                    onAdd={() => handleAddIdProofPhoto("front")}
+                                    onRemove={() => setIdProofFrontUri(null)}
+                                />
+                                <PhotoPickerSlot
+                                    label="Back Side (Optional)"
+                                    uri={idProofBackUri}
+                                    onAdd={() => handleAddIdProofPhoto("back")}
+                                    onRemove={() => setIdProofBackUri(null)}
+                                />
                             </View>
 
                             {submitError && (

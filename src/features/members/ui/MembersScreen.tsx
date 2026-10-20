@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
@@ -23,6 +23,7 @@ function getInitials(name: string): string {
 export function MembersScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<"all" | "active" | "due">("all");
 
@@ -54,7 +55,7 @@ export function MembersScreen() {
     const styles = createStyles(theme);
 
     const renderMemberItem = ({ item }: { item: Member }) => (
-        <Pressable style={styles.memberCard} onPress={() => router.push(`/members/${item.id}`)}>
+        <Pressable style={styles.memberCard} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.id) } })}>
             <View style={[styles.avatarSmall, { backgroundColor: getStatusColor(item.payment_status) + "15" }]}>
                 <Text style={{ color: getStatusColor(item.payment_status), fontFamily: "sans-extrabold" }}>{item.initials || getInitials(item.name)}</Text>
             </View>
@@ -125,12 +126,12 @@ export function MembersScreen() {
                     data={filteredMembers}
                     renderItem={renderMemberItem}
                     keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
                     showsVerticalScrollIndicator={false}
                 />
             )}
 
-            <Pressable accessibilityRole="button" style={styles.fab} onPress={() => router.push("/admission")}>
+            <Pressable accessibilityRole="button" style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={() => router.push("/admission")}>
                 <Ionicons name="add" size={32} color={theme.background} />
             </Pressable>
         </SafeAreaView>
