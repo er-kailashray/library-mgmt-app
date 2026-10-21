@@ -191,7 +191,7 @@ export function SettingsScreen() {
 							)}
 						</View>
 						<View style={styles.avatarCameraBadge}>
-							<Ionicons name="camera" size={16} color="#fff" />
+							<Ionicons name="camera" size={16} color={theme.background} />
 						</View>
 					</Pressable>
 					<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
