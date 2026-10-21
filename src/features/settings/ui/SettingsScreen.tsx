@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
+import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
-import { getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
+import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -35,8 +36,15 @@ export function SettingsScreen() {
 
 	useEffect(() => {
 		const loadUser = async () => {
-			const storedUser = await getStoredAuthUser();
-			setUser(storedUser);
+			setUser(await getStoredAuthUser());
+			// The cached copy can be stale (e.g. photo URL), so refresh it from the server.
+			try {
+				const freshUser = await getMeApi();
+				await updateStoredAuthUser(freshUser);
+				setUser(freshUser);
+			} catch {
+				// Offline or token issue - keep showing the cached user.
+			}
 		};
 		void loadUser();
 	}, []);
@@ -45,6 +53,20 @@ export function SettingsScreen() {
 	const [editProfileName, setEditProfileName] = useState("");
 	const [editProfilePhone, setEditProfilePhone] = useState("");
 	const [isSavingProfile, setIsSavingProfile] = useState(false);
+	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+	const handleChangePhoto = useCallback(async () => {
+		const uri = await pickProfilePhoto();
+		if (!uri) return;
+		try {
+			setIsUploadingPhoto(true);
+			setUser(await uploadProfilePhoto(uri));
+		} catch (err: any) {
+			Alert.alert("Error", err.message || "Failed to upload photo.");
+		} finally {
+			setIsUploadingPhoto(false);
+		}
+	}, []);
 
 	const openEditProfile = useCallback(() => {
 		if (!user) return;
@@ -103,6 +125,11 @@ export function SettingsScreen() {
 					onPress: () => router.push("/library-profile"),
 				},
 				{
+					icon: "location-outline",
+					label: "Library Location",
+					onPress: () => router.push("/library-location"),
+				},
+				{
 					icon: "images-outline",
 					label: "Manage Photos",
 					onPress: () => router.push("/library-photos"),
@@ -150,9 +177,23 @@ export function SettingsScreen() {
 
 			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 				<View style={styles.profileCenterBlock}>
-					<View style={styles.avatarHugeBackground}>
-						<Text style={styles.avatarHugeText}>{getInitials(dashboard?.library_name || "My Library")}</Text>
-					</View>
+					<Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={handleChangePhoto} disabled={isUploadingPhoto} style={styles.avatarHugeWrap}>
+						<View style={styles.avatarHugeBackground}>
+							{user?.profile_photo_url ? (
+								<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
+							) : (
+								<Text style={styles.avatarHugeText}>{getInitials(user?.name || "")}</Text>
+							)}
+							{isUploadingPhoto && (
+								<View style={styles.avatarHugeOverlay}>
+									<ActivityIndicator color="#fff" />
+								</View>
+							)}
+						</View>
+						<View style={styles.avatarCameraBadge}>
+							<Ionicons name="camera" size={16} color="#fff" />
+						</View>
+					</Pressable>
 					<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
 					{user && (
 						<View style={styles.ownerInfoRow}>
@@ -304,6 +345,14 @@ const createStyles = (theme: any) => StyleSheet.create({
 		marginBottom: 40,
 		paddingHorizontal: 16,
 	},
+	// iOS shadow lives on the wrapper because overflow: "hidden" (needed to clip the photo) would clip it.
+	avatarHugeWrap: {
+		marginBottom: 20,
+		shadowColor: theme.accent,
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.3,
+		shadowRadius: 16,
+	},
 	avatarHugeBackground: {
 		width: 110,
 		height: 110,
@@ -311,12 +360,31 @@ const createStyles = (theme: any) => StyleSheet.create({
 		backgroundColor: theme.accent,
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: 20,
-		shadowColor: theme.accent,
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.3,
-		shadowRadius: 16,
+		overflow: "hidden",
 		elevation: 8,
+	},
+	avatarHugeImage: {
+		width: "100%",
+		height: "100%",
+	},
+	avatarHugeOverlay: {
+		...StyleSheet.absoluteFill,
+		backgroundColor: "rgba(0,0,0,0.4)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	avatarCameraBadge: {
+		position: "absolute",
+		right: 2,
+		bottom: 2,
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: theme.primary,
+		borderWidth: 2,
+		borderColor: theme.background,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	avatarHugeText: {
 		fontFamily: "sans-extrabold",

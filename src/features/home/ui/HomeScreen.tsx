@@ -1,16 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
 import { getDashboardApi } from "@/features/home/logic/home-api";
+import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { StatTile } from "@/shared/ui/StatTile";
+import { getInitials } from "@/shared/utils/text";
 
 type MenuItem = {
 	key: string;
@@ -31,6 +33,17 @@ const MENU: MenuItem[] = [
 	{ key: "settings", label: "Settings", hint: "Library & reminders", icon: "settings-outline", href: "/settings" },
 ];
 
+type SetupStep = {
+	key: string;
+	label: string;
+	hint: string;
+	icon: keyof typeof Ionicons.glyphMap;
+	done: boolean;
+	required?: boolean;
+	busy?: boolean;
+	onPress: () => void;
+};
+
 function formatRupee(amount: number): string {
 	return new Intl.NumberFormat("en-IN", {
 		style: "currency",
@@ -43,7 +56,7 @@ export function HomeScreen() {
 	const router = useRouter();
 	const { theme, isDark } = useTheme();
 
-	const { data: dashboard, refetch: refetchDashboard } = useApiData(getDashboardApi, []);
+	const { data: dashboard, refetch: refetchDashboard, setData: setDashboard } = useApiData(getDashboardApi, []);
 	const { data: batches, refetch: refetchBatches } = useApiData(getBatchesApi, []);
 
 	// Refresh whenever Home regains focus (e.g. coming back after adding a batch) - Expo Router
@@ -58,6 +71,59 @@ export function HomeScreen() {
 	// Only resolve once batches have actually loaded, to avoid flashing the banner before we know.
 	const showBatchSetupBanner = batches !== null && batches.length === 0;
 
+	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+	const handleAddPhoto = useCallback(async () => {
+		const uri = await pickProfilePhoto();
+		if (!uri) return;
+		try {
+			setIsUploadingPhoto(true);
+			const user = await uploadProfilePhoto(uri);
+			// Patch the photo in place rather than refetching the whole dashboard.
+			setDashboard((current) => (current ? { ...current, owner_photo: user.profile_photo_url ?? null } : current));
+		} catch (err: any) {
+			Alert.alert("Error", err.message || "Failed to upload photo.");
+		} finally {
+			setIsUploadingPhoto(false);
+		}
+	}, [setDashboard]);
+
+	// Batches are required before anything else works; location and photo are nice-to-haves.
+	// Wait for both requests so the card doesn't flash with half its ticks wrong.
+	const setupSteps: SetupStep[] =
+		dashboard && batches
+			? [
+					{
+						key: "batches",
+						label: "Set up your batches",
+						hint: "Add your daily time slots, then assign seats",
+						icon: "calendar-outline",
+						done: batches.length > 0,
+						required: true,
+						onPress: () => router.push("/batches"),
+					},
+					{
+						key: "location",
+						label: "Pin library on map",
+						hint: "So students can get directions",
+						icon: "location-outline",
+						done: !!dashboard.library_address,
+						onPress: () => router.push("/library-location"),
+					},
+					{
+						key: "photo",
+						label: "Add profile photo",
+						hint: "Shown to your students",
+						icon: "camera-outline",
+						done: !!dashboard.owner_photo,
+						busy: isUploadingPhoto,
+						onPress: handleAddPhoto,
+					},
+				]
+			: [];
+	const completedSteps = setupSteps.filter((step) => step.done).length;
+	const showSetupCard = setupSteps.length > 0 && completedSteps < setupSteps.length;
+
 	const progressPercentage =
 		dashboard && dashboard.expected_collection > 0 ? Math.min(100, Math.round((dashboard.monthly_collection / dashboard.expected_collection) * 100)) : 0;
 
@@ -69,16 +135,77 @@ export function HomeScreen() {
 			<View style={styles.headerWrapper}>
 				<View style={styles.header}>
 					<View style={styles.headerText}>
-						<Text style={styles.headerTitle}>{dashboard?.library_name || "My Library"}</Text>
-						<Text style={styles.headerSubtitle}>{dashboard?.owner_name || ""}</Text>
+						<Text style={styles.headerTitle} numberOfLines={1}>
+							{dashboard?.library_name || "My Library"}
+						</Text>
+						<Pressable accessibilityRole="button" style={styles.headerAddressRow} onPress={() => router.push("/library-location")}>
+							<Ionicons name="location" size={14} color={theme.accent} />
+							<Text style={styles.headerSubtitle} numberOfLines={1}>
+								{dashboard?.library_address || "Add library address"}
+							</Text>
+							<Ionicons name="chevron-down" size={14} color={theme.mutedForeground} />
+						</Pressable>
 					</View>
-					<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.push("/settings")}>
-						<Ionicons name="menu" size={24} color={theme.primary} />
+					<Pressable accessibilityRole="button" accessibilityLabel="Profile and settings" onPress={() => router.push("/settings")}>
+						{dashboard?.owner_photo ? (
+							<Image source={{ uri: dashboard.owner_photo }} style={styles.avatar} />
+						) : (
+							<View style={styles.avatar}>
+								<Text style={styles.avatarText}>{getInitials(dashboard?.owner_name || "")}</Text>
+							</View>
+						)}
 					</Pressable>
 				</View>
 			</View>
 
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+				{showSetupCard && (
+					<View style={styles.setupCard}>
+						<View style={styles.setupHeaderRow}>
+							<Text style={styles.setupTitle}>Get your library ready</Text>
+							<Text style={styles.setupCount}>
+								{completedSteps}/{setupSteps.length} done
+							</Text>
+						</View>
+						<View style={styles.setupProgressTrack}>
+							<View style={[styles.setupProgressBar, { width: `${(completedSteps / setupSteps.length) * 100}%` }]} />
+						</View>
+
+						{setupSteps.map((step, index) => {
+							const highlight = step.required && !step.done;
+							return (
+								<Pressable
+									key={step.key}
+									accessibilityRole="button"
+									style={[styles.setupRow, index !== setupSteps.length - 1 && styles.setupRowBorder]}
+									onPress={step.onPress}
+									disabled={step.done || step.busy}
+								>
+									<View style={styles.setupIconWrap}>
+										<Ionicons name={step.icon} size={20} color={theme.accent} />
+									</View>
+									<View style={styles.setupRowText}>
+										<View style={styles.setupLabelRow}>
+											<Text style={styles.setupRowLabel}>{step.label}</Text>
+											{!step.done && (
+												<Text style={[styles.setupTag, highlight ? styles.setupTagRequired : styles.setupTagOptional]}>{step.required ? "Start here" : "Optional"}</Text>
+											)}
+										</View>
+										<Text style={styles.setupRowHint}>{step.hint}</Text>
+									</View>
+									{step.busy ? (
+										<ActivityIndicator size="small" color={theme.accent} />
+									) : step.done ? (
+										<Ionicons name="checkmark-circle" size={22} color={theme.success} />
+									) : (
+										<Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
+									)}
+								</Pressable>
+							);
+						})}
+					</View>
+				)}
+
 				{dashboard && (
 					<View style={styles.statsRow}>
 						<StatTile label="Seats Filled" value={`${dashboard.occupied_seats}/${dashboard.total_seats}`} icon="grid-outline" />
@@ -91,22 +218,6 @@ export function HomeScreen() {
 						/>
 					</View>
 				)}
-
-				{showBatchSetupBanner ? (
-					<View style={styles.alertCard} accessibilityRole="alert">
-						<View style={styles.alertTitleRow}>
-							<View style={styles.alertIconWrap}>
-								<Ionicons name="calendar-outline" size={20} color={theme.primary} />
-							</View>
-							<Text style={styles.alertTitle}>Set up your batches first</Text>
-						</View>
-						<Text style={styles.alertCopy}>Add the time slots you run each day — morning, afternoon, evening. Then you can assign seats and track who paid.</Text>
-						<Pressable accessibilityRole="button" style={styles.alertCta} onPress={() => router.push("/batches")}>
-							<Text style={styles.alertCtaText}>Add batches</Text>
-							<Ionicons name="arrow-forward" size={16} color={theme.background} />
-						</Pressable>
-					</View>
-				) : null}
 
 				{dashboard && (
 					<Pressable style={styles.duesCard} onPress={() => router.push("/renewals")}>
@@ -236,8 +347,6 @@ const createStyles = (theme: any) =>
 		headerWrapper: {
 			backgroundColor: theme.background,
 			paddingTop: 8,
-			borderBottomWidth: 1,
-			borderBottomColor: theme.border,
 			zIndex: 10,
 		},
 		header: {
@@ -253,22 +362,126 @@ const createStyles = (theme: any) =>
 		},
 		headerTitle: {
 			fontFamily: "sans-extrabold",
-			fontSize: 22,
+			fontSize: 20,
 			color: theme.primary,
 			marginBottom: 2,
 		},
+		headerAddressRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 4,
+		},
 		headerSubtitle: {
+			flexShrink: 1,
 			fontFamily: "sans-medium",
-			fontSize: 14,
+			fontSize: 13,
 			color: theme.mutedForeground,
 		},
-		headerActionCircle: {
+		avatar: {
 			width: 44,
 			height: 44,
 			borderRadius: 22,
 			backgroundColor: theme.muted,
 			alignItems: "center",
 			justifyContent: "center",
+			overflow: "hidden",
+		},
+		avatarText: {
+			fontFamily: "sans-bold",
+			fontSize: 16,
+			color: theme.primary,
+		},
+		setupCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.accent + "40",
+			padding: 18,
+			marginBottom: 24,
+		},
+		setupHeaderRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+		},
+		setupTitle: {
+			fontFamily: "sans-bold",
+			fontSize: 15,
+			color: theme.primary,
+		},
+		setupCount: {
+			fontFamily: "sans-bold",
+			fontSize: 12,
+			color: theme.mutedForeground,
+		},
+		setupProgressTrack: {
+			height: 4,
+			backgroundColor: theme.muted,
+			borderRadius: 2,
+			overflow: "hidden",
+			marginTop: 10,
+			marginBottom: 6,
+		},
+		setupProgressBar: {
+			height: "100%",
+			backgroundColor: theme.success,
+			borderRadius: 2,
+		},
+		setupRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 12,
+			paddingVertical: 12,
+		},
+		setupRowBorder: {
+			borderBottomWidth: StyleSheet.hairlineWidth,
+			borderBottomColor: theme.border,
+		},
+		setupIconWrap: {
+			width: 40,
+			height: 40,
+			borderRadius: RADIUS.sm,
+			backgroundColor: theme.accent + "15",
+			alignItems: "center",
+			justifyContent: "center",
+		},
+		setupRowText: {
+			flex: 1,
+		},
+		setupLabelRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			flexWrap: "wrap",
+			gap: 6,
+		},
+		setupRowLabel: {
+			fontFamily: "sans-bold",
+			fontSize: 14,
+			color: theme.primary,
+		},
+		setupTag: {
+			fontFamily: "sans-bold",
+			fontSize: 10,
+			textTransform: "uppercase",
+			letterSpacing: 0.4,
+			paddingHorizontal: 6,
+			paddingVertical: 2,
+			borderRadius: 4,
+			overflow: "hidden",
+		},
+		setupTagRequired: {
+			color: theme.accent,
+			backgroundColor: theme.accent + "1A",
+		},
+		setupTagOptional: {
+			color: theme.mutedForeground,
+			backgroundColor: theme.muted,
+		},
+		setupRowHint: {
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			marginTop: 2,
 		},
 		summaryCard: {
 			backgroundColor: theme.card,
@@ -336,57 +549,6 @@ const createStyles = (theme: any) =>
 			flexDirection: "row",
 			gap: 10,
 			marginBottom: 24,
-		},
-		alertCard: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			borderWidth: 1,
-			borderColor: theme.border,
-			padding: 18,
-			marginBottom: 32,
-		},
-		alertTitleRow: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 12,
-			marginBottom: 12,
-		},
-		alertIconWrap: {
-			width: 44,
-			height: 44,
-			borderRadius: RADIUS.sm,
-			backgroundColor: theme.muted,
-			alignItems: "center",
-			justifyContent: "center",
-		},
-		alertTitle: {
-			fontFamily: "sans-bold",
-			flex: 1,
-			fontSize: 15,
-			color: theme.primary,
-		},
-		alertCopy: {
-			fontFamily: "sans-medium",
-			fontSize: 13,
-			color: theme.mutedForeground,
-			lineHeight: 18,
-			marginBottom: 14,
-		},
-		alertCta: {
-			flexDirection: "row",
-			alignItems: "center",
-			justifyContent: "center",
-			gap: 8,
-			backgroundColor: theme.primary,
-			paddingVertical: 12,
-			paddingHorizontal: 16,
-			borderRadius: RADIUS.sm,
-			alignSelf: "flex-start",
-		},
-		alertCtaText: {
-			fontFamily: "sans-bold",
-			fontSize: 14,
-			color: theme.background,
 		},
 		duesCard: {
 			backgroundColor: theme.card,

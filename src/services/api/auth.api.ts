@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { STORAGE_KEYS } from "@/shared/constants/storage";
-import { apiFetch, apiPost } from "./client";
+import { uploadImage } from "@/shared/utils/image-upload";
+import { apiFetch, apiPost, apiUrl } from "./client";
 
 export interface LoginRequest {
 	phone: string;
@@ -18,6 +19,13 @@ export async function loginApi(payload: LoginRequest): Promise<LoginResponse> {
 	return apiPost<LoginResponse>("/api/login", payload);
 }
 
+export async function getMeApi(): Promise<AuthUser> {
+	const token = await getStoredAuthToken();
+	if (!token) throw new Error("No auth token");
+
+	return apiPost<AuthUser>("/api/me", {}, { headers: { Authorization: `Bearer ${token}` } });
+}
+
 export async function updateProfileApi(payload: { name: string; phone: string }): Promise<{ message: string; user: AuthUser }> {
 	const token = await getStoredAuthToken();
 	if (!token) throw new Error("No auth token");
@@ -25,6 +33,22 @@ export async function updateProfileApi(payload: { name: string; phone: string })
 	return apiPost<{ message: string; user: AuthUser }>("/api/me/update", payload, {
 		headers: { Authorization: `Bearer ${token}` },
 	});
+}
+
+export async function uploadProfilePhotoApi(uri: string): Promise<{ message: string; user: AuthUser }> {
+	const token = await getStoredAuthToken();
+	if (!token) throw new Error("No auth token");
+
+	const result = await uploadImage(apiUrl("/api/me/photo"), uri, {
+		fieldName: "photo",
+		headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+	});
+
+	const body = result.body ? JSON.parse(result.body) : null;
+	if (result.status < 200 || result.status >= 300) {
+		throw new Error(body?.message ?? "Failed to upload photo.");
+	}
+	return body;
 }
 
 export async function logoutApi(): Promise<void> {

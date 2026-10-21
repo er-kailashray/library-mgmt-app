@@ -1,7 +1,7 @@
 import { getStoredAuthToken } from "@/services/api/auth.api";
 import { apiFetch, apiPost, apiUrl } from "@/services/api/client";
 import { uploadImage } from "@/shared/utils/image-upload";
-import { Amenity, LibraryProfileResponse } from "../types/library-profile.types";
+import { Amenity, LibraryLocation, LibraryProfileResponse } from "../types/library-profile.types";
 
 async function authHeaders(): Promise<{ Authorization: string }> {
     const token = await getStoredAuthToken();
@@ -19,6 +19,10 @@ export async function updateLibraryProfileApi(payload: { library_name: string; t
 
 export async function updateLibraryAmenitiesApi(amenities: Amenity[]): Promise<LibraryProfileResponse> {
     return apiPost<LibraryProfileResponse>("/api/library/amenities", { amenities }, { headers: await authHeaders() });
+}
+
+export async function updateLibraryLocationApi(location: LibraryLocation): Promise<LibraryProfileResponse> {
+    return apiPost<LibraryProfileResponse>("/api/library/location", location, { headers: await authHeaders() });
 }
 
 export async function uploadLibraryPhotoApi(uri: string): Promise<{ status: boolean; message?: string; data: { id: number; url: string } }> {

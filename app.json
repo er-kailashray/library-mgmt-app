@@ -63,8 +63,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Librum uses your photo library to attach a member's ID proof at admission.",
-          "cameraPermission": "Librum uses your camera to photograph a member's ID proof at admission."
+          "photosPermission": "Librum uses your photo library to attach member ID proofs and your profile photo.",
+          "cameraPermission": "Librum uses your camera to photograph member ID proofs and your profile photo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Librum uses your location to pin your library on the map so students can find it."
         }
       ]
     ],

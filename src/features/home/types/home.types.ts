@@ -1,6 +1,8 @@
 export interface DashboardData {
     library_name: string;
+    library_address?: string | null;
     owner_name: string;
+    owner_photo?: string | null; // absolute URL, if the owner has uploaded one
 
     total_seats: number;
     occupied_seats: number;

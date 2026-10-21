@@ -37,6 +37,15 @@ export interface LibraryProfile {
     total_seats: number;
     amenities: Amenity[];
     photos: LibraryPhoto[];
+    address: string | null;
+    latitude: number | null;
+    longitude: number | null;
+}
+
+export interface LibraryLocation {
+    address: string;
+    latitude: number;
+    longitude: number;
 }
 
 export interface LibraryProfileResponse {

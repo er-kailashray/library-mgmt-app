@@ -4,6 +4,7 @@ export interface AuthUser {
 	name: string;
 	phone: string;
 	role: string;
+	profile_photo_url?: string | null;
 }
 
 /** Registration Payload */
