@@ -70,6 +70,9 @@ export function HomeScreen() {
 
 	// Only resolve once batches have actually loaded, to avoid flashing the banner before we know.
 	const showBatchSetupBanner = batches !== null && batches.length === 0;
+	// Brand-new library: every number on Home would be 0, so guide the owner to their first member instead.
+	// Payments are checked too so a library whose members have all left doesn't look "new".
+	const isNewLibrary = dashboard !== null && dashboard.total_members === 0 && dashboard.recent_payments.length === 0;
 
 	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -206,7 +209,33 @@ export function HomeScreen() {
 					</View>
 				)}
 
-				{dashboard && (
+				{isNewLibrary && (
+					<View style={styles.firstMemberCard}>
+						<View style={styles.firstMemberIconWrap}>
+							<Ionicons name="person-add-outline" size={26} color={theme.accent} />
+						</View>
+						<Text style={styles.firstMemberTitle}>Add your first member</Text>
+						<Text style={styles.firstMemberCopy}>
+							Admit a student, give them a seat and record their first payment. Your seats, collections and dues will show up here.
+						</Text>
+						{showBatchSetupBanner ? (
+							<>
+								<Pressable accessibilityRole="button" style={[styles.firstMemberCta, styles.firstMemberCtaMuted]} onPress={() => router.push("/batches")}>
+									<Text style={[styles.firstMemberCtaText, styles.firstMemberCtaTextMuted]}>Set up batches first</Text>
+									<Ionicons name="arrow-forward" size={16} color={theme.primary} />
+								</Pressable>
+								<Text style={styles.firstMemberHint}>Members are assigned to a batch, so add your time slots before admitting anyone.</Text>
+							</>
+						) : (
+							<Pressable accessibilityRole="button" style={styles.firstMemberCta} onPress={() => router.push("/admission")}>
+								<Ionicons name="add" size={18} color="#fff" />
+								<Text style={styles.firstMemberCtaText}>Add member</Text>
+							</Pressable>
+						)}
+					</View>
+				)}
+
+				{dashboard && !isNewLibrary && (
 					<View style={styles.statsRow}>
 						<StatTile label="Seats Filled" value={`${dashboard.occupied_seats}/${dashboard.total_seats}`} icon="grid-outline" />
 						<StatTile label="Members" value={String(dashboard.total_members)} icon="people-outline" />
@@ -219,7 +248,7 @@ export function HomeScreen() {
 					</View>
 				)}
 
-				{dashboard && (
+				{dashboard && !isNewLibrary && (
 					<Pressable style={styles.duesCard} onPress={() => router.push("/renewals")}>
 						<View style={styles.duesHeaderRow}>
 							<Text style={styles.duesTitle}>Dues & Renewals</Text>
@@ -264,32 +293,34 @@ export function HomeScreen() {
 					</Pressable>
 				)}
 
-				<Pressable style={styles.summaryCard} onPress={() => router.push("/payments")}>
-					<Text style={styles.summaryLabel}>This month (collections)</Text>
-					<Text style={styles.summaryValue}>{dashboard ? formatRupee(dashboard.monthly_collection) : "—"}</Text>
+				{!isNewLibrary && (
+					<Pressable style={styles.summaryCard} onPress={() => router.push("/payments")}>
+						<Text style={styles.summaryLabel}>This month (collections)</Text>
+						<Text style={styles.summaryValue}>{dashboard ? formatRupee(dashboard.monthly_collection) : "—"}</Text>
 
-					{dashboard && (
-						<>
-							<View style={styles.progressContainer}>
-								<View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
-							</View>
-							<View style={styles.summarySecondaryRow}>
-								<View>
-									<Text style={styles.summarySecondaryLabel}>PENDING</Text>
-									<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.pending_collection)}</Text>
+						{dashboard && (
+							<>
+								<View style={styles.progressContainer}>
+									<View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
 								</View>
-								<View style={styles.summarySecondaryRight}>
-									<Text style={styles.summarySecondaryLabel}>TODAY</Text>
-									<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.today_collection)}</Text>
+								<View style={styles.summarySecondaryRow}>
+									<View>
+										<Text style={styles.summarySecondaryLabel}>PENDING</Text>
+										<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.pending_collection)}</Text>
+									</View>
+									<View style={styles.summarySecondaryRight}>
+										<Text style={styles.summarySecondaryLabel}>TODAY</Text>
+										<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.today_collection)}</Text>
+									</View>
 								</View>
-							</View>
-						</>
-					)}
+							</>
+						)}
 
-					{showBatchSetupBanner && <Text style={styles.summaryHint}>Set up batches to start tracking seat sales and renewals.</Text>}
-				</Pressable>
+						{showBatchSetupBanner && <Text style={styles.summaryHint}>Set up batches to start tracking seat sales and renewals.</Text>}
+					</Pressable>
+				)}
 
-				{dashboard && (
+				{dashboard && !isNewLibrary && (
 					<>
 						<Text style={styles.sectionTitle}>Recent Payments</Text>
 						<View style={styles.recentCard}>
@@ -544,6 +575,67 @@ const createStyles = (theme: any) =>
 			fontFamily: "sans-extrabold",
 			fontSize: 16,
 			color: theme.primary,
+		},
+		firstMemberCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
+			padding: 24,
+			alignItems: "center",
+			marginBottom: 32,
+		},
+		firstMemberIconWrap: {
+			width: 56,
+			height: 56,
+			borderRadius: 28,
+			backgroundColor: theme.accent + "15",
+			alignItems: "center",
+			justifyContent: "center",
+			marginBottom: 14,
+		},
+		firstMemberTitle: {
+			fontFamily: "sans-extrabold",
+			fontSize: 18,
+			color: theme.primary,
+			marginBottom: 6,
+		},
+		firstMemberCopy: {
+			fontFamily: "sans-medium",
+			fontSize: 13,
+			color: theme.mutedForeground,
+			lineHeight: 19,
+			textAlign: "center",
+			marginBottom: 18,
+		},
+		firstMemberCta: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+			gap: 6,
+			backgroundColor: theme.accent,
+			borderRadius: RADIUS.sm,
+			paddingVertical: 12,
+			paddingHorizontal: 22,
+		},
+		firstMemberCtaMuted: {
+			backgroundColor: theme.muted,
+		},
+		firstMemberCtaText: {
+			fontFamily: "sans-bold",
+			fontSize: 14,
+			color: "#fff",
+		},
+		firstMemberCtaTextMuted: {
+			color: theme.primary,
+		},
+		firstMemberHint: {
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			textAlign: "center",
+			marginTop: 10,
+			lineHeight: 17,
 		},
 		statsRow: {
 			flexDirection: "row",

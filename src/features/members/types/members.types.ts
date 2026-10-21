@@ -1,3 +1,5 @@
+import { Payment } from "@/features/payments/types/payments.types";
+
 export enum MemberStatus {
     ACTIVE = "ACTIVE",
     EXPIRING_SOON = "EXPIRING_SOON",
@@ -48,6 +50,12 @@ export interface MemberDetail {
     status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     due_amount: number | null;
+    /** Combined monthly fee of the member's active batches. */
+    monthly_fee: number;
+    /** Pre-fill for "Record Payment / Renew"; null when the member has no active seat. */
+    suggested_payment: number | null;
+    /** Newest first. */
+    payments: Payment[];
     id_proof_type: "aadhaar" | "pan" | "voter_id_dl" | "student_id" | "other" | null;
     has_id_proof_front: boolean;
     has_id_proof_back: boolean;

@@ -13,6 +13,7 @@ export async function createAdmissionApi(payload: CreateAdmissionRequest): Promi
             phone: payload.phone,
             gender: payload.gender,
             allocations: payload.allocations,
+            payment: payload.payment,
         },
         { headers: { Authorization: `Bearer ${token}` } }
     );

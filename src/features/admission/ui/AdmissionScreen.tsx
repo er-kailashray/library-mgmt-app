@@ -1,22 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
-import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
+import { ID_PROOF_TYPE_LABELS } from "@/features/admission/types/admission.types";
+import { AddIdProofCard, IdProofDraft, IdProofSheet } from "@/features/admission/ui/IdProofSheet";
 import { uploadMemberIdProofApi } from "@/features/members/logic/members.api";
 import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
+import { PAYMENT_MODE_LABELS, PaymentMode } from "@/features/payments/types/payments.types";
+
+const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: PAYMENT_MODE_LABELS[value] }));
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
-import { PhotoPickerSlot } from "@/shared/ui/PhotoPickerSlot";
-import { SelectField } from "@/shared/ui/SelectField";
+import { ChoiceChips } from "@/shared/ui/ChoiceChips";
+import { PhotoPickerTile } from "@/shared/ui/PhotoPickerTile";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", {
@@ -50,43 +53,35 @@ export function AdmissionScreen() {
     const [phone, setPhone] = useState("");
     const [gender, setGender] = useState<Gender | null>(null);
 
-    const [idProofType, setIdProofType] = useState<IdProofType | null>(null);
-    const [idProofFrontUri, setIdProofFrontUri] = useState<string | null>(null);
-    const [idProofBackUri, setIdProofBackUri] = useState<string | null>(null);
+    const [payNow, setPayNow] = useState(true);
+    const [paidAmount, setPaidAmount] = useState("");
+    // Once the owner types an amount, stop overwriting it when batches change.
+    const [paidAmountEdited, setPaidAmountEdited] = useState(false);
+    const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
+
+    // Held locally and uploaded after the admission is created.
+    const [idProof, setIdProof] = useState<IdProofDraft | null>(null);
+    const [isIdProofSheetVisible, setIsIdProofSheetVisible] = useState(false);
+    // What the sheet opens with - usually the current draft, but partial when re-taking the front photo.
+    const [idProofSheetInitial, setIdProofSheetInitial] = useState<Partial<IdProofDraft> | null>(null);
+
+    const openIdProofSheet = (initial: Partial<IdProofDraft> | null) => {
+        setIdProofSheetInitial(initial);
+        setIsIdProofSheetVisible(true);
+    };
+
+    const removeIdProofFront = () => {
+        if (!idProof) return;
+        // The front photo is required: with a back photo kept, ask for a new front; otherwise drop the ID proof.
+        if (idProof.backUri) {
+            openIdProofSheet({ type: idProof.type, backUri: idProof.backUri });
+        } else {
+            setIdProof(null);
+        }
+    };
 
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const pickIdProofImage = useCallback(async (side: IdProofSide, source: "camera" | "gallery") => {
-        const permission =
-            source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (!permission.granted) {
-            Alert.alert("Permission needed", `Please allow ${source === "camera" ? "camera" : "photo library"} access to attach an ID proof.`);
-            return;
-        }
-
-        const result =
-            source === "camera"
-                ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true })
-                : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true });
-
-        if (!result.canceled && result.assets[0]) {
-            (side === "front" ? setIdProofFrontUri : setIdProofBackUri)(result.assets[0].uri);
-            setSubmitError(null);
-        }
-    }, []);
-
-    const handleAddIdProofPhoto = useCallback(
-        (side: IdProofSide) => {
-            Alert.alert(`Add ${side === "front" ? "Front" : "Back"} Photo`, undefined, [
-                { text: "Take Photo", onPress: () => pickIdProofImage(side, "camera") },
-                { text: "Choose from Gallery", onPress: () => pickIdProofImage(side, "gallery") },
-                { text: "Cancel", style: "cancel" },
-            ]);
-        },
-        [pickIdProofImage]
-    );
 
     const seatAvailableForBatches = (seat: (typeof seatsData)[number], batchIds: number[]) =>
         batchIds.every((bId) => seat.batches.find((sb) => sb.batch_id === bId)?.available === true);
@@ -100,6 +95,13 @@ export function AdmissionScreen() {
         () => selectedBatchIds.reduce((sum, bId) => sum + (parseFloat(batches.find((b) => b.id === bId)?.monthly_fee || "0") || 0), 0),
         [selectedBatchIds, batches]
     );
+
+    useEffect(() => {
+        if (!paidAmountEdited) setPaidAmount(totalMonthlyFee > 0 ? String(totalMonthlyFee) : "");
+    }, [totalMonthlyFee, paidAmountEdited]);
+
+    const paidAmountValue = parseFloat(paidAmount) || 0;
+    const isPartialPayment = payNow && paidAmountValue > 0 && paidAmountValue < totalMonthlyFee;
 
     const toggleBatch = (batchId: number) => {
         setSubmitError(null);
@@ -136,12 +138,8 @@ export function AdmissionScreen() {
             setSubmitError("You must select at least one batch.");
             return;
         }
-        if ((idProofFrontUri || idProofBackUri) && !idProofType) {
-            setSubmitError("Please select which ID type this photo is for.");
-            return;
-        }
-        if (idProofType && !idProofFrontUri) {
-            setSubmitError("Please add a front photo of the selected ID proof.");
+        if (payNow && paidAmountValue <= 0) {
+            setSubmitError('Please enter the amount received, or choose "Pay later".');
             return;
         }
 
@@ -170,13 +168,14 @@ export function AdmissionScreen() {
                 phone: phone.trim(),
                 gender: gender ?? undefined,
                 allocations: allocationPayload,
+                payment: payNow ? { amount: paidAmountValue, payment_mode: paymentMode } : undefined,
             });
 
-            if (idProofType && idProofFrontUri) {
+            if (idProof) {
                 try {
-                    await uploadMemberIdProofApi(memberId, idProofType, "front", idProofFrontUri);
-                    if (idProofBackUri) {
-                        await uploadMemberIdProofApi(memberId, idProofType, "back", idProofBackUri);
+                    await uploadMemberIdProofApi(memberId, idProof.type, "front", idProof.frontUri);
+                    if (idProof.backUri) {
+                        await uploadMemberIdProofApi(memberId, idProof.type, "back", idProof.backUri);
                     }
                 } catch {
                     Alert.alert("Admission confirmed", "Admission was created, but the ID proof photo failed to upload. You can add it from the member's profile.");
@@ -185,7 +184,12 @@ export function AdmissionScreen() {
                 }
             }
 
-            Alert.alert("Success", "Admission confirmed correctly!");
+            Alert.alert(
+                "Admission confirmed",
+                payNow
+                    ? `${formatRupee(paidAmountValue)} received via ${PAYMENT_MODE_LABELS[paymentMode]}.${isPartialPayment ? ` ${formatRupee(totalMonthlyFee - paidAmountValue)} is still due.` : ""}`
+                    : "No payment recorded - the member will show as due."
+            );
             router.back();
         } catch (err: any) {
             setSubmitError(err.message || "Failed to create admission.");
@@ -378,35 +382,103 @@ export function AdmissionScreen() {
                                         maxLength={15}
                                     />
                                 </View>
-                                <SelectField label="Gender (Optional)" placeholder="Select gender" value={gender} options={GENDER_OPTIONS} onChange={setGender} />
+                                <ChoiceChips label="Gender (Optional)" value={gender} options={GENDER_OPTIONS} onChange={setGender} allowDeselect />
                             </View>
+
+                            {/* FIRST PAYMENT */}
+                            {selectedBatchIds.length > 0 && (
+                                <View style={styles.sectionBlock}>
+                                    <Text style={styles.sectionTitle}>First Payment</Text>
+                                    <View style={styles.modeToggleRow}>
+                                        <Pressable
+                                            style={[styles.modeToggleChip, payNow && styles.modeToggleChipActive]}
+                                            onPress={() => {
+                                                setPayNow(true);
+                                                setSubmitError(null);
+                                            }}>
+                                            <Text style={[styles.modeToggleText, payNow && styles.modeToggleTextActive]}>Paid now</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            style={[styles.modeToggleChip, !payNow && styles.modeToggleChipActive]}
+                                            onPress={() => {
+                                                setPayNow(false);
+                                                setSubmitError(null);
+                                            }}>
+                                            <Text style={[styles.modeToggleText, !payNow && styles.modeToggleTextActive]}>Pay later</Text>
+                                        </Pressable>
+                                    </View>
+
+                                    {payNow ? (
+                                        <>
+                                            <View style={styles.inputWrap}>
+                                                <Text style={styles.inputLabel}>Amount Received</Text>
+                                                <View style={styles.amountField}>
+                                                    <Text style={styles.amountPrefix}>₹</Text>
+                                                    <TextInput
+                                                        style={styles.amountInput}
+                                                        value={paidAmount}
+                                                        onChangeText={(text) => {
+                                                            setPaidAmount(text.replace(/[^0-9.]/g, ""));
+                                                            setPaidAmountEdited(true);
+                                                            setSubmitError(null);
+                                                        }}
+                                                        keyboardType="decimal-pad"
+                                                        placeholder="0"
+                                                        placeholderTextColor={theme.mutedForeground + "80"}
+                                                    />
+                                                </View>
+                                                {isPartialPayment && (
+                                                    <Text style={styles.paymentHint}>Partial payment - {formatRupee(totalMonthlyFee - paidAmountValue)} will show as due.</Text>
+                                                )}
+                                            </View>
+
+                                            <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
+                                        </>
+                                    ) : (
+                                        <Text style={styles.paymentHint}>No payment will be recorded. The member will show as due from today, so you can collect later from Dues & Renewals.</Text>
+                                    )}
+                                </View>
+                            )}
 
                             {/* ID PROOF (OPTIONAL) */}
                             <View style={styles.sectionBlock}>
                                 <Text style={styles.sectionTitle}>ID Proof (Optional)</Text>
-                                <SelectField
-                                    label="ID Type"
-                                    placeholder="Select ID type"
-                                    value={idProofType}
-                                    options={ID_PROOF_TYPE_OPTIONS}
-                                    onChange={(type) => {
-                                        setIdProofType(type);
-                                        setSubmitError(null);
-                                    }}
-                                />
-
-                                <PhotoPickerSlot
-                                    label="Front Side"
-                                    uri={idProofFrontUri}
-                                    onAdd={() => handleAddIdProofPhoto("front")}
-                                    onRemove={() => setIdProofFrontUri(null)}
-                                />
-                                <PhotoPickerSlot
-                                    label="Back Side (Optional)"
-                                    uri={idProofBackUri}
-                                    onAdd={() => handleAddIdProofPhoto("back")}
-                                    onRemove={() => setIdProofBackUri(null)}
-                                />
+                                {idProof ? (
+                                    <View style={styles.idProofSummary}>
+                                        <View style={styles.idProofSummaryHeader}>
+                                            <View style={styles.idProofSummaryIcon}>
+                                                <Ionicons name="card-outline" size={20} color={theme.accent} />
+                                            </View>
+                                            <View style={styles.idProofSummaryText}>
+                                                <Text style={styles.idProofSummaryTitle}>{ID_PROOF_TYPE_LABELS[idProof.type]}</Text>
+                                                <Text style={styles.idProofSummarySubtitle}>{idProof.backUri ? "Front & back added" : "Front added"}</Text>
+                                            </View>
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.success} />
+                                        </View>
+                                        <View style={styles.idProofThumbRow}>
+                                            <PhotoPickerTile label="Front" uri={idProof.frontUri} onAdd={() => openIdProofSheet(idProof)} onRemove={removeIdProofFront} />
+                                            <PhotoPickerTile
+                                                label="Back"
+                                                hint="(optional)"
+                                                uri={idProof.backUri}
+                                                onAdd={() => openIdProofSheet(idProof)}
+                                                onRemove={() => setIdProof({ ...idProof, backUri: null })}
+                                            />
+                                        </View>
+                                        <View style={styles.idProofActionRow}>
+                                            <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => openIdProofSheet(idProof)}>
+                                                <Ionicons name="pencil" size={14} color={theme.primary} />
+                                                <Text style={styles.idProofActionText}>Edit</Text>
+                                            </Pressable>
+                                            <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => setIdProof(null)}>
+                                                <Ionicons name="trash-outline" size={14} color={theme.destructive} />
+                                                <Text style={[styles.idProofActionText, { color: theme.destructive }]}>Remove</Text>
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <AddIdProofCard title="No ID proof added" onAdd={() => openIdProofSheet(null)} />
+                                )}
                             </View>
 
                             {submitError && (
@@ -427,6 +499,18 @@ export function AdmissionScreen() {
                     )}
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            <IdProofSheet
+                visible={isIdProofSheetVisible}
+                onClose={() => setIsIdProofSheetVisible(false)}
+                initial={idProofSheetInitial}
+                saveLabel="Done"
+                onSave={(draft) => {
+                    setIdProof(draft);
+                    setIsIdProofSheetVisible(false);
+                    setSubmitError(null);
+                }}
+            />
         </SafeAreaView>
     );
 }
@@ -498,6 +582,61 @@ const createStyles = (theme: any) => StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
         paddingBottom: 10,
+    },
+    idProofSummary: {
+        gap: 14,
+    },
+    idProofSummaryHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    idProofSummaryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: theme.accent + "15",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 14,
+    },
+    idProofSummaryText: {
+        flex: 1,
+    },
+    idProofSummaryTitle: {
+        fontFamily: "sans-bold",
+        fontSize: 15,
+        color: theme.primary,
+    },
+    idProofSummarySubtitle: {
+        fontFamily: "sans-medium",
+        fontSize: 12,
+        color: theme.mutedForeground,
+        marginTop: 2,
+    },
+    idProofThumbRow: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    idProofActionRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    idProofActionBtn: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        height: 40,
+        borderRadius: RADIUS.sm,
+        backgroundColor: theme.background,
+        borderWidth: 1,
+        borderColor: theme.border,
+    },
+    idProofActionText: {
+        fontFamily: "sans-bold",
+        fontSize: 13,
+        color: theme.primary,
     },
     chipRowWrap: {
         flexDirection: "row",
@@ -657,6 +796,35 @@ const createStyles = (theme: any) => StyleSheet.create({
         paddingVertical: 14,
         fontSize: 15,
         color: theme.primary,
+    },
+    amountField: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: theme.background,
+        borderWidth: 1,
+        borderColor: theme.border,
+        borderRadius: RADIUS.md,
+        paddingHorizontal: 16,
+    },
+    amountPrefix: {
+        fontFamily: "sans-bold",
+        fontSize: 17,
+        color: theme.mutedForeground,
+        marginRight: 6,
+    },
+    amountInput: {
+        flex: 1,
+        fontFamily: "sans-bold",
+        fontSize: 17,
+        color: theme.primary,
+        paddingVertical: 14,
+    },
+    paymentHint: {
+        fontFamily: "sans-medium",
+        fontSize: 13,
+        color: theme.mutedForeground,
+        lineHeight: 18,
+        marginTop: 8,
     },
     errorBox: {
         backgroundColor: theme.destructive + "1A",

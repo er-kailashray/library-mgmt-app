@@ -39,6 +39,17 @@ export async function getMemberIdProofSource(id: number | string, side: IdProofS
     };
 }
 
+/** Removes one side of the member's ID proof, or the whole ID proof when no side is given. */
+export async function deleteMemberIdProofApi(id: number | string, side?: IdProofSide): Promise<{ status: boolean; message?: string }> {
+    const token = await getStoredAuthToken();
+    if (!token) throw new Error("No auth token");
+
+    return apiFetch(`/api/members/${id}/id-proof${side ? `/${side}` : ""}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+}
+
 export async function deactivateMemberApi(id: number | string): Promise<{ status: boolean; message?: string }> {
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");

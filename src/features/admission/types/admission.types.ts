@@ -1,4 +1,5 @@
 import { Gender } from "@/features/members/types/members.types";
+import { PaymentMode } from "@/features/payments/types/payments.types";
 
 export interface AdmissionAllocation {
     batch_id: number;
@@ -27,6 +28,8 @@ export interface CreateAdmissionRequest {
     phone: string;
     gender?: Gender;
     allocations: AdmissionAllocation[];
+    /** First payment taken at the desk; omit for "pay later". */
+    payment?: { amount: number; payment_mode: PaymentMode };
 }
 
 export interface CreateAdmissionResult {
