@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -31,6 +31,10 @@ function formatRupee(amount: number): string {
 
 export function AdmissionScreen() {
     const router = useRouter();
+    // Set when readmitting a member who left (from their profile's "Readmit" button).
+    const readmit = useLocalSearchParams<{ name?: string; phone?: string; gender?: Gender; outstanding?: string }>();
+    const isReadmission = !!readmit.phone;
+    const previousDues = parseFloat(readmit.outstanding ?? "0") || 0;
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
 
@@ -49,9 +53,15 @@ export function AdmissionScreen() {
     const [commonSeatId, setCommonSeatId] = useState<number | null>(null);
     const [seatsByBatch, setSeatsByBatch] = useState<Record<number, number>>({});
 
-    const [name, setName] = useState("");
-    const [phone, setPhone] = useState("");
-    const [gender, setGender] = useState<Gender | null>(null);
+    const [name, setName] = useState(readmit.name ?? "");
+    const [phone, setPhone] = useState(readmit.phone ?? "");
+    const [gender, setGender] = useState<Gender | null>(readmit.gender ?? null);
+
+    // Dues the member left behind: the owner collects some or all of it, or waives it.
+    const [collectPreviousDues, setCollectPreviousDues] = useState(true);
+    const [previousDuesAmount, setPreviousDuesAmount] = useState(previousDues > 0 ? String(Math.round(previousDues)) : "");
+    const [previousDuesMode, setPreviousDuesMode] = useState<PaymentMode>("cash");
+    const previousDuesValue = collectPreviousDues ? parseFloat(previousDuesAmount) || 0 : 0;
 
     const [payNow, setPayNow] = useState(true);
     const [paidAmount, setPaidAmount] = useState("");
@@ -142,6 +152,16 @@ export function AdmissionScreen() {
             setSubmitError('Please enter the amount received, or choose "Pay later".');
             return;
         }
+        if (previousDues > 0 && collectPreviousDues) {
+            if (previousDuesValue <= 0) {
+                setSubmitError('Enter the previous dues collected, or choose "Waive".');
+                return;
+            }
+            if (previousDuesValue > previousDues) {
+                setSubmitError(`Previous dues collected can't be more than ${formatRupee(previousDues)}.`);
+                return;
+            }
+        }
 
         let allocationPayload: { batch_id: number; seat_id: number }[];
 
@@ -169,6 +189,7 @@ export function AdmissionScreen() {
                 gender: gender ?? undefined,
                 allocations: allocationPayload,
                 payment: payNow ? { amount: paidAmountValue, payment_mode: paymentMode } : undefined,
+                ...(previousDues > 0 ? { previous_dues_paid: previousDuesValue, previous_dues_mode: previousDuesMode } : {}),
             });
 
             if (idProof) {
@@ -184,11 +205,17 @@ export function AdmissionScreen() {
                 }
             }
 
+            const settlementNote =
+                previousDues > 0
+                    ? previousDuesValue > 0
+                        ? ` Previous dues: ${formatRupee(previousDuesValue)} collected${previousDuesValue < previousDues ? `, ${formatRupee(previousDues - previousDuesValue)} waived` : ""}.`
+                        : ` Previous dues of ${formatRupee(previousDues)} waived.`
+                    : "";
             Alert.alert(
-                "Admission confirmed",
-                payNow
+                isReadmission ? "Readmission confirmed" : "Admission confirmed",
+                (payNow
                     ? `${formatRupee(paidAmountValue)} received via ${PAYMENT_MODE_LABELS[paymentMode]}.${isPartialPayment ? ` ${formatRupee(totalMonthlyFee - paidAmountValue)} is still due.` : ""}`
-                    : "No payment recorded - the member will show as due."
+                    : "No payment recorded - the member will show as due.") + settlementNote
             );
             router.back();
         } catch (err: any) {
@@ -209,8 +236,8 @@ export function AdmissionScreen() {
                         <Ionicons name="arrow-back" size={24} color={theme.primary} />
                     </Pressable>
                     <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>New Admission</Text>
-                        <Text style={styles.headerSubtitle}>Onboard member and allocate seat</Text>
+                        <Text style={styles.headerTitle}>{isReadmission ? "Readmission" : "New Admission"}</Text>
+                        <Text style={styles.headerSubtitle}>{isReadmission ? `Welcome back ${readmit.name ?? ""} - pick a new seat` : "Onboard member and allocate seat"}</Text>
                     </View>
                 </View>
             </View>
@@ -373,17 +400,75 @@ export function AdmissionScreen() {
                                 <View style={styles.inputWrap}>
                                     <Text style={styles.inputLabel}>Phone Number</Text>
                                     <TextInput
-                                        style={styles.inputField}
+                                        style={[styles.inputField, isReadmission && styles.inputFieldLocked]}
                                         placeholder="10-digit mobile number"
                                         placeholderTextColor={theme.mutedForeground + "80"}
                                         value={phone}
                                         onChangeText={setPhone}
                                         keyboardType="phone-pad"
                                         maxLength={15}
+                                        // The phone number is how a returning member is recognised.
+                                        editable={!isReadmission}
                                     />
                                 </View>
                                 <ChoiceChips label="Gender (Optional)" value={gender} options={GENDER_OPTIONS} onChange={setGender} allowDeselect />
                             </View>
+
+                            {/* PREVIOUS DUES (READMISSION) */}
+                            {previousDues > 0 && (
+                                <View style={styles.sectionBlock}>
+                                    <Text style={styles.sectionTitle}>Previous Dues</Text>
+                                    <Text style={styles.previousDuesSummary}>
+                                        {readmit.name ?? "This member"} left with <Text style={styles.previousDuesAmount}>{formatRupee(previousDues)}</Text> pending.
+                                    </Text>
+                                    <View style={styles.modeToggleRow}>
+                                        <Pressable
+                                            style={[styles.modeToggleChip, collectPreviousDues && styles.modeToggleChipActive]}
+                                            onPress={() => {
+                                                setCollectPreviousDues(true);
+                                                setSubmitError(null);
+                                            }}>
+                                            <Text style={[styles.modeToggleText, collectPreviousDues && styles.modeToggleTextActive]}>Collect</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            style={[styles.modeToggleChip, !collectPreviousDues && styles.modeToggleChipActive]}
+                                            onPress={() => {
+                                                setCollectPreviousDues(false);
+                                                setSubmitError(null);
+                                            }}>
+                                            <Text style={[styles.modeToggleText, !collectPreviousDues && styles.modeToggleTextActive]}>Waive & start fresh</Text>
+                                        </Pressable>
+                                    </View>
+
+                                    {collectPreviousDues ? (
+                                        <>
+                                            <View style={styles.inputWrap}>
+                                                <Text style={styles.inputLabel}>Amount Collected</Text>
+                                                <View style={styles.amountField}>
+                                                    <Text style={styles.amountPrefix}>₹</Text>
+                                                    <TextInput
+                                                        style={styles.amountInput}
+                                                        value={previousDuesAmount}
+                                                        onChangeText={(text) => {
+                                                            setPreviousDuesAmount(text.replace(/[^0-9.]/g, ""));
+                                                            setSubmitError(null);
+                                                        }}
+                                                        keyboardType="decimal-pad"
+                                                        placeholder="0"
+                                                        placeholderTextColor={theme.mutedForeground + "80"}
+                                                    />
+                                                </View>
+                                                {previousDuesValue > 0 && previousDuesValue < previousDues && (
+                                                    <Text style={styles.paymentHint}>Settling for less - the remaining {formatRupee(previousDues - previousDuesValue)} will be waived.</Text>
+                                                )}
+                                            </View>
+                                            <ChoiceChips label="Payment Mode" value={previousDuesMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPreviousDuesMode(mode)} />
+                                        </>
+                                    ) : (
+                                        <Text style={styles.paymentHint}>The {formatRupee(previousDues)} will be written off. Only the new admission is charged.</Text>
+                                    )}
+                                </View>
+                            )}
 
                             {/* FIRST PAYMENT */}
                             {selectedBatchIds.length > 0 && (
@@ -796,6 +881,20 @@ const createStyles = (theme: any) => StyleSheet.create({
         paddingVertical: 14,
         fontSize: 15,
         color: theme.primary,
+    },
+    inputFieldLocked: {
+        opacity: 0.6,
+    },
+    previousDuesSummary: {
+        fontFamily: "sans-medium",
+        fontSize: 14,
+        color: theme.mutedForeground,
+        lineHeight: 20,
+        marginBottom: 14,
+    },
+    previousDuesAmount: {
+        fontFamily: "sans-extrabold",
+        color: theme.destructive,
     },
     amountField: {
         flexDirection: "row",

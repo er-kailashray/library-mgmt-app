@@ -62,7 +62,8 @@ export function PaymentsScreen() {
         try {
             const response = await getMembersApi();
             if (response.status) {
-                setMembers(response.data || []);
+                // Members who left have no seat to pay for; they settle up when readmitted.
+                setMembers((response.data || []).filter((m) => m.status === "active"));
             }
         } catch {
             // The member picker will just show as empty; the form still validates selection is required.

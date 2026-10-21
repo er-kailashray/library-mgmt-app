@@ -14,6 +14,8 @@ export async function createAdmissionApi(payload: CreateAdmissionRequest): Promi
             gender: payload.gender,
             allocations: payload.allocations,
             payment: payload.payment,
+            previous_dues_paid: payload.previous_dues_paid,
+            previous_dues_mode: payload.previous_dues_mode,
         },
         { headers: { Authorization: `Bearer ${token}` } }
     );

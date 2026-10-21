@@ -13,12 +13,34 @@ import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { getInitials } from "@/shared/utils/text";
 
+type MemberFilter = "active" | "due" | "inactive" | "all";
+
+const FILTERS: { key: MemberFilter; label: string }[] = [
+    { key: "active", label: "Active" },
+    { key: "due", label: "Dues Pending" },
+    { key: "inactive", label: "Inactive" },
+    { key: "all", label: "All" },
+];
+
+function matchesFilter(member: Member, filter: MemberFilter): boolean {
+    switch (filter) {
+        case "active":
+            return member.status === "active";
+        case "due":
+            return member.status === "active" && member.payment_status !== "Paid";
+        case "inactive":
+            return member.status === "inactive";
+        default:
+            return true;
+    }
+}
+
 export function MembersScreen() {
     const router = useRouter();
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterStatus, setFilterStatus] = useState<"all" | "active" | "due">("all");
+    const [filterStatus, setFilterStatus] = useState<MemberFilter>("active");
 
     const { data, isLoading, error, refetch: fetchMembers } = useApiData(getMembersApi, []);
     const members = data ?? [];
@@ -33,36 +55,47 @@ export function MembersScreen() {
     const filteredMembers = useMemo(() => {
         return members.filter((m) => {
             const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.phone.includes(searchQuery);
-            const matchesStatus =
-                filterStatus === "all" ||
-                (filterStatus === "active" && m.payment_status === "Paid") ||
-                (filterStatus === "due" && m.payment_status !== "Paid");
-            return matchesSearch && matchesStatus;
+            return matchesSearch && matchesFilter(m, filterStatus);
         });
     }, [members, searchQuery, filterStatus]);
 
-    const getStatusColor = (payment_status: string) => {
-        return payment_status === "Paid" ? theme.success : theme.destructive;
+    const filterCounts = useMemo(
+        () => Object.fromEntries(FILTERS.map((f) => [f.key, members.filter((m) => matchesFilter(m, f.key)).length])) as Record<MemberFilter, number>,
+        [members]
+    );
+
+    // Inactive (left) > dues pending > active.
+    const getBadge = (member: Member): { label: string; color: string } => {
+        if (member.status === "inactive") return { label: "Inactive", color: theme.mutedForeground };
+        if (member.payment_status !== "Paid") return { label: "Due", color: theme.destructive };
+        return { label: "Active", color: theme.success };
     };
 
     const styles = createStyles(theme);
 
-    const renderMemberItem = ({ item }: { item: Member }) => (
-        <Pressable style={styles.memberCard} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.id) } })}>
-            <View style={[styles.avatarSmall, { backgroundColor: getStatusColor(item.payment_status) + "15" }]}>
-                <Text style={{ color: getStatusColor(item.payment_status), fontFamily: "sans-extrabold" }}>{item.initials || getInitials(item.name)}</Text>
-            </View>
-            <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{item.name}</Text>
-                <Text style={styles.memberMeta}>{item.phone}</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: getStatusColor(item.payment_status) + "15" }]}>
-                <Text style={[styles.badgeText, { color: getStatusColor(item.payment_status) }]}>
-                    {item.payment_status === "Paid" ? "Paid" : "Due"}
-                </Text>
-            </View>
-        </Pressable>
-    );
+    const renderMemberItem = ({ item }: { item: Member }) => {
+        const badge = getBadge(item);
+        const isInactive = item.status === "inactive";
+        return (
+            <Pressable style={styles.memberCard} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.id) } })}>
+                <View style={[styles.memberCardContent, isInactive && styles.memberCardFaded]}>
+                    <View style={[styles.avatarSmall, { backgroundColor: badge.color + "15" }]}>
+                        <Text style={{ color: badge.color, fontFamily: "sans-extrabold" }}>{item.initials || getInitials(item.name)}</Text>
+                    </View>
+                    <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{item.name}</Text>
+                        <Text style={styles.memberMeta}>
+                            {item.phone}
+                            {isInactive && item.outstanding_balance > 0 ? ` · ₹${Math.round(item.outstanding_balance).toLocaleString("en-IN")} pending` : ""}
+                        </Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: badge.color + "15" }]}>
+                        <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                </View>
+            </Pressable>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -73,7 +106,9 @@ export function MembersScreen() {
                 </Pressable>
                 <View style={styles.headerText}>
                     <Text style={styles.headerTitle}>Members</Text>
-                    <Text style={styles.headerSubtitle}>{filteredMembers.length} active students</Text>
+                    <Text style={styles.headerSubtitle}>
+                        {filterCounts.active} active{filterCounts.inactive > 0 ? ` · ${filterCounts.inactive} inactive` : ""}
+                    </Text>
                 </View>
                 <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => Alert.alert("Export", "Member list export coming soon!")}>
                     <Ionicons name="download-outline" size={22} color={theme.primary} />
@@ -92,15 +127,13 @@ export function MembersScreen() {
                     />
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-                    <Pressable style={[styles.filterChip, filterStatus === "all" && styles.filterChipActive]} onPress={() => setFilterStatus("all")}>
-                        <Text style={[styles.filterText, filterStatus === "all" && styles.filterTextActive]}>All Members</Text>
-                    </Pressable>
-                    <Pressable style={[styles.filterChip, filterStatus === "active" && styles.filterChipActive]} onPress={() => setFilterStatus("active")}>
-                        <Text style={[styles.filterText, filterStatus === "active" && styles.filterTextActive]}>Paid Only</Text>
-                    </Pressable>
-                    <Pressable style={[styles.filterChip, filterStatus === "due" && styles.filterChipActive]} onPress={() => setFilterStatus("due")}>
-                        <Text style={[styles.filterText, filterStatus === "due" && styles.filterTextActive]}>Dues Pending</Text>
-                    </Pressable>
+                    {FILTERS.map((f) => (
+                        <Pressable key={f.key} style={[styles.filterChip, filterStatus === f.key && styles.filterChipActive]} onPress={() => setFilterStatus(f.key)}>
+                            <Text style={[styles.filterText, filterStatus === f.key && styles.filterTextActive]}>
+                                {f.label} ({filterCounts[f.key]})
+                            </Text>
+                        </Pressable>
+                    ))}
                 </ScrollView>
             </View>
 
@@ -230,6 +263,15 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginBottom: 12,
         borderWidth: 1.5,
         borderColor: theme.border,
+    },
+    memberCardContent: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    // Members who left are dimmed, but the card itself stays solid so they're still easy to tap.
+    memberCardFaded: {
+        opacity: 0.6,
     },
     avatarSmall: {
         width: 52,

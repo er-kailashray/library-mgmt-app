@@ -23,8 +23,11 @@ export interface Member {
     id: number | string;
     name: string;
     phone: string;
+    status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     active_allocations_count: number;
+    /** Owed when the member left; 0 for active members. */
+    outstanding_balance: number;
     // UI-only derived fields
     initials?: string;
 }
@@ -50,6 +53,8 @@ export interface MemberDetail {
     status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     due_amount: number | null;
+    /** Owed when the member left (inactive members); collected or waived on readmission. */
+    outstanding_balance: number;
     /** Combined monthly fee of the member's active batches. */
     monthly_fee: number;
     /** Pre-fill for "Record Payment / Renew"; null when the member has no active seat. */

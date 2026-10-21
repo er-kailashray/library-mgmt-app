@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -38,6 +38,13 @@ export function MemberDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const { data: member, isLoading, error, refetch } = useApiData(() => getMemberDetailApi(id), [id]);
+
+    // Refresh on return, e.g. after readmitting this member from the admission screen.
+    useFocusEffect(
+        useCallback(() => {
+            void refetch();
+        }, [refetch])
+    );
     const [isDeactivating, setIsDeactivating] = useState(false);
     const [isSendingSms, setIsSendingSms] = useState(false);
     const [loadingIdProofSide, setLoadingIdProofSide] = useState<IdProofSide | null>(null);
@@ -231,7 +238,8 @@ export function MemberDetailScreen() {
         if (!member) return;
         Alert.alert(
             "Mark as left?",
-            `${member.name} will be marked inactive and their seat${member.allocations.length > 1 ? "s" : ""} will be freed up for new admissions.`,
+            `${member.name} will be marked inactive and their seat${member.allocations.length > 1 ? "s" : ""} will be freed up for new admissions.` +
+                (member.due_amount ? ` The ${formatRupee(member.due_amount)} they owe will be kept on record, to collect or waive if they come back.` : ""),
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -255,7 +263,18 @@ export function MemberDetailScreen() {
 
     const styles = createStyles(theme);
 
-    const getStatusColor = (payment_status: string) => (payment_status === "Paid" ? theme.success : theme.destructive);
+    const handleReadmit = () => {
+        if (!member) return;
+        router.push({
+            pathname: "/admission",
+            params: {
+                name: member.name,
+                phone: member.phone,
+                ...(member.gender ? { gender: member.gender } : {}),
+                outstanding: String(member.outstanding_balance ?? 0),
+            },
+        });
+    };
 
     return (
         <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -280,18 +299,19 @@ export function MemberDetailScreen() {
                             <Ionicons name="pencil" size={14} color={theme.mutedForeground} />
                         </Pressable>
                         <View style={[styles.profileContent, member.status === "inactive" && styles.profileBlockFaded]}>
-                            <View style={[styles.avatar, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
-                                <Text style={[styles.avatarText, { color: getStatusColor(member.payment_status) }]}>{getInitials(member.name)}</Text>
+                            <View style={[styles.avatar, { backgroundColor: (member.status === "active" ? theme.success : theme.mutedForeground) + "15" }]}>
+                                <Text style={[styles.avatarText, { color: member.status === "active" ? theme.success : theme.mutedForeground }]}>{getInitials(member.name)}</Text>
                             </View>
                             <Text style={styles.memberName}>{member.name}</Text>
                             <Text style={styles.memberPhone}>{member.phone}</Text>
+                            {/* Membership status; whether they've paid is shown by the Collect button and history below. */}
                             {member.status === "inactive" ? (
                                 <View style={[styles.badge, { backgroundColor: theme.mutedForeground + "15" }]}>
-                                    <Text style={[styles.badgeText, { color: theme.mutedForeground }]}>Left</Text>
+                                    <Text style={[styles.badgeText, { color: theme.mutedForeground }]}>Inactive</Text>
                                 </View>
                             ) : (
-                                <View style={[styles.badge, { backgroundColor: getStatusColor(member.payment_status) + "15" }]}>
-                                    <Text style={[styles.badgeText, { color: getStatusColor(member.payment_status) }]}>{member.payment_status}</Text>
+                                <View style={[styles.badge, { backgroundColor: theme.success + "15" }]}>
+                                    <Text style={[styles.badgeText, { color: theme.success }]}>Active</Text>
                                 </View>
                             )}
                         </View>
@@ -435,9 +455,20 @@ export function MemberDetailScreen() {
                     )}
 
                     {member.status === "inactive" ? (
-                        <View style={styles.inactiveNotice}>
-                            <Ionicons name="exit-outline" size={18} color={theme.mutedForeground} />
-                            <Text style={styles.inactiveNoticeText}>This member has left and their seat has been freed.</Text>
+                        <View style={styles.inactiveCard}>
+                            <View style={styles.inactiveNotice}>
+                                <Ionicons name="exit-outline" size={18} color={theme.mutedForeground} />
+                                <Text style={styles.inactiveNoticeText}>This member has left and their seat has been freed.</Text>
+                            </View>
+                            {member.outstanding_balance > 0 && (
+                                <Text style={styles.inactiveDues}>
+                                    Left with <Text style={styles.inactiveDuesAmount}>{formatRupee(member.outstanding_balance)}</Text> pending - you can collect or waive it when readmitting.
+                                </Text>
+                            )}
+                            <Pressable accessibilityRole="button" style={styles.readmitButton} onPress={handleReadmit}>
+                                <Ionicons name="person-add-outline" size={18} color="#fff" />
+                                <Text style={styles.readmitButtonText}>Readmit Member</Text>
+                            </Pressable>
                         </View>
                     ) : (
                         <Pressable style={[styles.leaveButton, isDeactivating && { opacity: 0.7 }]} onPress={handleMarkAsLeft} disabled={isDeactivating}>
@@ -1012,17 +1043,43 @@ const createStyles = (theme: any) =>
             fontSize: 15,
             color: theme.destructive,
         },
+        inactiveCard: {
+            backgroundColor: theme.card,
+            borderRadius: RADIUS.md,
+            padding: 16,
+            marginTop: 20,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            gap: 12,
+        },
         inactiveNotice: {
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
-            backgroundColor: theme.card,
+        },
+        inactiveDues: {
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            color: theme.mutedForeground,
+            lineHeight: 19,
+        },
+        inactiveDuesAmount: {
+            fontFamily: "sans-extrabold",
+            color: theme.destructive,
+        },
+        readmitButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            backgroundColor: theme.accent,
             borderRadius: RADIUS.md,
-            paddingVertical: 16,
-            paddingHorizontal: 16,
-            marginTop: 20,
-            borderWidth: 1.5,
-            borderColor: theme.border,
+            paddingVertical: 14,
+        },
+        readmitButtonText: {
+            fontFamily: "sans-extrabold",
+            fontSize: 15,
+            color: "#fff",
         },
         inactiveNoticeText: {
             flex: 1,

@@ -30,6 +30,9 @@ export interface CreateAdmissionRequest {
     allocations: AdmissionAllocation[];
     /** First payment taken at the desk; omit for "pay later". */
     payment?: { amount: number; payment_mode: PaymentMode };
+    /** Readmission only: how much of the dues left behind is collected now (0 waives it all). */
+    previous_dues_paid?: number;
+    previous_dues_mode?: PaymentMode;
 }
 
 export interface CreateAdmissionResult {
