@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
-import { getDashboardApi } from "@/features/home/logic/home-api";
+import { Batch } from "@/features/batches/types/batches.types";
+import { getDashboardApi, getMonthlyCollectionApi } from "@/features/home/logic/home-api";
+import { DashboardData, MonthlyCollection } from "@/features/home/types/home.types";
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
@@ -49,20 +51,85 @@ type SetupStep = {
 	onPress: () => void;
 };
 
-/** One-line read of how full the library is. */
-function occupancyStatus(percent: number): string {
-	if (percent >= 100) return "Full";
-	if (percent >= 80) return "Almost full";
-	if (percent >= 40) return "Filling up";
-	return "Plenty of space";
-}
-
 function formatLateness(daysOverdue: number): string {
 	if (daysOverdue <= 0) return "Due today";
 	if (daysOverdue < 30) return `${daysOverdue} day${daysOverdue === 1 ? "" : "s"} late`;
 	const months = Math.floor(daysOverdue / 30);
 	return `${months} month${months === 1 ? "" : "s"} late`;
 }
+
+type StatKey = "occupancy" | "dues" | "collections";
+
+const STAT_ORDER: StatKey[] = ["occupancy", "dues", "collections"];
+
+/** Darkens a "#RRGGBB" colour by `amount` (0-1). */
+function shade(hex: string, amount: number): string {
+	const channel = (i: number) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount));
+	return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Minutes since midnight for an "HH:MM[:SS]" time. */
+function toMinutes(time: string): number {
+	const [h, m] = time.split(":").map(Number);
+	return h * 60 + (m || 0);
+}
+
+function formatTime(time: string): string {
+	const minutes = toMinutes(time);
+	const h = Math.floor(minutes / 60);
+	const m = minutes % 60;
+	return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** The batch running right now (handles overnight batches), else the next one to start today/tomorrow. */
+function findBatchNow(batches: Batch[], now: Date): { current: Batch | null; next: Batch | null } {
+	const nowMinutes = now.getHours() * 60 + now.getMinutes();
+	const current =
+		batches.find((b) => {
+			const start = toMinutes(b.start_time);
+			const end = toMinutes(b.end_time);
+			return start <= end ? nowMinutes >= start && nowMinutes < end : nowMinutes >= start || nowMinutes < end;
+		}) ?? null;
+	const byStart = [...batches].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
+	const next = byStart.find((b) => toMinutes(b.start_time) > nowMinutes) ?? byStart[0] ?? null;
+	return { current, next };
+}
+
+type HomeStyles = ReturnType<typeof createStyles>;
+
+/** The single action at the bottom of every panel. */
+function PanelLink({ label, onPress, styles, theme }: { label: string; onPress: () => void; styles: HomeStyles; theme: { accent: string } }) {
+	return (
+		<Pressable accessibilityRole="button" style={({ pressed }) => [styles.panelLink, pressed && styles.menuRowPressed]} onPress={onPress} hitSlop={6}>
+			<Text style={styles.panelLinkText}>{label}</Text>
+			<Ionicons name="arrow-forward" size={14} color={theme.accent} />
+		</Pressable>
+	);
+}
+
+/** "YYYY-MM" shifted by whole months. */
+function shiftMonth(month: string, delta: number): string {
+	const [year, monthIndex] = month.split("-").map(Number);
+	const date = new Date(year, monthIndex - 1 + delta, 1);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonth(month: string): string {
+	return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
+/** Occupancy column chart: plot height and the band above it for the tapped column's value. */
+const CHART_HEIGHT = 96;
+const CHART_VALUE_SPACE = 18;
+
+/** Most-overdue members listed on Home before handing off to the Members screen. */
+const MAX_DUES_ON_HOME = 3;
+
+/** Latest payments listed on Home; the full list is one tap away. */
+const MAX_RECENT_PAYMENTS_ON_HOME = 3;
+
+/** How far back the collections card lets you browse. */
+const MAX_MONTHS_BACK = 12;
 
 function formatRupee(amount: number): string {
 	return new Intl.NumberFormat("en-IN", {
@@ -149,10 +216,56 @@ export function HomeScreen() {
 	const completedSteps = setupSteps.filter((step) => step.done).length;
 	const showSetupCard = setupSteps.length > 0 && completedSteps < setupSteps.length;
 
-	const occupancyPercent = dashboard && dashboard.total_seats > 0 ? Math.min(100, Math.round((dashboard.occupied_seats / dashboard.total_seats) * 100)) : 0;
+	// Which of the three summary tiles is expanded below the grid. Until the owner picks one,
+	// show dues if anyone owes money, otherwise collections.
+	const [pickedStat, setPickedStat] = useState<StatKey | null>(null);
+	const selectedStat: StatKey = pickedStat ?? (dashboard && dashboard.due_members_count > 0 ? "dues" : "collections");
+	const busiestBatch = dashboard?.batch_occupancy.reduce<DashboardData["batch_occupancy"][number] | null>(
+		(best, batch) => (!best || batch.occupied / Math.max(1, batch.total) > best.occupied / Math.max(1, best.total) ? batch : best),
+		null
+	);
+	const [pickedBatchId, setPickedBatchId] = useState<number | null>(null);
+	const recentPayments = dashboard?.recent_payments.slice(0, MAX_RECENT_PAYMENTS_ON_HOME) ?? [];
+	const batchNow = batches && batches.length > 0 ? findBatchNow(batches, new Date()) : null;
+	const chartBatch =
+		dashboard?.batch_occupancy.find((b) => b.id === pickedBatchId) ??
+		dashboard?.batch_occupancy.find((b) => b.id === batchNow?.current?.id) ??
+		busiestBatch ??
+		null;
 
-	const progressPercentage =
-		dashboard && dashboard.expected_collection > 0 ? Math.min(100, Math.round((dashboard.monthly_collection / dashboard.expected_collection) * 100)) : 0;
+	// 0 = this month; negative = browsing earlier months on the collections card.
+	const [monthOffset, setMonthOffset] = useState(0);
+	const [pastMonth, setPastMonth] = useState<MonthlyCollection | null>(null);
+	const [isLoadingPastMonth, setIsLoadingPastMonth] = useState(false);
+	const viewedMonth = dashboard ? shiftMonth(dashboard.collection_month, monthOffset) : null;
+
+	useEffect(() => {
+		if (monthOffset === 0 || !viewedMonth) return;
+		let cancelled = false;
+		setIsLoadingPastMonth(true);
+		getMonthlyCollectionApi(viewedMonth)
+			.then((response) => !cancelled && setPastMonth(response.data))
+			.catch(() => !cancelled && setPastMonth(null))
+			.finally(() => !cancelled && setIsLoadingPastMonth(false));
+		return () => {
+			cancelled = true;
+		};
+	}, [monthOffset, viewedMonth]);
+
+	// Average across batches: all bookings / (seats x batches). A library full in the morning and
+	// empty in the evening is 50% used, not 100%.
+	const batchSeatSlots = dashboard?.batch_occupancy.reduce((sum, b) => sum + b.total, 0) ?? 0;
+	const batchBookings = dashboard?.batch_occupancy.reduce((sum, b) => sum + b.occupied, 0) ?? 0;
+	const occupancyPercent = batchSeatSlots > 0 ? Math.min(100, Math.round((batchBookings / batchSeatSlots) * 100)) : 0;
+
+	// This month's fees split by status; the stacked bar and its legend share these.
+	const feeSegments = dashboard
+		? [
+				{ key: "paid", label: "Received", amount: dashboard.month_fees.collected, color: theme.success },
+				{ key: "due", label: "Due now", amount: dashboard.month_fees.due, color: theme.destructive },
+				{ key: "later", label: "Due later", amount: dashboard.month_fees.upcoming, color: theme.mutedForeground + "66" },
+			]
+		: [];
 
 	const styles = createStyles(theme);
 
@@ -169,6 +282,9 @@ export function HomeScreen() {
 				<View style={styles.headerWrapper}>
 					<View style={styles.header}>
 						<View style={styles.headerText}>
+							{/* ON HOLD: today's date line - placement still being decided (style: headerDate).
+							<Text style={styles.headerDate}>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</Text>
+							*/}
 							<Text style={styles.headerTitle} numberOfLines={1}>
 								{dashboard?.library_name || "My Library"}
 							</Text>
@@ -287,126 +403,311 @@ export function HomeScreen() {
 						</View>
 					)}
 
-					{dashboard && !isNewLibrary && (
-						<Pressable accessibilityRole="button" accessibilityLabel="Occupancy - open seats" style={({ pressed }) => [styles.occupancyCard, pressed && styles.menuCellPressed]} onPress={() => router.push("/seats")}>
-							<View style={styles.occupancyHeader}>
-								<Text style={styles.occupancyLabel}>Occupancy</Text>
-								<Text style={styles.occupancyPercent}>{occupancyPercent}%</Text>
-							</View>
-							<View style={styles.progressContainer}>
-								<View style={[styles.progressBar, { width: `${occupancyPercent}%` }]} />
-							</View>
-							<Text style={styles.occupancyDetail}>
-								{dashboard.occupied_seats} of {dashboard.total_seats} seats filled · {Math.max(0, dashboard.total_seats - dashboard.occupied_seats)} free
+					{batchNow && !isNewLibrary && (
+						<View style={[styles.nowPill, { backgroundColor: (batchNow.current ? theme.success : theme.mutedForeground) + "18" }]}>
+							<View style={[styles.nowDot, { backgroundColor: batchNow.current ? theme.success : theme.mutedForeground }]} />
+							<Text style={styles.nowText} numberOfLines={1}>
+								{batchNow.current ? (
+									<>
+										<Text style={[styles.nowStrong, { color: theme.success }]}>{batchNow.current.name}</Text> is on · {formatTime(batchNow.current.start_time)} – {formatTime(batchNow.current.end_time)}
+									</>
+								) : (
+									<>
+										No batch running
+										{batchNow.next ? (
+											<>
+												{" · next "}
+												<Text style={styles.nowStrong}>{batchNow.next.name}</Text> at {formatTime(batchNow.next.start_time)}
+											</>
+										) : null}
+									</>
+								)}
 							</Text>
-							<View style={styles.occupancyFooter}>
-								<Text style={styles.occupancyStatus}>{occupancyStatus(occupancyPercent)}</Text>
-								<View style={styles.occupancyLink}>
-									<Text style={styles.occupancyLinkText}>Seats</Text>
-									<Ionicons name="chevron-forward" size={14} color={theme.accent} />
-								</View>
-							</View>
-						</Pressable>
-					)}
-
-					{dashboard && !isNewLibrary && (
-						<View style={styles.duesCard}>
-							{dashboard.due_members_count > 0 ? (
-								<>
-									<View style={styles.duesHeaderRow}>
-										<View style={styles.duesTitleRow}>
-											<View style={[styles.duesTitleDot, { backgroundColor: theme.destructive }]} />
-											<Text style={styles.duesTitle}>Dues pending</Text>
-										</View>
-										<Text style={styles.duesTotal}>
-											{formatRupee(dashboard.due_total)}
-											<Text style={styles.duesTotalSuffix}>
-												{" "}
-												· {dashboard.due_members_count} member{dashboard.due_members_count === 1 ? "" : "s"}
-											</Text>
-										</Text>
-									</View>
-
-									{dashboard.top_dues.map((due) => (
-										<Pressable
-											key={due.member_id}
-											accessibilityRole="button"
-											style={({ pressed }) => [styles.dueRow, pressed && styles.menuRowPressed]}
-											onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(due.member_id) } })}>
-											<View style={styles.dueAvatar}>
-												<Text style={styles.dueAvatarText}>{getInitials(due.name)}</Text>
-											</View>
-											<View style={styles.dueInfo}>
-												<Text style={styles.dueName} numberOfLines={1}>
-													{due.name}
-												</Text>
-												<Text style={[styles.dueLateness, due.days_overdue >= 15 && { color: theme.destructive }]}>{formatLateness(due.days_overdue)}</Text>
-											</View>
-											<Text style={styles.dueAmount}>{formatRupee(due.amount)}</Text>
-											<Ionicons name="chevron-forward" size={16} color={theme.mutedForeground} />
-										</Pressable>
-									))}
-
-									<Pressable accessibilityRole="button" style={styles.duesSeeAll} onPress={() => router.push({ pathname: "/members", params: { filter: "due" } })} hitSlop={6}>
-										<Text style={styles.duesSeeAllText}>
-											{dashboard.due_members_count > dashboard.top_dues.length ? `See all ${dashboard.due_members_count} dues` : "Open dues list"}
-										</Text>
-										<Ionicons name="chevron-forward" size={14} color={theme.accent} />
-									</Pressable>
-								</>
-							) : (
-								<View style={styles.duesTitleRow}>
-									<Ionicons name="checkmark-circle" size={18} color={theme.success} />
-									<Text style={styles.duesCaughtUp}>All caught up - no dues pending</Text>
-								</View>
-							)}
-
-							{dashboard.upcoming_renewals > 0 && (
-								<Pressable accessibilityRole="button" style={({ pressed }) => [styles.renewalsRow, pressed && styles.menuRowPressed]} onPress={() => router.push("/renewals")}>
-									<Ionicons name="refresh-outline" size={16} color={theme.accent} />
-									<Text style={styles.renewalsText}>
-										{dashboard.upcoming_renewals} renewing this week
-									</Text>
-									<Ionicons name="chevron-forward" size={16} color={theme.mutedForeground} />
-								</Pressable>
-							)}
 						</View>
-					)}
-
-					{!isNewLibrary && (
-						<Pressable style={styles.summaryCard} onPress={() => router.push("/payments")}>
-							<Text style={styles.summaryLabel}>This month (collections)</Text>
-							<Text style={styles.summaryValue}>{dashboard ? formatRupee(dashboard.monthly_collection) : "—"}</Text>
-
-							{dashboard && (
-								<>
-									<View style={styles.progressContainer}>
-										<View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
-									</View>
-									<View style={styles.summarySecondaryRow}>
-										<View>
-											<Text style={styles.summarySecondaryLabel}>PENDING</Text>
-											<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.pending_collection)}</Text>
-										</View>
-										<View style={styles.summarySecondaryRight}>
-											<Text style={styles.summarySecondaryLabel}>TODAY</Text>
-											<Text style={styles.summarySecondaryValue}>{formatRupee(dashboard.today_collection)}</Text>
-										</View>
-									</View>
-								</>
-							)}
-
-							{showBatchSetupBanner && <Text style={styles.summaryHint}>Set up batches to start tracking seat sales and renewals.</Text>}
-						</Pressable>
 					)}
 
 					{dashboard && !isNewLibrary && (
 						<>
-							<Text style={styles.sectionTitle}>Recent Payments</Text>
+							<View style={styles.statGrid}>
+								{(
+									[
+										{
+											key: "occupancy",
+											icon: "pie-chart-outline",
+											label: "Occupancy",
+											value: `${occupancyPercent}%`,
+											alert: false,
+										},
+										{
+											key: "dues",
+											icon: "alert-circle-outline",
+											label: "Dues",
+											value: dashboard.due_members_count > 0 ? formatRupee(dashboard.due_total) : "₹0",
+											alert: dashboard.due_members_count > 0,
+										},
+										{
+											key: "collections",
+											icon: "wallet-outline",
+											label: "Received",
+											value: formatRupee(dashboard.month_cash.received),
+											alert: false,
+										},
+									] as { key: StatKey; icon: keyof typeof Ionicons.glyphMap; label: string; value: string; alert: boolean }[]
+								).map((tile) => {
+									const isSelected = selectedStat === tile.key;
+									return (
+										<Pressable
+											key={tile.key}
+											accessibilityRole="tab"
+											accessibilityState={{ selected: isSelected }}
+											style={({ pressed }) => [styles.statTile, isSelected && styles.statTileSelected, pressed && styles.menuCellPressed]}
+											onPress={() => setPickedStat(tile.key)}>
+											{isSelected && <LinearGradient pointerEvents="none" colors={[theme.accent, shade(theme.accent, 0.18)]} style={styles.statTileGradient} />}
+											<View style={[styles.statTileIcon, isSelected && styles.statTileIconSelected]}>
+												<Ionicons name={tile.icon} size={16} color={isSelected ? "#fff" : tile.alert ? theme.destructive : theme.accent} />
+											</View>
+											<Text
+												style={[styles.statTileValue, tile.alert && styles.statTileValueAlert, isSelected && styles.statTileTextSelected]}
+												numberOfLines={1}
+												adjustsFontSizeToFit>
+												{tile.value}
+											</Text>
+											<Text style={[styles.statTileLabel, isSelected && styles.statTileTextSelected]}>{tile.label}</Text>
+										</Pressable>
+									);
+								})}
+							</View>
+							{/* Pointer from the selected tile into its detail card, so they read as one unit. */}
+							<View style={styles.caretRow} pointerEvents="none">
+								{STAT_ORDER.map((key) => (
+									<View key={key} style={styles.caretSlot}>
+										{selectedStat === key && <View style={styles.caret} />}
+									</View>
+								))}
+							</View>
+						</>
+					)}
+
+					{/* The tile above already shows the headline number; the panel only adds context and the next step. */}
+					{dashboard && !isNewLibrary && selectedStat === "occupancy" && (
+						<View style={styles.panel}>
+							{dashboard.batch_occupancy.length === 0 ? (
+								<Text style={styles.panelLine}>Add batches to see how full each one is.</Text>
+							) : (
+								<>
+									{/* Column chart: seats filled per batch. One hue; the pale track is the batch's full capacity. */}
+									<View style={styles.chart} accessibilityRole="summary" accessibilityLabel="Seats filled in each batch">
+										<View style={styles.chartBaseline} pointerEvents="none" />
+										<View style={styles.chartFullLine} pointerEvents="none">
+											<Text style={styles.chartFullLabel}>Full</Text>
+										</View>
+										<View style={styles.chartColumns}>
+											{dashboard.batch_occupancy.map((batch) => {
+												const percent = batch.total > 0 ? Math.min(100, (batch.occupied / batch.total) * 100) : 0;
+												const isPicked = chartBatch?.id === batch.id;
+												return (
+													<Pressable
+														key={batch.id}
+														accessibilityRole="button"
+														accessibilityLabel={`${batch.name}, ${batch.occupied} of ${batch.total} seats filled`}
+														accessibilityState={{ selected: isPicked }}
+														style={styles.chartSlot}
+														onPress={() => setPickedBatchId(batch.id)}>
+														<View style={styles.chartPlot}>
+															<Text style={[styles.chartValue, !isPicked && styles.chartValueHidden]}>{batch.occupied}</Text>
+															<View style={styles.chartTrack}>
+																<View style={[styles.chartBar, { height: `${percent}%` }, !isPicked && chartBatch && styles.chartBarDim]} />
+															</View>
+														</View>
+														<Text style={[styles.chartName, isPicked && styles.chartNamePicked]} numberOfLines={1}>
+															{batch.name}
+															{batchNow?.current?.id === batch.id ? " •" : ""}
+														</Text>
+														<Text style={styles.chartTime} numberOfLines={1}>
+															{formatTime(batch.start_time).replace(":00", "")}
+														</Text>
+													</Pressable>
+												);
+											})}
+										</View>
+									</View>
+									{chartBatch && (
+										<View style={[styles.panelFooter, styles.panelRowBorder]}>
+											<Text style={styles.panelNote} numberOfLines={1}>
+												<Text style={styles.panelStrong}>{chartBatch.name}</Text>
+												{batchNow?.current?.id === chartBatch.id ? " (now)" : ""} · {chartBatch.occupied} of {chartBatch.total} seats
+												{chartBatch.occupied === 0 ? " · empty" : ""}
+											</Text>
+											<PanelLink styles={styles} theme={theme} label="Open seats" onPress={() => router.push("/seats")} />
+										</View>
+									)}
+								</>
+							)}
+						</View>
+					)}
+
+					{dashboard && !isNewLibrary && selectedStat === "dues" && (
+						<View style={styles.panel}>
+							{dashboard.top_dues.length === 0 && <Text style={styles.panelLine}>All caught up - nobody owes anything.</Text>}
+							{/* At most 3 here; everyone else is one tap away via "Open members". */}
+							{dashboard.top_dues.slice(0, MAX_DUES_ON_HOME).map((due, index) => (
+								<Pressable
+									key={due.member_id}
+									accessibilityRole="button"
+									style={({ pressed }) => [styles.panelRow, index > 0 && styles.panelRowBorder, pressed && styles.menuRowPressed]}
+									onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(due.member_id) } })}>
+									<View style={styles.dueAvatar}>
+										<Text style={styles.dueAvatarText}>{getInitials(due.name)}</Text>
+									</View>
+									<View style={styles.dueInfo}>
+										<Text style={styles.dueName} numberOfLines={1}>
+											{due.name}
+										</Text>
+										<Text style={[styles.dueLateness, due.days_overdue >= 15 && { color: theme.destructive }]}>{formatLateness(due.days_overdue)}</Text>
+									</View>
+									<Text style={styles.dueAmount}>{formatRupee(due.amount)}</Text>
+								</Pressable>
+							))}
+							{dashboard.upcoming_renewals > 0 && (
+								<Pressable
+									accessibilityRole="button"
+									style={({ pressed }) => [styles.panelRow, styles.panelRowBorder, pressed && styles.menuRowPressed]}
+									onPress={() => router.push("/renewals")}>
+									<Ionicons name="refresh-outline" size={16} color={theme.accent} />
+									<Text style={styles.renewalsText}>{dashboard.upcoming_renewals} renewing this week</Text>
+									<Ionicons name="chevron-forward" size={16} color={theme.mutedForeground} />
+								</Pressable>
+							)}
+							<View style={[styles.panelFooter, styles.panelRowBorder]}>
+								<Text style={styles.panelNote}>{dashboard.this_month_dues_count > 0 ? `${dashboard.this_month_dues_count} new this month` : " "}</Text>
+								<PanelLink
+									styles={styles}
+									theme={theme}
+									label="Open members"
+									onPress={() => router.push({ pathname: "/members", params: dashboard.due_members_count > 0 ? { filter: "due" } : {} })}
+								/>
+							</View>
+						</View>
+					)}
+
+					{dashboard && !isNewLibrary && selectedStat === "collections" && (
+						<View style={styles.panel}>
+							{viewedMonth && (
+								<View style={styles.panelHeaderRow}>
+									<Text style={styles.panelHeading}>{monthOffset === 0 ? "Received this month" : "Cash received"}</Text>
+									<View style={styles.monthSwitcher}>
+										<Pressable
+											accessibilityRole="button"
+											accessibilityLabel="Previous month"
+											style={styles.monthArrow}
+											onPress={() => setMonthOffset((o) => o - 1)}
+											disabled={monthOffset <= -MAX_MONTHS_BACK}
+											hitSlop={8}>
+											<Ionicons name="chevron-back" size={16} color={monthOffset <= -MAX_MONTHS_BACK ? theme.border : theme.primary} />
+										</Pressable>
+										<Text style={styles.monthLabel}>{formatMonth(viewedMonth)}</Text>
+										<Pressable
+											accessibilityRole="button"
+											accessibilityLabel="Next month"
+											style={styles.monthArrow}
+											onPress={() => setMonthOffset((o) => Math.min(0, o + 1))}
+											disabled={monthOffset === 0}
+											hitSlop={8}>
+											<Ionicons name="chevron-forward" size={16} color={monthOffset === 0 ? theme.border : theme.primary} />
+										</Pressable>
+								</View>
+								</View>
+							)}
+
+							{monthOffset === 0 ? (
+								<>
+									{/* Where this month's cash came from. */}
+									<View style={styles.cashSplit}>
+										{[
+											{ key: "this", label: "This month", amount: dashboard.month_cash.for_this_month },
+											{ key: "old", label: "Old dues", amount: dashboard.month_cash.for_earlier_months },
+											{ key: "advance", label: "Advance", amount: dashboard.month_cash.in_advance },
+										].map((part) => (
+											<View key={part.key} style={styles.cashSplitItem}>
+												<Text style={[styles.cashSplitAmount, part.amount === 0 && styles.cashSplitAmountZero]} numberOfLines={1} adjustsFontSizeToFit>
+													{formatRupee(part.amount)}
+												</Text>
+												<Text style={styles.cashSplitLabel}>{part.label}</Text>
+											</View>
+										))}
+									</View>
+
+									<View style={[styles.panelHeaderRow, styles.panelSection]}>
+										<Text style={styles.panelHeading}>{formatMonth(dashboard.collection_month).split(" ")[0]} fees</Text>
+										<Text style={styles.panelHeadingValue}>{formatRupee(dashboard.month_fees.expected)}</Text>
+									</View>
+									{/* One stacked bar for this month's fees: received | due now | due later (the track). */}
+									<View style={styles.stackBar}>
+										{feeSegments.map((segment) =>
+											segment.amount > 0 ? <View key={segment.key} style={[styles.stackSegment, { flex: segment.amount, backgroundColor: segment.color }]} /> : null
+										)}
+									</View>
+									<View style={styles.feeLegend}>
+										{feeSegments.map((segment) => (
+											<View key={segment.key} style={styles.feeLegendItem}>
+												<View style={styles.feeLegendLabelRow}>
+													<View style={[styles.feeDot, { backgroundColor: segment.color }]} />
+													<Text style={styles.feeLegendLabel}>{segment.label}</Text>
+												</View>
+												<Text style={styles.feeLegendAmount} numberOfLines={1} adjustsFontSizeToFit>
+													{formatRupee(segment.amount)}
+												</Text>
+											</View>
+										))}
+									</View>
+									{dashboard.month_fees.arrears > 0 && (
+										<Text style={styles.panelNote}>
+											+ <Text style={[styles.panelStrong, { color: theme.destructive }]}>{formatRupee(dashboard.month_fees.arrears)}</Text> still owed from earlier
+											months
+										</Text>
+									)}
+									<View style={[styles.panelFooter, styles.panelRowBorder]}>
+										<Text style={styles.panelNote} numberOfLines={1}>
+											Payments clear the oldest dues first
+										</Text>
+										<PanelLink styles={styles} theme={theme} label="Open payments" onPress={() => router.push("/payments")} />
+									</View>
+								</>
+							) : isLoadingPastMonth ? (
+								<ActivityIndicator style={styles.pastMonthLoader} color={theme.accent} />
+							) : (
+								<>
+									<Text style={styles.panelLine}>
+										{pastMonth ? (
+											<>
+												<Text style={styles.panelStrong}>{formatRupee(pastMonth.collected)}</Text> collected from {pastMonth.payments_count} payment
+												{pastMonth.payments_count === 1 ? "" : "s"}
+											</>
+										) : (
+											"Couldn't load this month."
+										)}
+									</Text>
+									<View style={styles.panelFooter}>
+										<Text style={styles.panelNote}>Full month</Text>
+										<PanelLink styles={styles} theme={theme} label="Open payments" onPress={() => router.push("/payments")} />
+									</View>
+								</>
+							)}
+						</View>
+					)}
+
+					{dashboard && !isNewLibrary && (
+						<>
+							<View style={styles.sectionHeaderRow}>
+								<Text style={[styles.sectionTitle, styles.sectionTitleInline]}>Recent Payments</Text>
+								{dashboard.recent_payments.length > 0 && (
+									<PanelLink styles={styles} theme={theme} label="See more" onPress={() => router.push("/payments")} />
+								)}
+							</View>
 							<View style={styles.recentCard}>
 								{dashboard.recent_payments.length > 0 ? (
-									dashboard.recent_payments.map((payment, index) => (
-										<View key={`${payment.name}-${index}`} style={[styles.recentRow, index !== dashboard.recent_payments.length - 1 && styles.recentRowBorder]}>
+									recentPayments.map((payment, index) => (
+										<View key={`${payment.name}-${index}`} style={[styles.recentRow, index !== recentPayments.length - 1 && styles.recentRowBorder]}>
 											<View style={styles.recentIconCircle}>
 												<Ionicons name="checkmark-circle" size={18} color={theme.success} />
 											</View>
@@ -518,6 +819,15 @@ const createStyles = (theme: any) =>
 		headerText: {
 			flex: 1,
 			paddingRight: 16,
+		},
+		// Small date line above the library name.
+		headerDate: {
+			fontFamily: "sans-bold",
+			fontSize: 11,
+			color: theme.accent,
+			textTransform: "uppercase",
+			letterSpacing: 0.8,
+			marginBottom: 2,
 		},
 		headerTitle: {
 			fontFamily: "sans-extrabold",
@@ -642,67 +952,27 @@ const createStyles = (theme: any) =>
 			color: theme.mutedForeground,
 			marginTop: 2,
 		},
-		summaryCard: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			padding: 20,
-			marginBottom: 32,
-			borderWidth: 1,
-			borderColor: theme.border,
-		},
-		summaryLabel: {
-			fontFamily: "sans-semibold",
-			fontSize: 13,
-			color: theme.mutedForeground,
-			textTransform: "uppercase",
-			letterSpacing: 0.5,
-		},
-		summaryValue: {
-			fontFamily: "sans-extrabold",
-			fontSize: 34,
-			color: theme.accent,
-			marginTop: 8,
-			letterSpacing: -1,
-		},
-		summaryHint: {
-			fontFamily: "sans-medium",
-			fontSize: 13,
-			color: theme.mutedForeground,
-			marginTop: 12,
-			lineHeight: 18,
-		},
-		progressContainer: {
-			height: 6,
-			backgroundColor: theme.muted,
-			borderRadius: 3,
-			overflow: "hidden",
-			marginTop: 16,
-		},
-		progressBar: {
-			height: "100%",
-			backgroundColor: theme.accent,
-			borderRadius: 3,
-		},
-		summarySecondaryRow: {
+		monthSwitcher: {
 			flexDirection: "row",
-			justifyContent: "space-between",
 			alignItems: "center",
-			marginTop: 16,
+			gap: 4,
 		},
-		summarySecondaryRight: {
-			alignItems: "flex-end",
+		monthArrow: {
+			width: 26,
+			height: 26,
+			borderRadius: 13,
+			alignItems: "center",
+			justifyContent: "center",
 		},
-		summarySecondaryLabel: {
+		monthLabel: {
 			fontFamily: "sans-bold",
-			fontSize: 11,
-			color: theme.mutedForeground,
-			letterSpacing: 0.5,
-			marginBottom: 2,
-		},
-		summarySecondaryValue: {
-			fontFamily: "sans-extrabold",
-			fontSize: 16,
+			fontSize: 13,
 			color: theme.primary,
+			minWidth: 70,
+			textAlign: "center",
+		},
+		pastMonthLoader: {
+			marginVertical: 24,
 		},
 		firstMemberCard: {
 			backgroundColor: theme.card,
@@ -765,106 +1035,350 @@ const createStyles = (theme: any) =>
 			marginTop: 10,
 			lineHeight: 17,
 		},
-		occupancyCard: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			borderWidth: 1,
-			borderColor: theme.border,
-			padding: 16,
-			marginBottom: 24,
-		},
-		occupancyHeader: {
-			flexDirection: "row",
-			alignItems: "baseline",
-			justifyContent: "space-between",
-		},
-		occupancyLabel: {
-			fontFamily: "sans-semibold",
-			fontSize: 13,
-			color: theme.mutedForeground,
-			textTransform: "uppercase",
-			letterSpacing: 0.5,
-		},
-		occupancyPercent: {
-			fontFamily: "sans-extrabold",
-			fontSize: 26,
-			color: theme.accent,
-			letterSpacing: -0.5,
-		},
-		occupancyDetail: {
-			fontFamily: "sans-semibold",
-			fontSize: 13,
-			color: theme.primary,
-			marginTop: 12,
-		},
-		occupancyFooter: {
+		nowPill: {
 			flexDirection: "row",
 			alignItems: "center",
-			justifyContent: "space-between",
-			marginTop: 4,
-		},
-		occupancyStatus: {
-			fontFamily: "sans-medium",
-			fontSize: 12,
-			color: theme.mutedForeground,
-		},
-		occupancyLink: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 2,
-		},
-		occupancyLinkText: {
-			fontFamily: "sans-bold",
-			fontSize: 13,
-			color: theme.accent,
-		},
-		duesCard: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			borderWidth: 1,
-			borderColor: theme.border,
-			paddingHorizontal: 16,
-			paddingVertical: 14,
-			marginBottom: 24,
-		},
-		duesHeaderRow: {
-			flexDirection: "row",
-			alignItems: "center",
-			justifyContent: "space-between",
-			marginBottom: 4,
-		},
-		duesTitleRow: {
-			flexDirection: "row",
-			alignItems: "center",
+			alignSelf: "flex-start",
 			gap: 8,
+			paddingVertical: 7,
+			paddingHorizontal: 12,
+			borderRadius: 20,
+			marginBottom: 14,
+			maxWidth: "100%",
 		},
-		duesTitleDot: {
+		nowDot: {
 			width: 8,
 			height: 8,
 			borderRadius: 4,
 		},
-		duesTitle: {
-			fontFamily: "sans-bold",
-			fontSize: 15,
+		nowText: {
+			flexShrink: 1,
+			fontFamily: "sans-medium",
+			fontSize: 13,
 			color: theme.primary,
 		},
-		duesTotal: {
+		nowStrong: {
+			fontFamily: "sans-bold",
+		},
+		statGrid: {
+			flexDirection: "row",
+			gap: 10,
+		},
+		statTile: {
+			flex: 1,
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
+			paddingTop: 12,
+			paddingBottom: 14,
+			paddingHorizontal: 8,
+			alignItems: "center",
+		},
+		statTileSelected: {
+			borderColor: theme.accent,
+			shadowColor: theme.accent,
+			shadowOffset: { width: 0, height: 6 },
+			shadowOpacity: 0.35,
+			shadowRadius: 10,
+			elevation: 6,
+		},
+		// Rounded itself (rather than clipping the tile) so the selected tile's glow isn't cut off on iOS.
+		statTileGradient: {
+			...StyleSheet.absoluteFill,
+			borderRadius: RADIUS.md,
+		},
+		statTileIcon: {
+			width: 28,
+			height: 28,
+			borderRadius: 14,
+			backgroundColor: theme.accent + "15",
+			alignItems: "center",
+			justifyContent: "center",
+			marginBottom: 8,
+		},
+		statTileIconSelected: {
+			backgroundColor: "rgba(255,255,255,0.22)",
+		},
+		statTileValue: {
 			fontFamily: "sans-extrabold",
-			fontSize: 15,
+			fontSize: 18,
+			color: theme.primary,
+		},
+		statTileValueAlert: {
 			color: theme.destructive,
 		},
-		duesTotalSuffix: {
+		statTileLabel: {
+			fontFamily: "sans-bold",
+			fontSize: 10,
+			color: theme.mutedForeground,
+			textTransform: "uppercase",
+			letterSpacing: 0.6,
+			marginTop: 3,
+		},
+		statTileTextSelected: {
+			color: "#fff",
+		},
+		// Same 3-column layout as the grid, so the caret lines up under the selected tile.
+		caretRow: {
+			flexDirection: "row",
+			gap: 10,
+			height: 10,
+			zIndex: 2,
+			elevation: 2,
+		},
+		caretSlot: {
+			flex: 1,
+			alignItems: "center",
+		},
+		// A rotated square in the panel colours, half above the panel: reads as the panel's notch.
+		caret: {
+			width: 14,
+			height: 14,
+			marginTop: 3,
+			backgroundColor: theme.card,
+			borderLeftWidth: 1,
+			borderTopWidth: 1,
+			borderColor: theme.border,
+			transform: [{ rotate: "45deg" }],
+		},
+		// Shared, deliberately light panel under the Occupancy / Dues / Collections tiles.
+		panel: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
+			paddingHorizontal: 14,
+			paddingVertical: 12,
+			marginBottom: 24,
+			gap: 8,
+		},
+		panelBar: {
+			height: 5,
+			borderRadius: 3,
+			backgroundColor: theme.muted,
+			overflow: "hidden",
+			marginTop: 2,
+		},
+		panelBarFill: {
+			height: "100%",
+			borderRadius: 3,
+			backgroundColor: theme.accent,
+		},
+		// --- occupancy column chart ---
+		chart: {
+			paddingTop: 4,
+		},
+		// Recessive hairline marking 100% (top of the plot area).
+		chartFullLine: {
+			position: "absolute",
+			top: CHART_VALUE_SPACE + 4,
+			left: 0,
+			right: 0,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: theme.border,
+		},
+		// Shared baseline the columns grow from.
+		chartBaseline: {
+			position: "absolute",
+			top: CHART_VALUE_SPACE + CHART_HEIGHT + 4,
+			left: 0,
+			right: 0,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: theme.border,
+		},
+		chartFullLabel: {
+			position: "absolute",
+			top: -14,
+			left: 0,
+			fontFamily: "sans-medium",
+			fontSize: 10,
+			color: theme.mutedForeground,
+		},
+		chartColumns: {
+			flexDirection: "row",
+			alignItems: "flex-start",
+		},
+		chartSlot: {
+			flex: 1,
+			alignItems: "center",
+			paddingHorizontal: 2,
+		},
+		chartPlot: {
+			height: CHART_VALUE_SPACE + CHART_HEIGHT,
+			alignItems: "center",
+			justifyContent: "flex-end",
+		},
+		chartValue: {
+			fontFamily: "sans-bold",
+			fontSize: 12,
+			color: theme.primary,
+			height: CHART_VALUE_SPACE,
+		},
+		chartValueHidden: {
+			opacity: 0,
+		},
+		chartTrack: {
+			width: 22,
+			height: CHART_HEIGHT,
+			justifyContent: "flex-end",
+			backgroundColor: theme.accent + "1A",
+			borderTopLeftRadius: 4,
+			borderTopRightRadius: 4,
+		},
+		chartBar: {
+			width: "100%",
+			backgroundColor: theme.accent,
+			borderTopLeftRadius: 4,
+			borderTopRightRadius: 4,
+		},
+		// Non-tapped columns step back a little so the tapped one reads as selected.
+		chartBarDim: {
+			opacity: 0.55,
+		},
+		chartName: {
+			fontFamily: "sans-semibold",
+			fontSize: 11,
+			color: theme.mutedForeground,
+			marginTop: 6,
+			maxWidth: "100%",
+		},
+		chartNamePicked: {
+			fontFamily: "sans-bold",
+			color: theme.primary,
+		},
+		chartTime: {
+			fontFamily: "sans-medium",
+			fontSize: 10,
+			color: theme.mutedForeground,
+		},
+		panelHeaderRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+		},
+		cashSplit: {
+			flexDirection: "row",
+			paddingVertical: 2,
+		},
+		cashSplitItem: {
+			flex: 1,
+		},
+		cashSplitAmount: {
+			fontFamily: "sans-extrabold",
+			fontSize: 16,
+			color: theme.primary,
+		},
+		cashSplitAmountZero: {
+			color: theme.mutedForeground,
+			fontFamily: "sans-semibold",
+		},
+		cashSplitLabel: {
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			marginTop: 1,
+		},
+		// Second heading inside a panel, divided from the part above.
+		panelSection: {
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: theme.border,
+			paddingTop: 10,
+			marginTop: 2,
+		},
+		panelHeadingValue: {
+			fontFamily: "sans-bold",
+			fontSize: 13,
+			color: theme.primary,
+		},
+		panelHeading: {
+			fontFamily: "sans-bold",
+			fontSize: 12,
+			color: theme.mutedForeground,
+			textTransform: "uppercase",
+			letterSpacing: 0.6,
+		},
+		// Track = the whole month's expected fees; segments are separated by a 2px surface gap.
+		stackBar: {
+			flexDirection: "row",
+			height: 8,
+			borderRadius: 4,
+			overflow: "hidden",
+			backgroundColor: theme.muted,
+			gap: 2,
+			marginTop: 2,
+		},
+		stackSegment: {
+			height: "100%",
+		},
+		feeLegend: {
+			flexDirection: "row",
+		},
+		feeLegendItem: {
+			flex: 1,
+		},
+		feeLegendLabelRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 6,
+		},
+		feeDot: {
+			width: 8,
+			height: 8,
+			borderRadius: 4,
+		},
+		feeLegendLabel: {
 			fontFamily: "sans-medium",
 			fontSize: 12,
 			color: theme.mutedForeground,
 		},
-		dueRow: {
+		feeLegendAmount: {
+			fontFamily: "sans-bold",
+			fontSize: 14,
+			color: theme.primary,
+			marginTop: 2,
+			marginLeft: 14,
+		},
+		panelLine: {
+			fontFamily: "sans-medium",
+			fontSize: 13,
+			color: theme.primary,
+		},
+		panelStrong: {
+			fontFamily: "sans-bold",
+		},
+		panelNote: {
+			flex: 1,
+			fontFamily: "sans-medium",
+			fontSize: 12,
+			color: theme.mutedForeground,
+		},
+		panelFooter: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 8,
+			paddingTop: 2,
+		},
+		panelRow: {
 			flexDirection: "row",
 			alignItems: "center",
 			gap: 10,
-			paddingVertical: 10,
+			paddingVertical: 8,
+		},
+		panelRowBorder: {
 			borderTopWidth: StyleSheet.hairlineWidth,
 			borderTopColor: theme.border,
+			paddingTop: 8,
+		},
+		panelLink: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 4,
+		},
+		panelLinkText: {
+			fontFamily: "sans-bold",
+			fontSize: 13,
+			color: theme.accent,
 		},
 		dueAvatar: {
 			width: 34,
@@ -897,33 +1411,6 @@ const createStyles = (theme: any) =>
 			fontFamily: "sans-extrabold",
 			fontSize: 14,
 			color: theme.primary,
-		},
-		duesSeeAll: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 2,
-			paddingTop: 10,
-			borderTopWidth: StyleSheet.hairlineWidth,
-			borderTopColor: theme.border,
-		},
-		duesSeeAllText: {
-			fontFamily: "sans-bold",
-			fontSize: 13,
-			color: theme.accent,
-		},
-		duesCaughtUp: {
-			fontFamily: "sans-semibold",
-			fontSize: 14,
-			color: theme.primary,
-		},
-		renewalsRow: {
-			flexDirection: "row",
-			alignItems: "center",
-			gap: 8,
-			marginTop: 12,
-			paddingTop: 12,
-			borderTopWidth: StyleSheet.hairlineWidth,
-			borderTopColor: theme.border,
 		},
 		renewalsText: {
 			flex: 1,
@@ -981,6 +1468,15 @@ const createStyles = (theme: any) =>
 			fontSize: 13,
 			color: theme.mutedForeground,
 			padding: 18,
+		},
+		sectionHeaderRow: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "space-between",
+			marginBottom: 16,
+		},
+		sectionTitleInline: {
+			marginBottom: 0,
 		},
 		sectionTitle: {
 			fontFamily: "sans-bold",
