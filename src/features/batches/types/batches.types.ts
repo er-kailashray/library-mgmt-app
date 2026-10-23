@@ -5,6 +5,7 @@ export interface Batch {
     start_time: string;
     end_time: string;
     monthly_fee: string;
+    /** Members currently seated in this batch. */
     allocations_count: number;
     total_seats: number;
     created_at: string;
