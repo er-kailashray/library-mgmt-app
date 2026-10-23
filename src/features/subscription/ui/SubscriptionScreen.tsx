@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { formatSubscriptionDate, getSubscriptionApi } from "@/features/subscription/logic/subscription-api";
+import { formatSubscriptionDate, getSubscriptionApi, getSubscriptionInvoicesApi, startCheckoutApi } from "@/features/subscription/logic/subscription-api";
 import { SubscriptionInfo, SubscriptionPlan, SubscriptionStateKey } from "@/features/subscription/types/subscription.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
@@ -50,11 +52,14 @@ export function SubscriptionScreen() {
     const insets = useSafeAreaInsets();
 
     const { data: info, isLoading, error, refetch } = useApiData(getSubscriptionApi, []);
+    const { data: invoices, refetch: refetchInvoices } = useApiData(getSubscriptionInvoicesApi, []);
+    const [isPaying, setIsPaying] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
             void refetch();
-        }, [refetch])
+            void refetchInvoices();
+        }, [refetch, refetchInvoices])
     );
 
     // Yearly is the better deal, so it's pre-selected; otherwise keep the owner's current plan.
@@ -75,10 +80,28 @@ export function SubscriptionScreen() {
         expired: theme.destructive,
     };
 
-    const handleContinue = () => {
+    // Razorpay Checkout runs on a signed page in the in-app browser, which redirects back to this
+    // deep link with ?result=success|failed|cancelled. The server verifies the payment itself.
+    const handleContinue = async () => {
         if (!selectedPlan) return;
-        // Payment (Razorpay) arrives in a later step; until then this only confirms the choice.
-        Alert.alert("Coming soon", `Online payment for the ${selectedPlan.name} plan (${formatRupee(selectedPlan.price)}) will be available shortly.`);
+        const returnUrl = Linking.createURL("subscription");
+        try {
+            setIsPaying(true);
+            const { data } = await startCheckoutApi(selectedPlan.code, returnUrl);
+            const session = await WebBrowser.openAuthSessionAsync(data.pay_url, returnUrl);
+            const result = session.type === "success" ? Linking.parse(session.url).queryParams?.result : null;
+
+            await Promise.all([refetch(), refetchInvoices()]);
+            if (result === "success") {
+                Alert.alert("Payment successful", `Your ${selectedPlan.name} plan is active. Thank you!`);
+            } else if (result === "failed") {
+                Alert.alert("Payment failed", "No money was taken for this attempt. Please try again or use another payment method.");
+            }
+        } catch (err: any) {
+            Alert.alert("Couldn't start payment", err.message || "Please try again.");
+        } finally {
+            setIsPaying(false);
+        }
     };
 
     const styles = createStyles(theme);
@@ -166,13 +189,44 @@ export function SubscriptionScreen() {
                         ))}
                     </View>
 
-                    {selectedPlan && !(info.state === "active" && info.plan?.code === selectedPlan.code) && (
-                        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]} onPress={handleContinue}>
-                            <Text style={styles.ctaText}>
-                                Continue with {selectedPlan.name} · {formatRupee(selectedPlan.price)}
-                            </Text>
+                    {selectedPlan && (
+                        <Pressable
+                            accessibilityRole="button"
+                            style={({ pressed }) => [styles.cta, (pressed || isPaying) && { opacity: 0.85 }]}
+                            onPress={handleContinue}
+                            disabled={isPaying}>
+                            {isPaying ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.ctaText}>
+                                    {info.state === "active" && info.plan?.code === selectedPlan.code ? "Extend" : "Continue with"} {selectedPlan.name} ·{" "}
+                                    {formatRupee(selectedPlan.price)}
+                                </Text>
+                            )}
                         </Pressable>
                     )}
+                    {info.state === "active" && (
+                        <Text style={styles.finePrint}>Paying now adds to your current plan - it starts when this one ends.</Text>
+                    )}
+                    {invoices && invoices.length > 0 && (
+                        <>
+                            <Text style={styles.sectionTitle}>Payment history</Text>
+                            <View style={styles.included}>
+                                {invoices.map((invoice) => (
+                                    <View key={invoice.id} style={styles.invoiceRow}>
+                                        <View style={styles.invoiceText}>
+                                            <Text style={styles.invoicePlan}>{invoice.plan} plan</Text>
+                                            <Text style={styles.invoiceMeta}>
+                                                {formatSubscriptionDate(invoice.paid_at)} · {invoice.invoice_number}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.invoiceAmount}>{formatRupee(invoice.amount)}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </>
+                    )}
+
                     <Text style={styles.finePrint}>Your data is never deleted. If your plan ends, you can still view everything and pick up where you left off.</Text>
                 </ScrollView>
             )}
@@ -359,6 +413,30 @@ const createStyles = (theme: any) =>
         includedText: {
             flex: 1,
             fontFamily: "sans-medium",
+            fontSize: 14,
+            color: theme.primary,
+        },
+        invoiceRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+        },
+        invoiceText: {
+            flex: 1,
+        },
+        invoicePlan: {
+            fontFamily: "sans-bold",
+            fontSize: 14,
+            color: theme.primary,
+        },
+        invoiceMeta: {
+            fontFamily: "sans-medium",
+            fontSize: 12,
+            color: theme.mutedForeground,
+            marginTop: 1,
+        },
+        invoiceAmount: {
+            fontFamily: "sans-bold",
             fontSize: 14,
             color: theme.primary,
         },

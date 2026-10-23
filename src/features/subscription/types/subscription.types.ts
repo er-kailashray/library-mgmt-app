@@ -29,3 +29,21 @@ export interface SubscriptionResponse {
 
 /** Days before the end of a trial/plan when Home starts nudging the owner to subscribe. */
 export const SUBSCRIPTION_NUDGE_DAYS = 7;
+
+export interface CheckoutResponse {
+    status: boolean;
+    data: { payment_id: number; pay_url: string };
+}
+
+export interface SubscriptionInvoice {
+    id: number;
+    invoice_number: string;
+    plan: string;
+    amount: number;
+    paid_at: string;
+}
+
+export interface SubscriptionInvoicesResponse {
+    status: boolean;
+    data: SubscriptionInvoice[];
+}

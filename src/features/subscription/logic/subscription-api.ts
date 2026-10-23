@@ -1,6 +1,6 @@
 import { getStoredAuthToken } from "@/services/api/auth.api";
-import { apiFetch } from "@/services/api/client";
-import { SubscriptionInfo, SubscriptionResponse, SubscriptionStateKey } from "../types/subscription.types";
+import { apiFetch, apiPost } from "@/services/api/client";
+import { CheckoutResponse, SubscriptionInfo, SubscriptionInvoicesResponse, SubscriptionResponse, SubscriptionStateKey } from "../types/subscription.types";
 
 export async function getSubscriptionApi(): Promise<SubscriptionResponse> {
     const token = await getStoredAuthToken();
@@ -11,6 +11,21 @@ export async function getSubscriptionApi(): Promise<SubscriptionResponse> {
             Authorization: `Bearer ${token}`,
         },
     });
+}
+
+/** Creates a Razorpay order; returns the signed checkout page to open, which comes back to `returnUrl`. */
+export async function startCheckoutApi(plan: string, returnUrl: string): Promise<CheckoutResponse> {
+    const token = await getStoredAuthToken();
+    if (!token) throw new Error("No auth token");
+
+    return apiPost<CheckoutResponse>("/api/subscription/checkout", { plan, return_url: returnUrl }, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export async function getSubscriptionInvoicesApi(): Promise<SubscriptionInvoicesResponse> {
+    const token = await getStoredAuthToken();
+    if (!token) throw new Error("No auth token");
+
+    return apiFetch<SubscriptionInvoicesResponse>("/api/subscription/payments", { headers: { Authorization: `Bearer ${token}` } });
 }
 
 export function formatSubscriptionDate(iso: string): string {
