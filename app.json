@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fff9e3"
+      "backgroundColor": "#FDFCF9"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,7 +21,7 @@
       "package": "com.kailashray.librum",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#fff9e3"
+        "backgroundColor": "#E26D4D"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -39,9 +39,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#fff9e3",
+          "backgroundColor": "#FDFCF9",
           "dark": {
-            "backgroundColor": "#081126"
+            "backgroundColor": "#0C0A09"
           }
         }
       ],

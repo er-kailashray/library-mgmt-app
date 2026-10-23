@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="480" viewBox="0 0 600 480">
+	<circle cx="300" cy="245" r="205" fill="#E26D4D" opacity="0.1"/>
+	<rect x="60" y="380" width="480" height="4" rx="2" fill="#1C1917" opacity="0.1"/>
+	<rect x="228" y="66" width="170" height="324" rx="28" fill="#1C1917" opacity="0.08"/>
+	<rect x="220" y="58" width="170" height="324" rx="28" fill="#1C1917"/>
+	<rect x="231" y="72" width="148" height="296" rx="19" fill="#FDFCF9"/>
+	<rect x="280" y="80" width="50" height="9" rx="4.5" fill="#1C1917"/>
+	<g transform="translate(285 106) scale(0.0390625)"><rect width="1024" height="1024" rx="224" fill="#E26D4D"/>
+	<g transform="translate(-13 -3)">
+		<rect x="494" y="262" width="104" height="322" rx="20" fill="#FFFFFF" opacity="0.55" transform="rotate(20 494 584)"/>
+		<rect x="330" y="250" width="140" height="370" rx="24" fill="#FFFFFF"/>
+		<rect x="330" y="310" width="140" height="16" fill="#E26D4D"/>
+		<rect x="330" y="548" width="140" height="16" fill="#E26D4D"/>
+		<rect x="330" y="650" width="390" height="130" rx="24" fill="#FFFFFF"/>
+		<rect x="392" y="650" width="16" height="130" fill="#E26D4D"/>
+		<rect x="642" y="650" width="16" height="130" fill="#E26D4D"/>
+	</g></g>
+	<text x="305" y="172" font-family="Plus Jakarta Sans" font-size="15" font-weight="800" fill="#1C1917" text-anchor="middle" opacity="1">Welcome back</text>
+	<text x="305" y="190" font-family="Plus Jakarta Sans" font-size="9.5" font-weight="500" fill="#A8A29E" text-anchor="middle" opacity="1">Enter the code sent to</text>
+	<text x="305" y="204" font-family="Plus Jakarta Sans" font-size="10" font-weight="700" fill="#1C1917" text-anchor="middle" opacity="1">+91 98765 43210</text>
+	<rect x="251" y="222" width="22" height="32" rx="6" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+		<text x="262" y="244" font-family="Plus Jakarta Sans" font-size="15" font-weight="800" fill="#1C1917" text-anchor="middle" opacity="1">4</text><rect x="279" y="222" width="22" height="32" rx="6" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+		<text x="290" y="244" font-family="Plus Jakarta Sans" font-size="15" font-weight="800" fill="#1C1917" text-anchor="middle" opacity="1">7</text><rect x="307" y="222" width="22" height="32" rx="6" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+		<text x="318" y="244" font-family="Plus Jakarta Sans" font-size="15" font-weight="800" fill="#1C1917" text-anchor="middle" opacity="1">2</text><rect x="335" y="222" width="22" height="32" rx="6" fill="#FFFFFF" stroke="#E26D4D" stroke-opacity="1" stroke-width="2"/>
+		<rect x="345" y="230" width="2" height="16" rx="1" fill="#E26D4D"/>
+	<text x="305" y="278" font-family="Plus Jakarta Sans" font-size="9.5" font-weight="500" fill="#A8A29E" text-anchor="middle" opacity="1">Resend code in 0:24</text>
+	<rect x="249" y="318" width="112" height="34" rx="10" fill="#E26D4D"/>
+	<text x="305" y="340" font-family="Plus Jakarta Sans" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="1">Verify</text>
+
+	
+	<circle cx="392" cy="134" r="30" fill="#14B8A6" stroke="#FDFCF9" stroke-width="4"/>
+	<path d="M379.4 134 L389 143.6 L405.5 124.4" fill="none" stroke="#FFFFFF" stroke-width="5.7" stroke-linecap="round" stroke-linejoin="round"/>
+
+	
+	<rect x="72" y="246" width="170" height="64" rx="14" fill="#1C1917" opacity="0.07"/>
+	<rect x="66" y="238" width="170" height="64" rx="14" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.08" stroke-width="2"/>
+	<rect x="80" y="252" width="36" height="36" rx="9" fill="#14B8A6" opacity="0.18"/>
+	<rect x="89" y="260" width="8" height="20" rx="2" fill="#14B8A6"/><rect x="99" y="260" width="8" height="20" rx="2" fill="#14B8A6" opacity="0.6"/>
+	<text x="126" y="267" font-family="Plus Jakarta Sans" font-size="12" font-weight="800" fill="#1C1917" text-anchor="start" opacity="1">Library created</text>
+	<text x="126" y="283" font-family="Plus Jakarta Sans" font-size="10.5" font-weight="500" fill="#A8A29E" text-anchor="start" opacity="1">Sunrise Library</text>
+
+	<path d="M150 124 Q150 140 166 140 Q150 140 150 156 Q150 140 134 140 Q150 140 150 124Z" fill="#E26D4D"/><path d="M180 178 Q180 186 188 186 Q180 186 180 194 Q180 186 172 186 Q180 186 180 178Z" fill="#14B8A6"/>
+	<path d="M468 276 Q468 290 482 290 Q468 290 468 304 Q468 290 454 290 Q468 290 468 276Z" fill="#14B8A6"/><path d="M462 83 Q462 92 471 92 Q462 92 462 101 Q462 92 453 92 Q462 92 462 83Z" fill="#E26D4D"/><path d="M440 323 Q440 330 447 330 Q440 330 440 337 Q440 330 433 330 Q440 330 440 323Z" fill="#1C1917"/>
+</svg>
