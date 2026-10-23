@@ -11,6 +11,7 @@ import { Batch } from "@/features/batches/types/batches.types";
 import { getDashboardApi, getMonthlyCollectionApi } from "@/features/home/logic/home-api";
 import { DashboardData, MonthlyCollection } from "@/features/home/types/home.types";
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
+import { SubscriptionBanner } from "@/features/subscription/ui/SubscriptionBanner";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -309,6 +310,8 @@ export function HomeScreen() {
 				</View>
 
 				<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+					<SubscriptionBanner />
+
 					{showSetupCard && (
 						<View style={styles.setupCard}>
 							<View style={styles.setupHeaderRow}>

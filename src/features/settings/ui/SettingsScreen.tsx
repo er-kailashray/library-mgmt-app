@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
+import { getSubscriptionApi, subscriptionChipLabel } from "@/features/subscription/logic/subscription-api";
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
 import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
@@ -19,6 +20,8 @@ interface SettingsItem {
 	label: string;
 	onPress: () => void;
 	destructive?: boolean;
+	/** Short status shown before the chevron, e.g. "Trial · 12 days left". */
+	badge?: { text: string; color: string };
 }
 
 interface SettingsGroup {
@@ -33,6 +36,18 @@ export function SettingsScreen() {
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const { data: dashboard } = useApiData(getDashboardApi, []);
+	const { data: subscription, refetch: refetchSubscription } = useApiData(getSubscriptionApi, []);
+
+	// Pick up a plan change when coming back from the Subscription screen.
+	useFocusEffect(
+		useCallback(() => {
+			void refetchSubscription();
+		}, [refetchSubscription])
+	);
+
+	const subscriptionColor = subscription
+		? { trial: theme.accent, active: theme.success, grace: theme.warning, expired: theme.destructive }[subscription.state]
+		: theme.mutedForeground;
 
 	useEffect(() => {
 		const loadUser = async () => {
@@ -116,6 +131,17 @@ export function SettingsScreen() {
 	}, []);
 
 	const SETTINGS_GROUPS: SettingsGroup[] = [
+		{
+			title: "Subscription",
+			items: [
+				{
+					icon: "diamond-outline",
+					label: "Plan & Billing",
+					onPress: () => router.push("/subscription"),
+					badge: subscription ? { text: subscriptionChipLabel(subscription), color: subscriptionColor } : undefined,
+				},
+			],
+		},
 		{
 			title: "Library Setup",
 			items: [
@@ -240,6 +266,9 @@ export function SettingsScreen() {
 										<Ionicons name={item.icon} size={20} color={item.destructive ? theme.destructive : theme.primary} />
 									</View>
 									<Text style={[styles.optionText, item.destructive && styles.logoutText]}>{item.label}</Text>
+									{item.badge && (
+										<Text style={[styles.optionBadge, { color: item.badge.color, backgroundColor: item.badge.color + "18" }]}>{item.badge.text}</Text>
+									)}
 									<Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
 								</Pressable>
 							))}
@@ -510,6 +539,15 @@ const createStyles = (theme: any) => StyleSheet.create({
 		fontFamily: "sans-bold",
 		fontSize: 15,
 		color: theme.primary,
+	},
+	optionBadge: {
+		fontFamily: "sans-bold",
+		fontSize: 11,
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 10,
+		overflow: "hidden",
+		marginRight: 6,
 	},
 	logoutText: {
 		color: theme.destructive,
