@@ -1,3 +1,5 @@
+import { notifyIfSubscriptionExpired } from "./subscription-guard";
+
 const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
 function buildUrl(path: string) {
@@ -14,6 +16,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 	const json = text.length ? JSON.parse(text) : null;
 
 	if (!response.ok) {
+		notifyIfSubscriptionExpired(response.status, json);
 		throw new Error(json?.message ?? response.statusText ?? "Request failed");
 	}
 

@@ -1,5 +1,7 @@
 import { File, UploadTask, UploadType } from "expo-file-system";
 
+import { notifyIfSubscriptionExpired } from "@/services/api/subscription-guard";
+
 function guessImageMimeType(uri: string): string {
     const filename = uri.split("/").pop() || "photo.jpg";
     const extension = (/\.(\w+)$/.exec(filename)?.[1] || "jpg").toLowerCase();
@@ -30,5 +32,10 @@ export async function uploadImage(
     });
 
     const result = await task.uploadAsync();
+    try {
+        notifyIfSubscriptionExpired(result.status, result.body ? JSON.parse(result.body) : null);
+    } catch {
+        // Non-JSON body: not the read-only refusal; callers handle the error as before.
+    }
     return { status: result.status, body: result.body };
 }
