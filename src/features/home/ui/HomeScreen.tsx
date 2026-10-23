@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
@@ -16,6 +16,7 @@ import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 type MenuItem = {
 	key: string;
@@ -143,7 +144,6 @@ function formatRupee(amount: number): string {
 export function HomeScreen() {
 	const router = useRouter();
 	const { theme, isDark } = useTheme();
-	const { height: windowHeight } = useWindowDimensions();
 
 	const { data: dashboard, refetch: refetchDashboard, setData: setDashboard } = useApiData(getDashboardApi, []);
 	const { data: batches, refetch: refetchBatches } = useApiData(getBatchesApi, []);
@@ -157,8 +157,7 @@ export function HomeScreen() {
 		}, [refetchDashboard, refetchBatches])
 	);
 
-	// Only resolve once batches have actually loaded, to avoid flashing the banner before we know.
-	const showBatchSetupBanner = batches !== null && batches.length === 0;
+	// Only true once batches have actually loaded, so batch-dependent sections don't flash in.
 	const hasBatches = batches !== null && batches.length > 0;
 	// Brand-new library: every number on Home would be 0, so guide the owner to their first member instead.
 	// Payments are checked too so a library whose members have all left doesn't look "new".
@@ -271,13 +270,7 @@ export function HomeScreen() {
 	const styles = createStyles(theme);
 
 	return (
-		<View style={styles.root}>
-			{/* Accent wash over the top quarter of the screen, fading into the page background. */}
-			<LinearGradient
-				pointerEvents="none"
-				colors={[theme.accent + (isDark ? "59" : "40"), theme.accent + "00"]}
-				style={[styles.topGradient, { height: windowHeight * 0.25 }]}
-			/>
+		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
 				<StatusBar style={isDark ? "light" : "dark"} />
 				<View style={styles.headerWrapper}>
@@ -359,9 +352,9 @@ export function HomeScreen() {
 						</View>
 					)}
 
-					{/* Two rows of one-tap actions. The first needs batches, so it only appears once some exist;
-					    the second (Seats, Batches, Renewals, Settings) is always there. */}
-					{[...(hasBatches ? [QUICK_ACCESS] : []), MORE_MENU].map((row, rowIndex, rows) => (
+					{/* Two rows of one-tap actions, shown once batches exist. Before that the setup card is the
+					    only thing to do: it links to Batches, and Settings stays on the avatar. */}
+					{(hasBatches ? [QUICK_ACCESS, MORE_MENU] : []).map((row, rowIndex, rows) => (
 						<View key={rowIndex} style={[styles.quickAccessRow, rowIndex < rows.length - 1 && styles.quickAccessRowStacked]}>
 							{row.map((item) => (
 								<Pressable
@@ -381,7 +374,8 @@ export function HomeScreen() {
 						</View>
 					))}
 
-					{isNewLibrary && (
+					{/* Members need a batch, so this only appears once the setup card's first step is done. */}
+					{isNewLibrary && hasBatches && (
 						<View style={styles.firstMemberCard}>
 							<View style={styles.firstMemberIconWrap}>
 								<Ionicons name="person-add-outline" size={26} color={theme.accent} />
@@ -390,20 +384,10 @@ export function HomeScreen() {
 							<Text style={styles.firstMemberCopy}>
 								Admit a student, give them a seat and record their first payment. Your seats, collections and dues will show up here.
 							</Text>
-							{showBatchSetupBanner ? (
-								<>
-									<Pressable accessibilityRole="button" style={[styles.firstMemberCta, styles.firstMemberCtaMuted]} onPress={() => router.push("/batches")}>
-										<Text style={[styles.firstMemberCtaText, styles.firstMemberCtaTextMuted]}>Set up batches first</Text>
-										<Ionicons name="arrow-forward" size={16} color={theme.primary} />
-									</Pressable>
-									<Text style={styles.firstMemberHint}>Members are assigned to a batch, so add your time slots before admitting anyone.</Text>
-								</>
-							) : (
-								<Pressable accessibilityRole="button" style={styles.firstMemberCta} onPress={() => router.push("/admission")}>
-									<Ionicons name="add" size={18} color="#fff" />
-									<Text style={styles.firstMemberCtaText}>Add member</Text>
-								</Pressable>
-							)}
+							<Pressable accessibilityRole="button" style={styles.firstMemberCta} onPress={() => router.push("/admission")}>
+								<Ionicons name="add" size={18} color="#fff" />
+								<Text style={styles.firstMemberCtaText}>Add member</Text>
+							</Pressable>
 						</View>
 					)}
 
@@ -733,22 +717,12 @@ export function HomeScreen() {
 					)}
 				</ScrollView>
 			</SafeAreaView>
-		</View>
+		</ScreenBackground>
 	);
 }
 
 const createStyles = (theme: any) =>
 	StyleSheet.create({
-		root: {
-			flex: 1,
-			backgroundColor: theme.background,
-		},
-		topGradient: {
-			position: "absolute",
-			top: 0,
-			left: 0,
-			right: 0,
-		},
 		// Transparent so the gradient behind shows through the header.
 		safe: {
 			flex: 1,
@@ -1003,24 +977,10 @@ const createStyles = (theme: any) =>
 			paddingVertical: 12,
 			paddingHorizontal: 22,
 		},
-		firstMemberCtaMuted: {
-			backgroundColor: theme.muted,
-		},
 		firstMemberCtaText: {
 			fontFamily: "sans-bold",
 			fontSize: 14,
 			color: "#fff",
-		},
-		firstMemberCtaTextMuted: {
-			color: theme.primary,
-		},
-		firstMemberHint: {
-			fontFamily: "sans-medium",
-			fontSize: 12,
-			color: theme.mutedForeground,
-			textAlign: "center",
-			marginTop: 10,
-			lineHeight: 17,
 		},
 		nowPill: {
 			flexDirection: "row",

@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -18,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { registerApi } from "@/features/auth/logic/auth-register.api";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 export function RegisterScreen() {
     const router = useRouter();
@@ -73,117 +75,119 @@ export function RegisterScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View>
-                    <Text style={styles.title}>Create Account</Text>
-                    <Text style={styles.subtitle}>Setup your library profile</Text>
-                </View>
-            </View>
-
-            <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-                    <View style={styles.formCard}>
-                        <Text style={styles.sectionTitle}>Library Details</Text>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Library Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. Yash Library"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                value={libraryName}
-                                onChangeText={setLibraryName}
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Total Capacity (Seats)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. 50"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                keyboardType="numeric"
-                                value={totalSeats}
-                                onChangeText={setTotalSeats}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.formCard}>
-                        <Text style={styles.sectionTitle}>Owner Details</Text>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Full Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. Kailash Ray"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                value={name}
-                                onChangeText={setName}
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Phone Number</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="10-digit mobile number"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                keyboardType="phone-pad"
-                                maxLength={15}
-                                value={phone}
-                                onChangeText={setPhone}
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Min 6 characters"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                secureTextEntry
-                                value={password}
-                                onChangeText={setPassword}
-                            />
-                        </View>
-                    </View>
-
-                    {error && (
-                        <View style={styles.errorBox}>
-                            <Ionicons name="alert-circle" size={18} color={theme.destructive} />
-                            <Text style={styles.errorText}>{error}</Text>
-                        </View>
-                    )}
-
-                    <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleRegister} disabled={isSubmitting}>
-                        {isSubmitting ? (
-                            <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
-                        ) : (
-                            <Text style={styles.submitButtonText}>Register & Send OTP</Text>
-                        )}
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable style={styles.backButton} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
                     </Pressable>
-
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>Powered by Kailash Ray</Text>
+                    <View style={styles.headerText}>
+                        <Text style={styles.title}>Create Account</Text>
+                        <Text style={styles.subtitle}>Setup your library profile</Text>
                     </View>
+                    <Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />
+                </View>
 
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+                    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+                        <View style={styles.formCard}>
+                            <Text style={styles.sectionTitle}>Library Details</Text>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Library Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g. Yash Library"
+                                    placeholderTextColor={theme.mutedForeground + "4D"}
+                                    value={libraryName}
+                                    onChangeText={setLibraryName}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Total Capacity (Seats)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g. 50"
+                                    placeholderTextColor={theme.mutedForeground + "4D"}
+                                    keyboardType="numeric"
+                                    value={totalSeats}
+                                    onChangeText={setTotalSeats}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.formCard}>
+                            <Text style={styles.sectionTitle}>Owner Details</Text>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Full Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g. Kailash Ray"
+                                    placeholderTextColor={theme.mutedForeground + "4D"}
+                                    value={name}
+                                    onChangeText={setName}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Phone Number</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="10-digit mobile number"
+                                    placeholderTextColor={theme.mutedForeground + "4D"}
+                                    keyboardType="phone-pad"
+                                    maxLength={15}
+                                    value={phone}
+                                    onChangeText={setPhone}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Password</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Min 6 characters"
+                                    placeholderTextColor={theme.mutedForeground + "4D"}
+                                    secureTextEntry
+                                    value={password}
+                                    onChangeText={setPassword}
+                                />
+                            </View>
+                        </View>
+
+                        {error && (
+                            <View style={styles.errorBox}>
+                                <Ionicons name="alert-circle" size={18} color={theme.destructive} />
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
+
+                        <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleRegister} disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
+                            ) : (
+                                <Text style={styles.submitButtonText}>Register & Send OTP</Text>
+                            )}
+                        </Pressable>
+
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>Powered by Kailash Ray</Text>
+                        </View>
+
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
@@ -196,6 +200,13 @@ const createStyles = (theme: any) => StyleSheet.create({
         gap: 16,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
+    },
+    headerText: {
+        flex: 1,
+    },
+    headerLogo: {
+        width: 40,
+        height: 40,
     },
     backButton: {
         width: 44,

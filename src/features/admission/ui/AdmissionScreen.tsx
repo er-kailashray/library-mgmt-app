@@ -20,6 +20,7 @@ import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ChoiceChips } from "@/shared/ui/ChoiceChips";
 import { PhotoPickerTile } from "@/shared/ui/PhotoPickerTile";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", {
@@ -228,388 +229,388 @@ export function AdmissionScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.headerWrapper}>
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>{isReadmission ? "Readmission" : "New Admission"}</Text>
-                        <Text style={styles.headerSubtitle}>{isReadmission ? `Welcome back ${readmit.name ?? ""} - pick a new seat` : "Onboard member and allocate seat"}</Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.headerWrapper}>
+                    <View style={styles.header}>
+                        <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                            <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                        </Pressable>
+                        <View style={styles.headerText}>
+                            <Text style={styles.headerTitle}>{isReadmission ? "Readmission" : "New Admission"}</Text>
+                            <Text style={styles.headerSubtitle}>{isReadmission ? `Welcome back ${readmit.name ?? ""} - pick a new seat` : "Onboard member and allocate seat"}</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
 
-            <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                    {isLoading ? (
-                        <LoadingState />
-                    ) : error ? (
-                        <ErrorState message={error} onRetry={fetchData} />
-                    ) : batches.length === 0 ? (
-                        <EmptyState
-                            icon="calendar-outline"
-                            title="No batches set up yet"
-                            subtitle="You need at least one batch before you can admit a student — batches are what a seat gets booked against."
-                            actionLabel="Set up a batch"
-                            onAction={() => router.push("/batches")}
-                        />
-                    ) : (
-                        <>
-                            {/* BATCH SELECTION */}
-                            <View style={styles.sectionBlock}>
-                                <Text style={styles.sectionTitle}>Select Batches</Text>
-                                <View style={styles.chipRowWrap}>
-                                    {batches.map((b) => {
-                                        const isSelected = selectedBatchIds.includes(b.id);
-                                        return (
-                                            <Pressable
-                                                key={b.id}
-                                                style={[styles.filterChip, isSelected && styles.filterChipSelected]}
-                                                onPress={() => toggleBatch(b.id)}>
-                                                <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
-                                                    {b.name} · {formatRupee(parseFloat(b.monthly_fee) || 0)}
-                                                </Text>
-                                            </Pressable>
-                                        );
-                                    })}
+                <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                        {isLoading ? (
+                            <LoadingState />
+                        ) : error ? (
+                            <ErrorState message={error} onRetry={fetchData} />
+                        ) : batches.length === 0 ? (
+                            <EmptyState
+                                icon="calendar-outline"
+                                title="No batches set up yet"
+                                subtitle="You need at least one batch before you can admit a student — batches are what a seat gets booked against."
+                                actionLabel="Set up a batch"
+                                onAction={() => router.push("/batches")}
+                            />
+                        ) : (
+                            <>
+                                {/* BATCH SELECTION */}
+                                <View style={styles.sectionBlock}>
+                                    <Text style={styles.sectionTitle}>Select Batches</Text>
+                                    <View style={styles.chipRowWrap}>
+                                        {batches.map((b) => {
+                                            const isSelected = selectedBatchIds.includes(b.id);
+                                            return (
+                                                <Pressable
+                                                    key={b.id}
+                                                    style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+                                                    onPress={() => toggleBatch(b.id)}>
+                                                    <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
+                                                        {b.name} · {formatRupee(parseFloat(b.monthly_fee) || 0)}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+
+                                    {selectedBatchIds.length > 0 && (
+                                        <View style={styles.feeSummaryRow}>
+                                            <Text style={styles.feeSummaryLabel}>Total Monthly Fee</Text>
+                                            <Text style={styles.feeSummaryValue}>{formatRupee(totalMonthlyFee)}</Text>
+                                        </View>
+                                    )}
                                 </View>
 
+                                {/* SEAT ASSIGNMENT */}
                                 {selectedBatchIds.length > 0 && (
-                                    <View style={styles.feeSummaryRow}>
-                                        <Text style={styles.feeSummaryLabel}>Total Monthly Fee</Text>
-                                        <Text style={styles.feeSummaryValue}>{formatRupee(totalMonthlyFee)}</Text>
+                                    <View style={styles.sectionBlock}>
+                                        <Text style={styles.sectionTitle}>Assign Seat</Text>
+
+                                        {selectedBatchIds.length > 1 && (
+                                            <View style={styles.modeToggleRow}>
+                                                <Pressable
+                                                    style={[styles.modeToggleChip, assignMode === "common" && styles.modeToggleChipActive]}
+                                                    onPress={() => {
+                                                        setAssignMode("common");
+                                                        setSeatsByBatch({});
+                                                    }}>
+                                                    <Text style={[styles.modeToggleText, assignMode === "common" && styles.modeToggleTextActive]}>Same seat for all</Text>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[styles.modeToggleChip, assignMode === "perBatch" && styles.modeToggleChipActive]}
+                                                    onPress={() => {
+                                                        setAssignMode("perBatch");
+                                                        setCommonSeatId(null);
+                                                    }}>
+                                                    <Text style={[styles.modeToggleText, assignMode === "perBatch" && styles.modeToggleTextActive]}>Different seat per batch</Text>
+                                                </Pressable>
+                                            </View>
+                                        )}
+
+                                        {assignMode === "common" ? (
+                                            <>
+                                                <Text style={styles.gridInstruction}>
+                                                    {hasCommonSeatOption
+                                                        ? "The grid shows all seats. Only seats available across ALL selected batches can be picked."
+                                                        : 'No single seat is free across every selected batch — switch to "Different seat per batch" above.'}
+                                                </Text>
+
+                                                <View style={styles.unifiedGrid}>
+                                                    {seatsData.map((seat) => {
+                                                        const isFullyAvailable = seatAvailableForBatches(seat, selectedBatchIds);
+                                                        const isSelected = commonSeatId === seat.seat_id;
+
+                                                        if (isFullyAvailable) {
+                                                            return (
+                                                                <Pressable
+                                                                    key={seat.seat_id}
+                                                                    style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
+                                                                    onPress={() => handleSeatSelect(seat.seat_id)}>
+                                                                    <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
+                                                                        {seat.seat_number}
+                                                                    </Text>
+                                                                </Pressable>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
+                                                                <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
+                                                                <View style={styles.strikethrough} />
+                                                            </View>
+                                                        );
+                                                    })}
+                                                </View>
+                                            </>
+                                        ) : (
+                                            selectedBatchIds.map((bId) => {
+                                                const batch = batches.find((b) => b.id === bId);
+                                                return (
+                                                    <View key={bId} style={styles.perBatchBlock}>
+                                                        <Text style={styles.perBatchLabel}>{batch?.name ?? "Batch"}</Text>
+                                                        <View style={styles.unifiedGrid}>
+                                                            {seatsData.map((seat) => {
+                                                                const isAvailable = seat.batches.find((sb) => sb.batch_id === bId)?.available === true;
+                                                                const isSelected = seatsByBatch[bId] === seat.seat_id;
+
+                                                                if (isAvailable) {
+                                                                    return (
+                                                                        <Pressable
+                                                                            key={seat.seat_id}
+                                                                            style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
+                                                                            onPress={() => handlePerBatchSeatSelect(bId, seat.seat_id)}>
+                                                                            <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
+                                                                                {seat.seat_number}
+                                                                            </Text>
+                                                                        </Pressable>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
+                                                                        <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
+                                                                        <View style={styles.strikethrough} />
+                                                                    </View>
+                                                                );
+                                                            })}
+                                                        </View>
+                                                    </View>
+                                                );
+                                            })
+                                        )}
                                     </View>
                                 )}
-                            </View>
 
-                            {/* SEAT ASSIGNMENT */}
-                            {selectedBatchIds.length > 0 && (
+                                {/* USER INFO */}
                                 <View style={styles.sectionBlock}>
-                                    <Text style={styles.sectionTitle}>Assign Seat</Text>
+                                    <Text style={styles.sectionTitle}>Member Info</Text>
+                                    <View style={styles.inputWrap}>
+                                        <Text style={styles.inputLabel}>Full Name</Text>
+                                        <TextInput
+                                            style={styles.inputField}
+                                            placeholder="e.g. John Doe"
+                                            placeholderTextColor={theme.mutedForeground + "80"}
+                                            value={name}
+                                            onChangeText={setName}
+                                            autoCapitalize="words"
+                                        />
+                                    </View>
+                                    <View style={styles.inputWrap}>
+                                        <Text style={styles.inputLabel}>Phone Number</Text>
+                                        <TextInput
+                                            style={[styles.inputField, isReadmission && styles.inputFieldLocked]}
+                                            placeholder="10-digit mobile number"
+                                            placeholderTextColor={theme.mutedForeground + "80"}
+                                            value={phone}
+                                            onChangeText={setPhone}
+                                            keyboardType="phone-pad"
+                                            maxLength={15}
+                                            // The phone number is how a returning member is recognised.
+                                            editable={!isReadmission}
+                                        />
+                                    </View>
+                                    <ChoiceChips label="Gender (Optional)" value={gender} options={GENDER_OPTIONS} onChange={setGender} allowDeselect />
+                                </View>
 
-                                    {selectedBatchIds.length > 1 && (
+                                {/* PREVIOUS DUES (READMISSION) */}
+                                {previousDues > 0 && (
+                                    <View style={styles.sectionBlock}>
+                                        <Text style={styles.sectionTitle}>Previous Dues</Text>
+                                        <Text style={styles.previousDuesSummary}>
+                                            {readmit.name ?? "This member"} left with <Text style={styles.previousDuesAmount}>{formatRupee(previousDues)}</Text> pending.
+                                        </Text>
                                         <View style={styles.modeToggleRow}>
                                             <Pressable
-                                                style={[styles.modeToggleChip, assignMode === "common" && styles.modeToggleChipActive]}
+                                                style={[styles.modeToggleChip, collectPreviousDues && styles.modeToggleChipActive]}
                                                 onPress={() => {
-                                                    setAssignMode("common");
-                                                    setSeatsByBatch({});
+                                                    setCollectPreviousDues(true);
+                                                    setSubmitError(null);
                                                 }}>
-                                                <Text style={[styles.modeToggleText, assignMode === "common" && styles.modeToggleTextActive]}>Same seat for all</Text>
+                                                <Text style={[styles.modeToggleText, collectPreviousDues && styles.modeToggleTextActive]}>Collect</Text>
                                             </Pressable>
                                             <Pressable
-                                                style={[styles.modeToggleChip, assignMode === "perBatch" && styles.modeToggleChipActive]}
+                                                style={[styles.modeToggleChip, !collectPreviousDues && styles.modeToggleChipActive]}
                                                 onPress={() => {
-                                                    setAssignMode("perBatch");
-                                                    setCommonSeatId(null);
+                                                    setCollectPreviousDues(false);
+                                                    setSubmitError(null);
                                                 }}>
-                                                <Text style={[styles.modeToggleText, assignMode === "perBatch" && styles.modeToggleTextActive]}>Different seat per batch</Text>
+                                                <Text style={[styles.modeToggleText, !collectPreviousDues && styles.modeToggleTextActive]}>Waive & start fresh</Text>
                                             </Pressable>
                                         </View>
-                                    )}
 
-                                    {assignMode === "common" ? (
-                                        <>
-                                            <Text style={styles.gridInstruction}>
-                                                {hasCommonSeatOption
-                                                    ? "The grid shows all seats. Only seats available across ALL selected batches can be picked."
-                                                    : 'No single seat is free across every selected batch — switch to "Different seat per batch" above.'}
-                                            </Text>
-
-                                            <View style={styles.unifiedGrid}>
-                                                {seatsData.map((seat) => {
-                                                    const isFullyAvailable = seatAvailableForBatches(seat, selectedBatchIds);
-                                                    const isSelected = commonSeatId === seat.seat_id;
-
-                                                    if (isFullyAvailable) {
-                                                        return (
-                                                            <Pressable
-                                                                key={seat.seat_id}
-                                                                style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
-                                                                onPress={() => handleSeatSelect(seat.seat_id)}>
-                                                                <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
-                                                                    {seat.seat_number}
-                                                                </Text>
-                                                            </Pressable>
-                                                        );
-                                                    }
-                                                    return (
-                                                        <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
-                                                            <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
-                                                            <View style={styles.strikethrough} />
-                                                        </View>
-                                                    );
-                                                })}
-                                            </View>
-                                        </>
-                                    ) : (
-                                        selectedBatchIds.map((bId) => {
-                                            const batch = batches.find((b) => b.id === bId);
-                                            return (
-                                                <View key={bId} style={styles.perBatchBlock}>
-                                                    <Text style={styles.perBatchLabel}>{batch?.name ?? "Batch"}</Text>
-                                                    <View style={styles.unifiedGrid}>
-                                                        {seatsData.map((seat) => {
-                                                            const isAvailable = seat.batches.find((sb) => sb.batch_id === bId)?.available === true;
-                                                            const isSelected = seatsByBatch[bId] === seat.seat_id;
-
-                                                            if (isAvailable) {
-                                                                return (
-                                                                    <Pressable
-                                                                        key={seat.seat_id}
-                                                                        style={[styles.gridSeatBox, isSelected && styles.gridSeatBoxSelected]}
-                                                                        onPress={() => handlePerBatchSeatSelect(bId, seat.seat_id)}>
-                                                                        <Text style={[styles.gridSeatNumber, isSelected && styles.gridSeatNumberSelected]}>
-                                                                            {seat.seat_number}
-                                                                        </Text>
-                                                                    </Pressable>
-                                                                );
-                                                            }
-                                                            return (
-                                                                <View key={seat.seat_id} style={[styles.gridSeatBox, styles.gridSeatBoxDisabled]}>
-                                                                    <Text style={styles.gridSeatNumberDisabled}>{seat.seat_number}</Text>
-                                                                    <View style={styles.strikethrough} />
-                                                                </View>
-                                                            );
-                                                        })}
+                                        {collectPreviousDues ? (
+                                            <>
+                                                <View style={styles.inputWrap}>
+                                                    <Text style={styles.inputLabel}>Amount Collected</Text>
+                                                    <View style={styles.amountField}>
+                                                        <Text style={styles.amountPrefix}>₹</Text>
+                                                        <TextInput
+                                                            style={styles.amountInput}
+                                                            value={previousDuesAmount}
+                                                            onChangeText={(text) => {
+                                                                setPreviousDuesAmount(text.replace(/[^0-9.]/g, ""));
+                                                                setSubmitError(null);
+                                                            }}
+                                                            keyboardType="decimal-pad"
+                                                            placeholder="0"
+                                                            placeholderTextColor={theme.mutedForeground + "80"}
+                                                        />
                                                     </View>
+                                                    {previousDuesValue > 0 && previousDuesValue < previousDues && (
+                                                        <Text style={styles.paymentHint}>Settling for less - the remaining {formatRupee(previousDues - previousDuesValue)} will be waived.</Text>
+                                                    )}
                                                 </View>
-                                            );
-                                        })
-                                    )}
-                                </View>
-                            )}
-
-                            {/* USER INFO */}
-                            <View style={styles.sectionBlock}>
-                                <Text style={styles.sectionTitle}>Member Info</Text>
-                                <View style={styles.inputWrap}>
-                                    <Text style={styles.inputLabel}>Full Name</Text>
-                                    <TextInput
-                                        style={styles.inputField}
-                                        placeholder="e.g. John Doe"
-                                        placeholderTextColor={theme.mutedForeground + "80"}
-                                        value={name}
-                                        onChangeText={setName}
-                                        autoCapitalize="words"
-                                    />
-                                </View>
-                                <View style={styles.inputWrap}>
-                                    <Text style={styles.inputLabel}>Phone Number</Text>
-                                    <TextInput
-                                        style={[styles.inputField, isReadmission && styles.inputFieldLocked]}
-                                        placeholder="10-digit mobile number"
-                                        placeholderTextColor={theme.mutedForeground + "80"}
-                                        value={phone}
-                                        onChangeText={setPhone}
-                                        keyboardType="phone-pad"
-                                        maxLength={15}
-                                        // The phone number is how a returning member is recognised.
-                                        editable={!isReadmission}
-                                    />
-                                </View>
-                                <ChoiceChips label="Gender (Optional)" value={gender} options={GENDER_OPTIONS} onChange={setGender} allowDeselect />
-                            </View>
-
-                            {/* PREVIOUS DUES (READMISSION) */}
-                            {previousDues > 0 && (
-                                <View style={styles.sectionBlock}>
-                                    <Text style={styles.sectionTitle}>Previous Dues</Text>
-                                    <Text style={styles.previousDuesSummary}>
-                                        {readmit.name ?? "This member"} left with <Text style={styles.previousDuesAmount}>{formatRupee(previousDues)}</Text> pending.
-                                    </Text>
-                                    <View style={styles.modeToggleRow}>
-                                        <Pressable
-                                            style={[styles.modeToggleChip, collectPreviousDues && styles.modeToggleChipActive]}
-                                            onPress={() => {
-                                                setCollectPreviousDues(true);
-                                                setSubmitError(null);
-                                            }}>
-                                            <Text style={[styles.modeToggleText, collectPreviousDues && styles.modeToggleTextActive]}>Collect</Text>
-                                        </Pressable>
-                                        <Pressable
-                                            style={[styles.modeToggleChip, !collectPreviousDues && styles.modeToggleChipActive]}
-                                            onPress={() => {
-                                                setCollectPreviousDues(false);
-                                                setSubmitError(null);
-                                            }}>
-                                            <Text style={[styles.modeToggleText, !collectPreviousDues && styles.modeToggleTextActive]}>Waive & start fresh</Text>
-                                        </Pressable>
+                                                <ChoiceChips label="Payment Mode" value={previousDuesMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPreviousDuesMode(mode)} />
+                                            </>
+                                        ) : (
+                                            <Text style={styles.paymentHint}>The {formatRupee(previousDues)} will be written off. Only the new admission is charged.</Text>
+                                        )}
                                     </View>
+                                )}
 
-                                    {collectPreviousDues ? (
-                                        <>
-                                            <View style={styles.inputWrap}>
-                                                <Text style={styles.inputLabel}>Amount Collected</Text>
-                                                <View style={styles.amountField}>
-                                                    <Text style={styles.amountPrefix}>₹</Text>
-                                                    <TextInput
-                                                        style={styles.amountInput}
-                                                        value={previousDuesAmount}
-                                                        onChangeText={(text) => {
-                                                            setPreviousDuesAmount(text.replace(/[^0-9.]/g, ""));
-                                                            setSubmitError(null);
-                                                        }}
-                                                        keyboardType="decimal-pad"
-                                                        placeholder="0"
-                                                        placeholderTextColor={theme.mutedForeground + "80"}
-                                                    />
-                                                </View>
-                                                {previousDuesValue > 0 && previousDuesValue < previousDues && (
-                                                    <Text style={styles.paymentHint}>Settling for less - the remaining {formatRupee(previousDues - previousDuesValue)} will be waived.</Text>
-                                                )}
-                                            </View>
-                                            <ChoiceChips label="Payment Mode" value={previousDuesMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPreviousDuesMode(mode)} />
-                                        </>
-                                    ) : (
-                                        <Text style={styles.paymentHint}>The {formatRupee(previousDues)} will be written off. Only the new admission is charged.</Text>
-                                    )}
-                                </View>
-                            )}
-
-                            {/* FIRST PAYMENT */}
-                            {selectedBatchIds.length > 0 && (
-                                <View style={styles.sectionBlock}>
-                                    <Text style={styles.sectionTitle}>First Payment</Text>
-                                    <View style={styles.modeToggleRow}>
-                                        <Pressable
-                                            style={[styles.modeToggleChip, payNow && styles.modeToggleChipActive]}
-                                            onPress={() => {
-                                                setPayNow(true);
-                                                setSubmitError(null);
-                                            }}>
-                                            <Text style={[styles.modeToggleText, payNow && styles.modeToggleTextActive]}>Paid now</Text>
-                                        </Pressable>
-                                        <Pressable
-                                            style={[styles.modeToggleChip, !payNow && styles.modeToggleChipActive]}
-                                            onPress={() => {
-                                                setPayNow(false);
-                                                setSubmitError(null);
-                                            }}>
-                                            <Text style={[styles.modeToggleText, !payNow && styles.modeToggleTextActive]}>Pay later</Text>
-                                        </Pressable>
-                                    </View>
-
-                                    {payNow ? (
-                                        <>
-                                            <View style={styles.inputWrap}>
-                                                <Text style={styles.inputLabel}>Amount Received</Text>
-                                                <View style={styles.amountField}>
-                                                    <Text style={styles.amountPrefix}>₹</Text>
-                                                    <TextInput
-                                                        style={styles.amountInput}
-                                                        value={paidAmount}
-                                                        onChangeText={(text) => {
-                                                            setPaidAmount(text.replace(/[^0-9.]/g, ""));
-                                                            setPaidAmountEdited(true);
-                                                            setSubmitError(null);
-                                                        }}
-                                                        keyboardType="decimal-pad"
-                                                        placeholder="0"
-                                                        placeholderTextColor={theme.mutedForeground + "80"}
-                                                    />
-                                                </View>
-                                                {isPartialPayment && (
-                                                    <Text style={styles.paymentHint}>Partial payment - {formatRupee(totalMonthlyFee - paidAmountValue)} will show as due.</Text>
-                                                )}
-                                            </View>
-
-                                            <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
-                                        </>
-                                    ) : (
-                                        <Text style={styles.paymentHint}>No payment will be recorded. The member will show as due from today, so you can collect later from Dues & Renewals.</Text>
-                                    )}
-                                </View>
-                            )}
-
-                            {/* ID PROOF (OPTIONAL) */}
-                            <View style={styles.sectionBlock}>
-                                <Text style={styles.sectionTitle}>ID Proof (Optional)</Text>
-                                {idProof ? (
-                                    <View style={styles.idProofSummary}>
-                                        <View style={styles.idProofSummaryHeader}>
-                                            <View style={styles.idProofSummaryIcon}>
-                                                <Ionicons name="card-outline" size={20} color={theme.accent} />
-                                            </View>
-                                            <View style={styles.idProofSummaryText}>
-                                                <Text style={styles.idProofSummaryTitle}>{ID_PROOF_TYPE_LABELS[idProof.type]}</Text>
-                                                <Text style={styles.idProofSummarySubtitle}>{idProof.backUri ? "Front & back added" : "Front added"}</Text>
-                                            </View>
-                                            <Ionicons name="checkmark-circle" size={20} color={theme.success} />
-                                        </View>
-                                        <View style={styles.idProofThumbRow}>
-                                            <PhotoPickerTile label="Front" uri={idProof.frontUri} onAdd={() => openIdProofSheet(idProof)} onRemove={removeIdProofFront} />
-                                            <PhotoPickerTile
-                                                label="Back"
-                                                hint="(optional)"
-                                                uri={idProof.backUri}
-                                                onAdd={() => openIdProofSheet(idProof)}
-                                                onRemove={() => setIdProof({ ...idProof, backUri: null })}
-                                            />
-                                        </View>
-                                        <View style={styles.idProofActionRow}>
-                                            <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => openIdProofSheet(idProof)}>
-                                                <Ionicons name="pencil" size={14} color={theme.primary} />
-                                                <Text style={styles.idProofActionText}>Edit</Text>
+                                {/* FIRST PAYMENT */}
+                                {selectedBatchIds.length > 0 && (
+                                    <View style={styles.sectionBlock}>
+                                        <Text style={styles.sectionTitle}>First Payment</Text>
+                                        <View style={styles.modeToggleRow}>
+                                            <Pressable
+                                                style={[styles.modeToggleChip, payNow && styles.modeToggleChipActive]}
+                                                onPress={() => {
+                                                    setPayNow(true);
+                                                    setSubmitError(null);
+                                                }}>
+                                                <Text style={[styles.modeToggleText, payNow && styles.modeToggleTextActive]}>Paid now</Text>
                                             </Pressable>
-                                            <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => setIdProof(null)}>
-                                                <Ionicons name="trash-outline" size={14} color={theme.destructive} />
-                                                <Text style={[styles.idProofActionText, { color: theme.destructive }]}>Remove</Text>
+                                            <Pressable
+                                                style={[styles.modeToggleChip, !payNow && styles.modeToggleChipActive]}
+                                                onPress={() => {
+                                                    setPayNow(false);
+                                                    setSubmitError(null);
+                                                }}>
+                                                <Text style={[styles.modeToggleText, !payNow && styles.modeToggleTextActive]}>Pay later</Text>
                                             </Pressable>
                                         </View>
+
+                                        {payNow ? (
+                                            <>
+                                                <View style={styles.inputWrap}>
+                                                    <Text style={styles.inputLabel}>Amount Received</Text>
+                                                    <View style={styles.amountField}>
+                                                        <Text style={styles.amountPrefix}>₹</Text>
+                                                        <TextInput
+                                                            style={styles.amountInput}
+                                                            value={paidAmount}
+                                                            onChangeText={(text) => {
+                                                                setPaidAmount(text.replace(/[^0-9.]/g, ""));
+                                                                setPaidAmountEdited(true);
+                                                                setSubmitError(null);
+                                                            }}
+                                                            keyboardType="decimal-pad"
+                                                            placeholder="0"
+                                                            placeholderTextColor={theme.mutedForeground + "80"}
+                                                        />
+                                                    </View>
+                                                    {isPartialPayment && (
+                                                        <Text style={styles.paymentHint}>Partial payment - {formatRupee(totalMonthlyFee - paidAmountValue)} will show as due.</Text>
+                                                    )}
+                                                </View>
+
+                                                <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
+                                            </>
+                                        ) : (
+                                            <Text style={styles.paymentHint}>No payment will be recorded. The member will show as due from today, so you can collect later from Dues & Renewals.</Text>
+                                        )}
                                     </View>
-                                ) : (
-                                    <AddIdProofCard title="No ID proof added" onAdd={() => openIdProofSheet(null)} />
                                 )}
-                            </View>
 
-                            {submitError && (
-                                <View style={styles.errorBox}>
-                                    <Ionicons name="alert-circle" size={18} color={theme.destructive} />
-                                    <Text style={styles.errorText}>{submitError}</Text>
+                                {/* ID PROOF (OPTIONAL) */}
+                                <View style={styles.sectionBlock}>
+                                    <Text style={styles.sectionTitle}>ID Proof (Optional)</Text>
+                                    {idProof ? (
+                                        <View style={styles.idProofSummary}>
+                                            <View style={styles.idProofSummaryHeader}>
+                                                <View style={styles.idProofSummaryIcon}>
+                                                    <Ionicons name="card-outline" size={20} color={theme.accent} />
+                                                </View>
+                                                <View style={styles.idProofSummaryText}>
+                                                    <Text style={styles.idProofSummaryTitle}>{ID_PROOF_TYPE_LABELS[idProof.type]}</Text>
+                                                    <Text style={styles.idProofSummarySubtitle}>{idProof.backUri ? "Front & back added" : "Front added"}</Text>
+                                                </View>
+                                                <Ionicons name="checkmark-circle" size={20} color={theme.success} />
+                                            </View>
+                                            <View style={styles.idProofThumbRow}>
+                                                <PhotoPickerTile label="Front" uri={idProof.frontUri} onAdd={() => openIdProofSheet(idProof)} onRemove={removeIdProofFront} />
+                                                <PhotoPickerTile
+                                                    label="Back"
+                                                    hint="(optional)"
+                                                    uri={idProof.backUri}
+                                                    onAdd={() => openIdProofSheet(idProof)}
+                                                    onRemove={() => setIdProof({ ...idProof, backUri: null })}
+                                                />
+                                            </View>
+                                            <View style={styles.idProofActionRow}>
+                                                <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => openIdProofSheet(idProof)}>
+                                                    <Ionicons name="pencil" size={14} color={theme.primary} />
+                                                    <Text style={styles.idProofActionText}>Edit</Text>
+                                                </Pressable>
+                                                <Pressable accessibilityRole="button" style={styles.idProofActionBtn} onPress={() => setIdProof(null)}>
+                                                    <Ionicons name="trash-outline" size={14} color={theme.destructive} />
+                                                    <Text style={[styles.idProofActionText, { color: theme.destructive }]}>Remove</Text>
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <AddIdProofCard title="No ID proof added" onAdd={() => openIdProofSheet(null)} />
+                                    )}
                                 </View>
-                            )}
 
-                            <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isSubmitting}>
-                                {isSubmitting ? (
-                                    <ActivityIndicator color="#fff" size="small" />
-                                ) : (
-                                    <Text style={styles.submitButtonText}>Confirm Admission</Text>
+                                {submitError && (
+                                    <View style={styles.errorBox}>
+                                        <Ionicons name="alert-circle" size={18} color={theme.destructive} />
+                                        <Text style={styles.errorText}>{submitError}</Text>
+                                    </View>
                                 )}
-                            </Pressable>
-                        </>
-                    )}
-                </ScrollView>
-            </KeyboardAvoidingView>
 
-            <IdProofSheet
-                visible={isIdProofSheetVisible}
-                onClose={() => setIsIdProofSheetVisible(false)}
-                initial={idProofSheetInitial}
-                saveLabel="Done"
-                onSave={(draft) => {
-                    setIdProof(draft);
-                    setIsIdProofSheetVisible(false);
-                    setSubmitError(null);
-                }}
-            />
-        </SafeAreaView>
+                                <Pressable style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isSubmitting}>
+                                    {isSubmitting ? (
+                                        <ActivityIndicator color="#fff" size="small" />
+                                    ) : (
+                                        <Text style={styles.submitButtonText}>Confirm Admission</Text>
+                                    )}
+                                </Pressable>
+                            </>
+                        )}
+                    </ScrollView>
+                </KeyboardAvoidingView>
+
+                <IdProofSheet
+                    visible={isIdProofSheetVisible}
+                    onClose={() => setIsIdProofSheetVisible(false)}
+                    initial={idProofSheetInitial}
+                    saveLabel="Done"
+                    onSave={(draft) => {
+                        setIdProof(draft);
+                        setIsIdProofSheetVisible(false);
+                        setSubmitError(null);
+                    }}
+                />
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
     },
     headerWrapper: {
-        backgroundColor: theme.background,
         paddingTop: 8,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,

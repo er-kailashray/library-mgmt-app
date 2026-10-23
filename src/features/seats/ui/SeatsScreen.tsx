@@ -11,6 +11,7 @@ import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 const COLUMNS = 6;
 const SECTION_SIZE = 20;
@@ -239,88 +240,90 @@ export function SeatsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.headerWrapper}>
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Seat Management</Text>
-                        <Text style={styles.headerSubtitle}>Check availability across batches</Text>
-                    </View>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={fetchData} />
-            ) : seats.length === 0 ? (
-                <EmptyState icon="grid-outline" title="No seats configured yet" subtitle="Seats are created automatically when your library is set up." />
-            ) : batchesFilter.length === 0 ? (
-                <EmptyState
-                    icon="calendar-outline"
-                    title="No batches set up yet"
-                    subtitle="Seat availability is shown per batch — add a batch first to see it here."
-                    actionLabel="Set up a batch"
-                    onAction={() => router.push("/batches")}
-                />
-            ) : (
-                <SectionList<SeatMatrixSeat[], SeatSection>
-                    ref={sectionListRef}
-                    sections={sections}
-                    keyExtractor={(row) => `row-${row[0]?.seat_id}`}
-                    renderItem={renderRow}
-                    renderSectionHeader={renderSectionHeader}
-                    ListHeaderComponent={renderListHeader}
-                    stickySectionHeadersEnabled
-                    contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
-                    showsVerticalScrollIndicator={false}
-                    initialNumToRender={10}
-                    windowSize={10}
-                    removeClippedSubviews
-                />
-            )}
-
-            <Modal visible={!!selectedSeat} transparent={true} animationType="fade" onRequestClose={() => setSelectedSeat(null)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Seat {formatSeatNumber(selectedSeat?.seat_number || "")}</Text>
-                            <Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setSelectedSeat(null)}>
-                                <Ionicons name="close" size={24} color={theme.primary} />
-                            </Pressable>
-                        </View>
-
-                        <Text style={styles.modalSubheading}>Batch Availability</Text>
-
-                        <View style={styles.batchList}>
-                            {selectedSeat?.batches.map((b) => {
-                                const filteredOut = selectedBatchIds.length > 0 && !selectedBatchIds.includes(b.batch_id);
-                                if (filteredOut) return null;
-
-                                return (
-                                    <View key={b.batch_id} style={styles.batchRow}>
-                                        <Text style={styles.batchRowName}>{b.batch_name}</Text>
-                                        {b.available ? (
-                                            <View style={[styles.statusBadge, { backgroundColor: theme.success + "1A" }]}>
-                                                <Text style={[styles.statusText, { color: theme.success }]}>Available</Text>
-                                            </View>
-                                        ) : (
-                                            <View style={[styles.statusBadge, { backgroundColor: theme.destructive + "1A" }]}>
-                                                <Text style={[styles.statusText, { color: theme.destructive }]}>Occupied</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                );
-                            })}
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.headerWrapper}>
+                    <View style={styles.header}>
+                        <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                            <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                        </Pressable>
+                        <View style={styles.headerText}>
+                            <Text style={styles.headerTitle}>Seat Management</Text>
+                            <Text style={styles.headerSubtitle}>Check availability across batches</Text>
                         </View>
                     </View>
                 </View>
-            </Modal>
-        </SafeAreaView>
+
+                {isLoading ? (
+                    <LoadingState />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={fetchData} />
+                ) : seats.length === 0 ? (
+                    <EmptyState icon="grid-outline" title="No seats configured yet" subtitle="Seats are created automatically when your library is set up." />
+                ) : batchesFilter.length === 0 ? (
+                    <EmptyState
+                        icon="calendar-outline"
+                        title="No batches set up yet"
+                        subtitle="Seat availability is shown per batch — add a batch first to see it here."
+                        actionLabel="Set up a batch"
+                        onAction={() => router.push("/batches")}
+                    />
+                ) : (
+                    <SectionList<SeatMatrixSeat[], SeatSection>
+                        ref={sectionListRef}
+                        sections={sections}
+                        keyExtractor={(row) => `row-${row[0]?.seat_id}`}
+                        renderItem={renderRow}
+                        renderSectionHeader={renderSectionHeader}
+                        ListHeaderComponent={renderListHeader}
+                        stickySectionHeadersEnabled
+                        contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
+                        showsVerticalScrollIndicator={false}
+                        initialNumToRender={10}
+                        windowSize={10}
+                        removeClippedSubviews
+                    />
+                )}
+
+                <Modal visible={!!selectedSeat} transparent={true} animationType="fade" onRequestClose={() => setSelectedSeat(null)}>
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Seat {formatSeatNumber(selectedSeat?.seat_number || "")}</Text>
+                                <Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setSelectedSeat(null)}>
+                                    <Ionicons name="close" size={24} color={theme.primary} />
+                                </Pressable>
+                            </View>
+
+                            <Text style={styles.modalSubheading}>Batch Availability</Text>
+
+                            <View style={styles.batchList}>
+                                {selectedSeat?.batches.map((b) => {
+                                    const filteredOut = selectedBatchIds.length > 0 && !selectedBatchIds.includes(b.batch_id);
+                                    if (filteredOut) return null;
+
+                                    return (
+                                        <View key={b.batch_id} style={styles.batchRow}>
+                                            <Text style={styles.batchRowName}>{b.batch_name}</Text>
+                                            {b.available ? (
+                                                <View style={[styles.statusBadge, { backgroundColor: theme.success + "1A" }]}>
+                                                    <Text style={[styles.statusText, { color: theme.success }]}>Available</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={[styles.statusBadge, { backgroundColor: theme.destructive + "1A" }]}>
+                                                    <Text style={[styles.statusText, { color: theme.destructive }]}>Occupied</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -328,10 +331,8 @@ const createStyles = (theme: any, seatChipSize: number) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         headerWrapper: {
-            backgroundColor: theme.background,
             paddingTop: 8,
             borderBottomWidth: 1,
             borderBottomColor: theme.border,

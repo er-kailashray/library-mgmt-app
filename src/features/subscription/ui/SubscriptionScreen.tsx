@@ -13,6 +13,7 @@ import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
@@ -107,130 +108,132 @@ export function SubscriptionScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={isDark ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Subscription</Text>
-                    <Text style={styles.headerSubtitle}>Your plan & billing</Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={isDark ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Subscription</Text>
+                        <Text style={styles.headerSubtitle}>Your plan & billing</Text>
+                    </View>
                 </View>
-            </View>
 
-            {isLoading && !info ? (
-                <LoadingState />
-            ) : error || !info ? (
-                <ErrorState message={error || "Could not load your subscription."} onRetry={refetch} />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    {/* CURRENT STATUS */}
-                    {(() => {
-                        const { title, detail, icon } = describeState(info);
-                        const color = stateColor[info.state];
-                        return (
-                            <View style={[styles.statusCard, { borderColor: color + "55", backgroundColor: color + "10" }]}>
-                                <View style={[styles.statusIcon, { backgroundColor: color + "22" }]}>
-                                    <Ionicons name={icon} size={22} color={color} />
-                                </View>
-                                <View style={styles.statusText}>
-                                    <Text style={styles.statusTitle}>{title}</Text>
-                                    <Text style={styles.statusDetail}>{detail}</Text>
-                                </View>
-                            </View>
-                        );
-                    })()}
-
-                    {/* PLANS */}
-                    <Text style={styles.sectionTitle}>{info.state === "active" ? "Your plan" : "Choose a plan"}</Text>
-                    <View style={styles.plans}>
-                        {info.plans.map((plan) => {
-                            const isSelected = plan.code === selectedCode;
-                            const saving = savingFor(plan);
-                            const isCurrent = info.state === "active" && info.plan?.code === plan.code;
+                {isLoading && !info ? (
+                    <LoadingState />
+                ) : error || !info ? (
+                    <ErrorState message={error || "Could not load your subscription."} onRetry={refetch} />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        {/* CURRENT STATUS */}
+                        {(() => {
+                            const { title, detail, icon } = describeState(info);
+                            const color = stateColor[info.state];
                             return (
-                                <Pressable
-                                    key={plan.code}
-                                    accessibilityRole="radio"
-                                    accessibilityState={{ selected: isSelected }}
-                                    style={[styles.planCard, isSelected && styles.planCardSelected]}
-                                    onPress={() => setSelectedCode(plan.code)}>
-                                    <View style={[styles.radio, isSelected && styles.radioSelected]}>{isSelected && <View style={styles.radioDot} />}</View>
-                                    <View style={styles.planText}>
-                                        <View style={styles.planNameRow}>
-                                            <Text style={styles.planName}>{plan.name}</Text>
-                                            {saving > 0 && <Text style={styles.planBadge}>Save {formatRupee(saving)}</Text>}
-                                            {isCurrent && <Text style={[styles.planBadge, styles.planBadgeCurrent]}>Current</Text>}
-                                        </View>
-                                        <Text style={styles.planHint}>
-                                            {plan.duration_months > 1
-                                                ? `${formatRupee(plan.monthly_equivalent)}/month, billed yearly`
-                                                : "Billed every month"}
-                                        </Text>
+                                <View style={[styles.statusCard, { borderColor: color + "55", backgroundColor: color + "10" }]}>
+                                    <View style={[styles.statusIcon, { backgroundColor: color + "22" }]}>
+                                        <Ionicons name={icon} size={22} color={color} />
                                     </View>
-                                    <View style={styles.planPrice}>
-                                        <Text style={styles.planPriceValue}>{formatRupee(plan.price)}</Text>
-                                        <Text style={styles.planPriceUnit}>/{plan.duration_months > 1 ? "year" : "month"}</Text>
+                                    <View style={styles.statusText}>
+                                        <Text style={styles.statusTitle}>{title}</Text>
+                                        <Text style={styles.statusDetail}>{detail}</Text>
                                     </View>
-                                </Pressable>
+                                </View>
                             );
-                        })}
-                    </View>
+                        })()}
 
-                    {/* INCLUDED */}
-                    <Text style={styles.sectionTitle}>Everything included</Text>
-                    <View style={styles.included}>
-                        {INCLUDED.map((item) => (
-                            <View key={item.text} style={styles.includedRow}>
-                                <Ionicons name={item.icon} size={18} color={theme.accent} />
-                                <Text style={styles.includedText}>{item.text}</Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    {selectedPlan && (
-                        <Pressable
-                            accessibilityRole="button"
-                            style={({ pressed }) => [styles.cta, (pressed || isPaying) && { opacity: 0.85 }]}
-                            onPress={handleContinue}
-                            disabled={isPaying}>
-                            {isPaying ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.ctaText}>
-                                    {info.state === "active" && info.plan?.code === selectedPlan.code ? "Extend" : "Continue with"} {selectedPlan.name} ·{" "}
-                                    {formatRupee(selectedPlan.price)}
-                                </Text>
-                            )}
-                        </Pressable>
-                    )}
-                    {info.state === "active" && (
-                        <Text style={styles.finePrint}>Paying now adds to your current plan - it starts when this one ends.</Text>
-                    )}
-                    {invoices && invoices.length > 0 && (
-                        <>
-                            <Text style={styles.sectionTitle}>Payment history</Text>
-                            <View style={styles.included}>
-                                {invoices.map((invoice) => (
-                                    <View key={invoice.id} style={styles.invoiceRow}>
-                                        <View style={styles.invoiceText}>
-                                            <Text style={styles.invoicePlan}>{invoice.plan} plan</Text>
-                                            <Text style={styles.invoiceMeta}>
-                                                {formatSubscriptionDate(invoice.paid_at)} · {invoice.invoice_number}
+                        {/* PLANS */}
+                        <Text style={styles.sectionTitle}>{info.state === "active" ? "Your plan" : "Choose a plan"}</Text>
+                        <View style={styles.plans}>
+                            {info.plans.map((plan) => {
+                                const isSelected = plan.code === selectedCode;
+                                const saving = savingFor(plan);
+                                const isCurrent = info.state === "active" && info.plan?.code === plan.code;
+                                return (
+                                    <Pressable
+                                        key={plan.code}
+                                        accessibilityRole="radio"
+                                        accessibilityState={{ selected: isSelected }}
+                                        style={[styles.planCard, isSelected && styles.planCardSelected]}
+                                        onPress={() => setSelectedCode(plan.code)}>
+                                        <View style={[styles.radio, isSelected && styles.radioSelected]}>{isSelected && <View style={styles.radioDot} />}</View>
+                                        <View style={styles.planText}>
+                                            <View style={styles.planNameRow}>
+                                                <Text style={styles.planName}>{plan.name}</Text>
+                                                {saving > 0 && <Text style={styles.planBadge}>Save {formatRupee(saving)}</Text>}
+                                                {isCurrent && <Text style={[styles.planBadge, styles.planBadgeCurrent]}>Current</Text>}
+                                            </View>
+                                            <Text style={styles.planHint}>
+                                                {plan.duration_months > 1
+                                                    ? `${formatRupee(plan.monthly_equivalent)}/month, billed yearly`
+                                                    : "Billed every month"}
                                             </Text>
                                         </View>
-                                        <Text style={styles.invoiceAmount}>{formatRupee(invoice.amount)}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </>
-                    )}
+                                        <View style={styles.planPrice}>
+                                            <Text style={styles.planPriceValue}>{formatRupee(plan.price)}</Text>
+                                            <Text style={styles.planPriceUnit}>/{plan.duration_months > 1 ? "year" : "month"}</Text>
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
 
-                    <Text style={styles.finePrint}>Your data is never deleted. If your plan ends, you can still view everything and pick up where you left off.</Text>
-                </ScrollView>
-            )}
-        </SafeAreaView>
+                        {/* INCLUDED */}
+                        <Text style={styles.sectionTitle}>Everything included</Text>
+                        <View style={styles.included}>
+                            {INCLUDED.map((item) => (
+                                <View key={item.text} style={styles.includedRow}>
+                                    <Ionicons name={item.icon} size={18} color={theme.accent} />
+                                    <Text style={styles.includedText}>{item.text}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {selectedPlan && (
+                            <Pressable
+                                accessibilityRole="button"
+                                style={({ pressed }) => [styles.cta, (pressed || isPaying) && { opacity: 0.85 }]}
+                                onPress={handleContinue}
+                                disabled={isPaying}>
+                                {isPaying ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.ctaText}>
+                                        {info.state === "active" && info.plan?.code === selectedPlan.code ? "Extend" : "Continue with"} {selectedPlan.name} ·{" "}
+                                        {formatRupee(selectedPlan.price)}
+                                    </Text>
+                                )}
+                            </Pressable>
+                        )}
+                        {info.state === "active" && (
+                            <Text style={styles.finePrint}>Paying now adds to your current plan - it starts when this one ends.</Text>
+                        )}
+                        {invoices && invoices.length > 0 && (
+                            <>
+                                <Text style={styles.sectionTitle}>Payment history</Text>
+                                <View style={styles.included}>
+                                    {invoices.map((invoice) => (
+                                        <View key={invoice.id} style={styles.invoiceRow}>
+                                            <View style={styles.invoiceText}>
+                                                <Text style={styles.invoicePlan}>{invoice.plan} plan</Text>
+                                                <Text style={styles.invoiceMeta}>
+                                                    {formatSubscriptionDate(invoice.paid_at)} · {invoice.invoice_number}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.invoiceAmount}>{formatRupee(invoice.amount)}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </>
+                        )}
+
+                        <Text style={styles.finePrint}>Your data is never deleted. If your plan ends, you can still view everything and pick up where you left off.</Text>
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -238,7 +241,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",

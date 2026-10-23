@@ -10,6 +10,7 @@ import { deleteLibraryPhotoApi, getLibraryProfileApi, uploadLibraryPhotoApi } fr
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 const MAX_PHOTOS = 10;
 
@@ -99,56 +100,58 @@ export function LibraryPhotosScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Manage Photos</Text>
-                    <Text style={styles.headerSubtitle}>{photos.length} / {MAX_PHOTOS} photos</Text>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={refetch} />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    <View style={styles.grid}>
-                        {photos.map((photo) => (
-                            <View key={photo.id} style={styles.photoTile}>
-                                <Image source={{ uri: photo.url }} style={styles.photoImage} />
-                                <Pressable
-                                    accessibilityRole="button"
-                                    style={styles.removeBtn}
-                                    onPress={() => handleDeletePhoto(photo.id)}
-                                    disabled={deletingId === photo.id}>
-                                    {deletingId === photo.id ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="close" size={16} color="#fff" />}
-                                </Pressable>
-                            </View>
-                        ))}
-
-                        {photos.length < MAX_PHOTOS && (
-                            <Pressable style={styles.addTile} onPress={handleAddPhoto} disabled={isUploading}>
-                                {isUploading ? (
-                                    <ActivityIndicator color={theme.primary} size="small" />
-                                ) : (
-                                    <>
-                                        <Ionicons name="camera-outline" size={28} color={theme.mutedForeground} />
-                                        <Text style={styles.addTileText}>Add Photo</Text>
-                                    </>
-                                )}
-                            </Pressable>
-                        )}
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Manage Photos</Text>
+                        <Text style={styles.headerSubtitle}>{photos.length} / {MAX_PHOTOS} photos</Text>
                     </View>
+                </View>
 
-                    {photos.length === 0 && <Text style={styles.emptyText}>Add a few photos of your library - these help members know what to expect.</Text>}
-                </ScrollView>
-            )}
-        </SafeAreaView>
+                {isLoading ? (
+                    <LoadingState />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={refetch} />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        <View style={styles.grid}>
+                            {photos.map((photo) => (
+                                <View key={photo.id} style={styles.photoTile}>
+                                    <Image source={{ uri: photo.url }} style={styles.photoImage} />
+                                    <Pressable
+                                        accessibilityRole="button"
+                                        style={styles.removeBtn}
+                                        onPress={() => handleDeletePhoto(photo.id)}
+                                        disabled={deletingId === photo.id}>
+                                        {deletingId === photo.id ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="close" size={16} color="#fff" />}
+                                    </Pressable>
+                                </View>
+                            ))}
+
+                            {photos.length < MAX_PHOTOS && (
+                                <Pressable style={styles.addTile} onPress={handleAddPhoto} disabled={isUploading}>
+                                    {isUploading ? (
+                                        <ActivityIndicator color={theme.primary} size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="camera-outline" size={28} color={theme.mutedForeground} />
+                                            <Text style={styles.addTileText}>Add Photo</Text>
+                                        </>
+                                    )}
+                                </Pressable>
+                            )}
+                        </View>
+
+                        {photos.length === 0 && <Text style={styles.emptyText}>Add a few photos of your library - these help members know what to expect.</Text>}
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -156,7 +159,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",

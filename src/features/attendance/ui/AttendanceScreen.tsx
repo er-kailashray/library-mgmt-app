@@ -10,6 +10,7 @@ import { AttendanceStatus } from "@/features/attendance/types/attendance.types";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 function formatDateLabel(dateStr: string): string {
     const date = new Date(`${dateStr}T00:00:00`);
@@ -57,75 +58,77 @@ export function AttendanceScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Attendance</Text>
-                    <Text style={styles.headerSubtitle}>{roster ? formatDateLabel(roster.date) : "Today"}</Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Attendance</Text>
+                        <Text style={styles.headerSubtitle}>{roster ? formatDateLabel(roster.date) : "Today"}</Text>
+                    </View>
                 </View>
-            </View>
 
-            {isLoading ? (
-                <LoadingState />
-            ) : error || !roster ? (
-                <ErrorState message={error || "Couldn't load attendance."} onRetry={refetch} />
-            ) : roster.batches.length === 0 ? (
-                <EmptyState
-                    icon="calendar-outline"
-                    title="No batches yet"
-                    subtitle="Set up a batch first to start tracking attendance."
-                    actionLabel="Set up a batch"
-                    onAction={() => router.push("/batches")}
-                />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    {roster.batches.map((batch) => {
-                        const presentCount = batch.members.filter((m) => m.status === "present").length;
-                        return (
-                            <View key={batch.batch_id} style={styles.batchBlock}>
-                                <View style={styles.batchHeader}>
-                                    <Text style={styles.batchTitle}>{batch.batch_name}</Text>
-                                    <Text style={styles.batchSummary}>
-                                        {presentCount}/{batch.members.length} present
-                                    </Text>
+                {isLoading ? (
+                    <LoadingState />
+                ) : error || !roster ? (
+                    <ErrorState message={error || "Couldn't load attendance."} onRetry={refetch} />
+                ) : roster.batches.length === 0 ? (
+                    <EmptyState
+                        icon="calendar-outline"
+                        title="No batches yet"
+                        subtitle="Set up a batch first to start tracking attendance."
+                        actionLabel="Set up a batch"
+                        onAction={() => router.push("/batches")}
+                    />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        {roster.batches.map((batch) => {
+                            const presentCount = batch.members.filter((m) => m.status === "present").length;
+                            return (
+                                <View key={batch.batch_id} style={styles.batchBlock}>
+                                    <View style={styles.batchHeader}>
+                                        <Text style={styles.batchTitle}>{batch.batch_name}</Text>
+                                        <Text style={styles.batchSummary}>
+                                            {presentCount}/{batch.members.length} present
+                                        </Text>
+                                    </View>
+
+                                    {batch.members.length === 0 ? (
+                                        <Text style={styles.emptyBatchText}>No students in this batch yet.</Text>
+                                    ) : (
+                                        batch.members.map((member) => (
+                                            <View key={member.member_id} style={styles.memberRow}>
+                                                <View style={styles.memberInfo}>
+                                                    <Text style={styles.memberName}>{member.name}</Text>
+                                                    <Text style={styles.memberMeta}>Seat {member.seat_number}</Text>
+                                                </View>
+                                                <View style={styles.statusButtons}>
+                                                    <Pressable
+                                                        accessibilityRole="button"
+                                                        style={[styles.statusBtn, member.status === "present" && styles.statusBtnPresentActive]}
+                                                        onPress={() => handleMark(batch.batch_id, member.member_id, "present")}>
+                                                        <Ionicons name="checkmark" size={18} color={member.status === "present" ? "#fff" : theme.success} />
+                                                    </Pressable>
+                                                    <Pressable
+                                                        accessibilityRole="button"
+                                                        style={[styles.statusBtn, member.status === "absent" && styles.statusBtnAbsentActive]}
+                                                        onPress={() => handleMark(batch.batch_id, member.member_id, "absent")}>
+                                                        <Ionicons name="close" size={18} color={member.status === "absent" ? "#fff" : theme.destructive} />
+                                                    </Pressable>
+                                                </View>
+                                            </View>
+                                        ))
+                                    )}
                                 </View>
-
-                                {batch.members.length === 0 ? (
-                                    <Text style={styles.emptyBatchText}>No students in this batch yet.</Text>
-                                ) : (
-                                    batch.members.map((member) => (
-                                        <View key={member.member_id} style={styles.memberRow}>
-                                            <View style={styles.memberInfo}>
-                                                <Text style={styles.memberName}>{member.name}</Text>
-                                                <Text style={styles.memberMeta}>Seat {member.seat_number}</Text>
-                                            </View>
-                                            <View style={styles.statusButtons}>
-                                                <Pressable
-                                                    accessibilityRole="button"
-                                                    style={[styles.statusBtn, member.status === "present" && styles.statusBtnPresentActive]}
-                                                    onPress={() => handleMark(batch.batch_id, member.member_id, "present")}>
-                                                    <Ionicons name="checkmark" size={18} color={member.status === "present" ? "#fff" : theme.success} />
-                                                </Pressable>
-                                                <Pressable
-                                                    accessibilityRole="button"
-                                                    style={[styles.statusBtn, member.status === "absent" && styles.statusBtnAbsentActive]}
-                                                    onPress={() => handleMark(batch.batch_id, member.member_id, "absent")}>
-                                                    <Ionicons name="close" size={18} color={member.status === "absent" ? "#fff" : theme.destructive} />
-                                                </Pressable>
-                                            </View>
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        );
-                    })}
-                </ScrollView>
-            )}
-        </SafeAreaView>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -133,7 +136,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",

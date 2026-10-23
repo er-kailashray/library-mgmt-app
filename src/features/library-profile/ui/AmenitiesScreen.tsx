@@ -10,6 +10,7 @@ import { AMENITY_ICONS, AMENITY_LABELS, AMENITY_OPTIONS, Amenity } from "@/featu
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 export function AmenitiesScreen() {
     const router = useRouter();
@@ -53,49 +54,51 @@ export function AmenitiesScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Amenities</Text>
-                    <Text style={styles.headerSubtitle}>What your library offers</Text>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error || !profile ? (
-                <ErrorState message={error || "Could not load amenities."} onRetry={refetch} />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    <View style={styles.grid}>
-                        {AMENITY_OPTIONS.map((amenity) => {
-                            const isSelected = selected.includes(amenity);
-                            return (
-                                <Pressable key={amenity} style={[styles.tile, isSelected && styles.tileSelected]} onPress={() => toggle(amenity)}>
-                                    <View style={[styles.tileIconCircle, isSelected && styles.tileIconCircleSelected]}>
-                                        <Ionicons name={AMENITY_ICONS[amenity]} size={22} color={isSelected ? "#fff" : theme.primary} />
-                                    </View>
-                                    <Text style={[styles.tileText, isSelected && styles.tileTextSelected]}>{AMENITY_LABELS[amenity]}</Text>
-                                    {isSelected && (
-                                        <View style={styles.tileCheck}>
-                                            <Ionicons name="checkmark-circle" size={18} color={theme.accent} />
-                                        </View>
-                                    )}
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-
-                    <Pressable style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
-                        {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
                     </Pressable>
-                </ScrollView>
-            )}
-        </SafeAreaView>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Amenities</Text>
+                        <Text style={styles.headerSubtitle}>What your library offers</Text>
+                    </View>
+                </View>
+
+                {isLoading ? (
+                    <LoadingState />
+                ) : error || !profile ? (
+                    <ErrorState message={error || "Could not load amenities."} onRetry={refetch} />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        <View style={styles.grid}>
+                            {AMENITY_OPTIONS.map((amenity) => {
+                                const isSelected = selected.includes(amenity);
+                                return (
+                                    <Pressable key={amenity} style={[styles.tile, isSelected && styles.tileSelected]} onPress={() => toggle(amenity)}>
+                                        <View style={[styles.tileIconCircle, isSelected && styles.tileIconCircleSelected]}>
+                                            <Ionicons name={AMENITY_ICONS[amenity]} size={22} color={isSelected ? "#fff" : theme.primary} />
+                                        </View>
+                                        <Text style={[styles.tileText, isSelected && styles.tileTextSelected]}>{AMENITY_LABELS[amenity]}</Text>
+                                        {isSelected && (
+                                            <View style={styles.tileCheck}>
+                                                <Ionicons name="checkmark-circle" size={18} color={theme.accent} />
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+
+                        <Pressable style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
+                            {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+                        </Pressable>
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -103,7 +106,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",

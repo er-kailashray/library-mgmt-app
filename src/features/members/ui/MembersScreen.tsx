@@ -12,6 +12,7 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { getInitials } from "@/shared/utils/text";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 type MemberFilter = "active" | "due" | "inactive" | "all";
 
@@ -102,76 +103,77 @@ export function MembersScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Members</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {filterCounts.active} active{filterCounts.inactive > 0 ? ` · ${filterCounts.inactive} inactive` : ""}
-                    </Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Members</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {filterCounts.active} active{filterCounts.inactive > 0 ? ` · ${filterCounts.inactive} inactive` : ""}
+                        </Text>
+                    </View>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => Alert.alert("Export", "Member list export coming soon!")}>
+                        <Ionicons name="download-outline" size={22} color={theme.primary} />
+                    </Pressable>
                 </View>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => Alert.alert("Export", "Member list export coming soon!")}>
-                    <Ionicons name="download-outline" size={22} color={theme.primary} />
-                </Pressable>
-            </View>
 
-            <View style={styles.searchSection}>
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={20} color={theme.mutedForeground} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search by name, seat or phone..."
-                        placeholderTextColor={theme.mutedForeground + "80"}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
+                <View style={styles.searchSection}>
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={20} color={theme.mutedForeground} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search by name, seat or phone..."
+                            placeholderTextColor={theme.mutedForeground + "80"}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                        {FILTERS.map((f) => (
+                            <Pressable key={f.key} style={[styles.filterChip, filterStatus === f.key && styles.filterChipActive]} onPress={() => setFilterStatus(f.key)}>
+                                <Text style={[styles.filterText, filterStatus === f.key && styles.filterTextActive]}>
+                                    {f.label} ({filterCounts[f.key]})
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </ScrollView>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-                    {FILTERS.map((f) => (
-                        <Pressable key={f.key} style={[styles.filterChip, filterStatus === f.key && styles.filterChipActive]} onPress={() => setFilterStatus(f.key)}>
-                            <Text style={[styles.filterText, filterStatus === f.key && styles.filterTextActive]}>
-                                {f.label} ({filterCounts[f.key]})
-                            </Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
-            </View>
 
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={fetchMembers} />
-            ) : filteredMembers.length === 0 ? (
-                members.length === 0 ? (
-                    <EmptyState icon="people-outline" title="No members yet" subtitle="Members will appear here once you admit a student." />
+                {isLoading ? (
+                    <LoadingState />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={fetchMembers} />
+                ) : filteredMembers.length === 0 ? (
+                    members.length === 0 ? (
+                        <EmptyState icon="people-outline" title="No members yet" subtitle="Members will appear here once you admit a student." />
+                    ) : (
+                        <EmptyState icon="search-outline" title="No members found" subtitle="Try adjusting your search or filters." />
+                    )
                 ) : (
-                    <EmptyState icon="search-outline" title="No members found" subtitle="Try adjusting your search or filters." />
-                )
-            ) : (
-                <FlatList
-                    data={filteredMembers}
-                    renderItem={renderMemberItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
-                    showsVerticalScrollIndicator={false}
-                />
-            )}
+                    <FlatList
+                        data={filteredMembers}
+                        renderItem={renderMemberItem}
+                        keyExtractor={(item) => item.id.toString()}
+                        contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
 
-            <Pressable accessibilityRole="button" style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={() => router.push("/admission")}>
-                <Ionicons name="add" size={32} color={theme.background} />
-            </Pressable>
-        </SafeAreaView>
+                <Pressable accessibilityRole="button" style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={() => router.push("/admission")}>
+                    <Ionicons name="add" size={32} color={theme.background} />
+                </Pressable>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: theme.background,
     },
     header: {
         flexDirection: "row",
@@ -180,7 +182,6 @@ const createStyles = (theme: any) => StyleSheet.create({
         paddingTop: 8,
         paddingBottom: 16,
         gap: 16,
-        backgroundColor: theme.background,
     },
     headerActionCircle: {
         width: 44,

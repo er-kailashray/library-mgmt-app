@@ -19,6 +19,7 @@ import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ChoiceChips } from "@/shared/ui/ChoiceChips";
 import { getInitials } from "@/shared/utils/text";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 
 const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: PAYMENT_MODE_LABELS[value] }));
@@ -277,324 +278,326 @@ export function MemberDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Member Details</Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Member Details</Text>
+                    </View>
+                    {/* Temporary: compare with the redesigned screen (MemberDetailScreenV2). */}
+                    <Pressable
+                        accessibilityRole="button"
+                        style={styles.designSwitch}
+                        onPress={() => router.replace({ pathname: "/members/v2/[id]", params: { id: String(id) } })}>
+                        <Ionicons name="swap-horizontal" size={14} color={theme.accent} />
+                        <Text style={styles.designSwitchText}>New design</Text>
+                    </Pressable>
                 </View>
-                {/* Temporary: compare with the redesigned screen (MemberDetailScreenV2). */}
-                <Pressable
-                    accessibilityRole="button"
-                    style={styles.designSwitch}
-                    onPress={() => router.replace({ pathname: "/members/v2/[id]", params: { id: String(id) } })}>
-                    <Ionicons name="swap-horizontal" size={14} color={theme.accent} />
-                    <Text style={styles.designSwitchText}>New design</Text>
-                </Pressable>
-            </View>
 
-            {isLoading ? (
-                <LoadingState />
-            ) : error || !member ? (
-                <ErrorState message={error || "Member not found."} onRetry={refetch} />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    <View style={styles.profileBlock}>
-                        <Pressable accessibilityRole="button" style={styles.editIconBtn} onPress={openEditModal}>
-                            <Ionicons name="pencil" size={14} color={theme.mutedForeground} />
-                        </Pressable>
-                        <View style={[styles.profileContent, member.status === "inactive" && styles.profileBlockFaded]}>
-                            <View style={[styles.avatar, { backgroundColor: (member.status === "active" ? theme.success : theme.mutedForeground) + "15" }]}>
-                                <Text style={[styles.avatarText, { color: member.status === "active" ? theme.success : theme.mutedForeground }]}>{getInitials(member.name)}</Text>
+                {isLoading ? (
+                    <LoadingState />
+                ) : error || !member ? (
+                    <ErrorState message={error || "Member not found."} onRetry={refetch} />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        <View style={styles.profileBlock}>
+                            <Pressable accessibilityRole="button" style={styles.editIconBtn} onPress={openEditModal}>
+                                <Ionicons name="pencil" size={14} color={theme.mutedForeground} />
+                            </Pressable>
+                            <View style={[styles.profileContent, member.status === "inactive" && styles.profileBlockFaded]}>
+                                <View style={[styles.avatar, { backgroundColor: (member.status === "active" ? theme.success : theme.mutedForeground) + "15" }]}>
+                                    <Text style={[styles.avatarText, { color: member.status === "active" ? theme.success : theme.mutedForeground }]}>{getInitials(member.name)}</Text>
+                                </View>
+                                <Text style={styles.memberName}>{member.name}</Text>
+                                <Text style={styles.memberPhone}>{member.phone}</Text>
+                                {/* Membership status; whether they've paid is shown by the Collect button and history below. */}
+                                {member.status === "inactive" ? (
+                                    <View style={[styles.badge, { backgroundColor: theme.mutedForeground + "15" }]}>
+                                        <Text style={[styles.badgeText, { color: theme.mutedForeground }]}>Inactive</Text>
+                                    </View>
+                                ) : (
+                                    <View style={[styles.badge, { backgroundColor: theme.success + "15" }]}>
+                                        <Text style={[styles.badgeText, { color: theme.success }]}>Active</Text>
+                                    </View>
+                                )}
                             </View>
-                            <Text style={styles.memberName}>{member.name}</Text>
-                            <Text style={styles.memberPhone}>{member.phone}</Text>
-                            {/* Membership status; whether they've paid is shown by the Collect button and history below. */}
-                            {member.status === "inactive" ? (
-                                <View style={[styles.badge, { backgroundColor: theme.mutedForeground + "15" }]}>
-                                    <Text style={[styles.badgeText, { color: theme.mutedForeground }]}>Inactive</Text>
+                        </View>
+
+                        {member.status === "active" && member.suggested_payment !== null && (
+                            <Pressable accessibilityRole="button" style={styles.renewButton} onPress={openPaymentSheet}>
+                                <Ionicons name="wallet-outline" size={18} color="#fff" />
+                                <Text style={styles.renewButtonText}>
+                                    {member.payment_status === "Due" && member.due_amount ? `Collect ${formatRupee(member.due_amount)}` : "Record Payment / Renew"}
+                                </Text>
+                            </Pressable>
+                        )}
+
+                        <Text style={styles.sectionTitle}>Batches & Seats</Text>
+                        {member.allocations.length === 0 ? (
+                            <Text style={styles.emptyText}>No active batch allocations.</Text>
+                        ) : (
+                            member.allocations.map((allocation) => (
+                                <View key={`${allocation.batch_id}-${allocation.seat_id}`} style={styles.allocationCard}>
+                                    <View style={styles.allocationIconBox}>
+                                        <Ionicons name="grid-outline" size={20} color={theme.accent} />
+                                    </View>
+                                    <View style={styles.allocationInfo}>
+                                        <Text style={styles.allocationBatch}>{allocation.batch_name}</Text>
+                                        <Text style={styles.allocationMeta}>Seat {allocation.seat_number} · Renews {allocation.renewal_date}</Text>
+                                    </View>
+                                </View>
+                            ))
+                        )}
+
+                        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Payment History</Text>
+                        {member.payments.length === 0 ? (
+                            <Text style={styles.emptyText}>No payments recorded yet.</Text>
+                        ) : (
+                            <View style={styles.historyCard}>
+                                {member.payments.map((payment: Payment, index: number) => {
+                                    const isPaid = payment.status === PaymentStatus.PAID;
+                                    const tone = isPaid ? theme.success : theme.accent;
+                                    return (
+                                        <View key={payment.id} style={[styles.historyRow, index !== member.payments.length - 1 && styles.historyRowBorder]}>
+                                            <View style={[styles.historyIcon, { backgroundColor: tone + "15" }]}>
+                                                <Ionicons name={isPaid ? "checkmark-circle" : "time-outline"} size={18} color={tone} />
+                                            </View>
+                                            <View style={styles.historyInfo}>
+                                                <Text style={styles.historyAmount}>{formatRupee(payment.amount)}</Text>
+                                                <Text style={styles.historyMeta}>
+                                                    {payment.method} · {formatPaymentDate(payment.date)}
+                                                </Text>
+                                            </View>
+                                            <View style={[styles.badge, styles.historyBadge, { backgroundColor: tone + "15" }]}>
+                                                <Text style={[styles.badgeText, { color: tone }]}>{isPaid ? "Paid" : "Partial"}</Text>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        <View style={styles.idProofBlock}>
+                            <Text style={styles.sectionTitle}>ID Proof</Text>
+                            {member.has_id_proof_front ? (
+                                <View style={styles.idProofCard}>
+                                    <View style={styles.idProofHeader}>
+                                        <View style={styles.allocationIconBox}>
+                                            <Ionicons name="card-outline" size={20} color={theme.accent} />
+                                        </View>
+                                        <View style={styles.idProofHeaderText}>
+                                            <Text style={styles.idProofTitle}>{member.id_proof_type ? ID_PROOF_TYPE_LABELS[member.id_proof_type as IdProofType] : "ID Proof"}</Text>
+                                            <Text style={styles.idProofSubtitle}>{member.has_id_proof_back ? "Front & back on file" : "Front on file"}</Text>
+                                        </View>
+                                        {isSavingIdProof ? (
+                                            <ActivityIndicator color={theme.mutedForeground} size="small" />
+                                        ) : (
+                                            <View style={styles.idProofIconActions}>
+                                                <Pressable
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel="Re-upload ID proof"
+                                                    style={styles.idProofIconBtn}
+                                                    onPress={() => setIsIdProofSheetVisible(true)}
+                                                    hitSlop={6}>
+                                                    <Ionicons name="pencil" size={15} color={theme.primary} />
+                                                </Pressable>
+                                                <Pressable
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel="Remove ID proof"
+                                                    style={styles.idProofIconBtn}
+                                                    onPress={handleRemoveIdProof}
+                                                    hitSlop={6}>
+                                                    <Ionicons name="trash-outline" size={15} color={theme.destructive} />
+                                                </Pressable>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={styles.idProofViewRow}>
+                                        {(member.has_id_proof_back ? (["front", "back"] as const) : (["front"] as const)).map((side) => (
+                                            <Pressable
+                                                key={side}
+                                                accessibilityRole="button"
+                                                style={styles.idProofViewBtn}
+                                                onPress={() => handleViewIdProof(side)}
+                                                disabled={loadingIdProofSide !== null}>
+                                                {loadingIdProofSide === side ? (
+                                                    <ActivityIndicator color={theme.primary} size="small" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="eye-outline" size={16} color={theme.primary} />
+                                                        <Text style={styles.idProofViewBtnText}>View {side === "front" ? "Front" : "Back"}</Text>
+                                                    </>
+                                                )}
+                                            </Pressable>
+                                        ))}
+                                    </View>
                                 </View>
                             ) : (
-                                <View style={[styles.badge, { backgroundColor: theme.success + "15" }]}>
-                                    <Text style={[styles.badgeText, { color: theme.success }]}>Active</Text>
-                                </View>
+                                <AddIdProofCard title="No ID proof on file" onAdd={() => setIsIdProofSheetVisible(true)} />
                             )}
                         </View>
-                    </View>
 
-                    {member.status === "active" && member.suggested_payment !== null && (
-                        <Pressable accessibilityRole="button" style={styles.renewButton} onPress={openPaymentSheet}>
-                            <Ionicons name="wallet-outline" size={18} color="#fff" />
-                            <Text style={styles.renewButtonText}>
-                                {member.payment_status === "Due" && member.due_amount ? `Collect ${formatRupee(member.due_amount)}` : "Record Payment / Renew"}
-                            </Text>
-                        </Pressable>
-                    )}
-
-                    <Text style={styles.sectionTitle}>Batches & Seats</Text>
-                    {member.allocations.length === 0 ? (
-                        <Text style={styles.emptyText}>No active batch allocations.</Text>
-                    ) : (
-                        member.allocations.map((allocation) => (
-                            <View key={`${allocation.batch_id}-${allocation.seat_id}`} style={styles.allocationCard}>
-                                <View style={styles.allocationIconBox}>
-                                    <Ionicons name="grid-outline" size={20} color={theme.accent} />
-                                </View>
-                                <View style={styles.allocationInfo}>
-                                    <Text style={styles.allocationBatch}>{allocation.batch_name}</Text>
-                                    <Text style={styles.allocationMeta}>Seat {allocation.seat_number} · Renews {allocation.renewal_date}</Text>
+                        {member.payment_status === "Due" && (
+                            <View style={styles.remindBlock}>
+                                <Text style={styles.sectionTitle}>Send a Reminder</Text>
+                                {member.due_amount ? <Text style={styles.remindAmount}>₹{Math.round(member.due_amount)} due</Text> : null}
+                                <View style={styles.remindButtonsRow}>
+                                    <Pressable style={[styles.remindBtn, styles.whatsappBtn]} onPress={handleWhatsAppRemind}>
+                                        <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+                                        <Text style={styles.remindBtnText}>WhatsApp</Text>
+                                    </Pressable>
+                                    <Pressable style={[styles.remindBtn, styles.smsBtn]} onPress={handleSmsRemind} disabled={isSendingSms}>
+                                        {isSendingSms ? (
+                                            <ActivityIndicator color={theme.primary} size="small" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="chatbox-ellipses-outline" size={18} color={theme.primary} />
+                                                <Text style={[styles.remindBtnText, { color: theme.primary }]}>SMS</Text>
+                                            </>
+                                        )}
+                                    </Pressable>
                                 </View>
                             </View>
-                        ))
-                    )}
+                        )}
 
-                    <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Payment History</Text>
-                    {member.payments.length === 0 ? (
-                        <Text style={styles.emptyText}>No payments recorded yet.</Text>
-                    ) : (
-                        <View style={styles.historyCard}>
-                            {member.payments.map((payment: Payment, index: number) => {
-                                const isPaid = payment.status === PaymentStatus.PAID;
-                                const tone = isPaid ? theme.success : theme.accent;
-                                return (
-                                    <View key={payment.id} style={[styles.historyRow, index !== member.payments.length - 1 && styles.historyRowBorder]}>
-                                        <View style={[styles.historyIcon, { backgroundColor: tone + "15" }]}>
-                                            <Ionicons name={isPaid ? "checkmark-circle" : "time-outline"} size={18} color={tone} />
-                                        </View>
-                                        <View style={styles.historyInfo}>
-                                            <Text style={styles.historyAmount}>{formatRupee(payment.amount)}</Text>
-                                            <Text style={styles.historyMeta}>
-                                                {payment.method} · {formatPaymentDate(payment.date)}
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.badge, styles.historyBadge, { backgroundColor: tone + "15" }]}>
-                                            <Text style={[styles.badgeText, { color: tone }]}>{isPaid ? "Paid" : "Partial"}</Text>
-                                        </View>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    )}
-
-                    <View style={styles.idProofBlock}>
-                        <Text style={styles.sectionTitle}>ID Proof</Text>
-                        {member.has_id_proof_front ? (
-                            <View style={styles.idProofCard}>
-                                <View style={styles.idProofHeader}>
-                                    <View style={styles.allocationIconBox}>
-                                        <Ionicons name="card-outline" size={20} color={theme.accent} />
-                                    </View>
-                                    <View style={styles.idProofHeaderText}>
-                                        <Text style={styles.idProofTitle}>{member.id_proof_type ? ID_PROOF_TYPE_LABELS[member.id_proof_type as IdProofType] : "ID Proof"}</Text>
-                                        <Text style={styles.idProofSubtitle}>{member.has_id_proof_back ? "Front & back on file" : "Front on file"}</Text>
-                                    </View>
-                                    {isSavingIdProof ? (
-                                        <ActivityIndicator color={theme.mutedForeground} size="small" />
-                                    ) : (
-                                        <View style={styles.idProofIconActions}>
-                                            <Pressable
-                                                accessibilityRole="button"
-                                                accessibilityLabel="Re-upload ID proof"
-                                                style={styles.idProofIconBtn}
-                                                onPress={() => setIsIdProofSheetVisible(true)}
-                                                hitSlop={6}>
-                                                <Ionicons name="pencil" size={15} color={theme.primary} />
-                                            </Pressable>
-                                            <Pressable
-                                                accessibilityRole="button"
-                                                accessibilityLabel="Remove ID proof"
-                                                style={styles.idProofIconBtn}
-                                                onPress={handleRemoveIdProof}
-                                                hitSlop={6}>
-                                                <Ionicons name="trash-outline" size={15} color={theme.destructive} />
-                                            </Pressable>
-                                        </View>
-                                    )}
+                        {member.status === "inactive" ? (
+                            <View style={styles.inactiveCard}>
+                                <View style={styles.inactiveNotice}>
+                                    <Ionicons name="exit-outline" size={18} color={theme.mutedForeground} />
+                                    <Text style={styles.inactiveNoticeText}>This member has left and their seat has been freed.</Text>
                                 </View>
-                                <View style={styles.idProofViewRow}>
-                                    {(member.has_id_proof_back ? (["front", "back"] as const) : (["front"] as const)).map((side) => (
-                                        <Pressable
-                                            key={side}
-                                            accessibilityRole="button"
-                                            style={styles.idProofViewBtn}
-                                            onPress={() => handleViewIdProof(side)}
-                                            disabled={loadingIdProofSide !== null}>
-                                            {loadingIdProofSide === side ? (
-                                                <ActivityIndicator color={theme.primary} size="small" />
-                                            ) : (
-                                                <>
-                                                    <Ionicons name="eye-outline" size={16} color={theme.primary} />
-                                                    <Text style={styles.idProofViewBtnText}>View {side === "front" ? "Front" : "Back"}</Text>
-                                                </>
-                                            )}
-                                        </Pressable>
-                                    ))}
-                                </View>
+                                {member.outstanding_balance > 0 && (
+                                    <Text style={styles.inactiveDues}>
+                                        Left with <Text style={styles.inactiveDuesAmount}>{formatRupee(member.outstanding_balance)}</Text> pending - you can collect or waive it when readmitting.
+                                    </Text>
+                                )}
+                                <Pressable accessibilityRole="button" style={styles.readmitButton} onPress={handleReadmit}>
+                                    <Ionicons name="person-add-outline" size={18} color="#fff" />
+                                    <Text style={styles.readmitButtonText}>Readmit Member</Text>
+                                </Pressable>
                             </View>
                         ) : (
-                            <AddIdProofCard title="No ID proof on file" onAdd={() => setIsIdProofSheetVisible(true)} />
+                            <Pressable style={[styles.leaveButton, isDeactivating && { opacity: 0.7 }]} onPress={handleMarkAsLeft} disabled={isDeactivating}>
+                                {isDeactivating ? (
+                                    <ActivityIndicator color={theme.destructive} size="small" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="exit-outline" size={18} color={theme.destructive} />
+                                        <Text style={styles.leaveButtonText}>Mark as Left</Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        )}
+                    </ScrollView>
+                )}
+
+                <Modal visible={idProofModalVisible} transparent animationType="fade" onRequestClose={closeIdProofModal}>
+                    <View style={styles.idProofModalOverlay}>
+                        <Pressable style={styles.idProofModalCloseBtn} onPress={closeIdProofModal}>
+                            <Ionicons name="close" size={28} color="#fff" />
+                        </Pressable>
+                        {viewingSide && <Text style={styles.idProofModalLabel}>{viewingSide === "front" ? "Front" : "Back"}</Text>}
+                        {idProofSource ? (
+                            <Image source={idProofSource} style={styles.idProofModalImage} resizeMode="contain" />
+                        ) : (
+                            <ActivityIndicator color="#fff" size="large" />
                         )}
                     </View>
+                </Modal>
 
-                    {member.payment_status === "Due" && (
-                        <View style={styles.remindBlock}>
-                            <Text style={styles.sectionTitle}>Send a Reminder</Text>
-                            {member.due_amount ? <Text style={styles.remindAmount}>₹{Math.round(member.due_amount)} due</Text> : null}
-                            <View style={styles.remindButtonsRow}>
-                                <Pressable style={[styles.remindBtn, styles.whatsappBtn]} onPress={handleWhatsAppRemind}>
-                                    <Ionicons name="logo-whatsapp" size={18} color="#fff" />
-                                    <Text style={styles.remindBtnText}>WhatsApp</Text>
-                                </Pressable>
-                                <Pressable style={[styles.remindBtn, styles.smsBtn]} onPress={handleSmsRemind} disabled={isSendingSms}>
-                                    {isSendingSms ? (
-                                        <ActivityIndicator color={theme.primary} size="small" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="chatbox-ellipses-outline" size={18} color={theme.primary} />
-                                            <Text style={[styles.remindBtnText, { color: theme.primary }]}>SMS</Text>
-                                        </>
-                                    )}
-                                </Pressable>
-                            </View>
-                        </View>
-                    )}
+                <IdProofSheet
+                    visible={isIdProofSheetVisible}
+                    onClose={() => setIsIdProofSheetVisible(false)}
+                    // Re-uploading starts from the current ID type; the photos are retaken.
+                    initial={member?.id_proof_type ? { type: member.id_proof_type as IdProofType } : null}
+                    title={member?.has_id_proof_front ? "Re-upload ID Proof" : "Add ID Proof"}
+                    onSave={handleSaveIdProof}
+                    isSaving={isSavingIdProof}
+                />
 
-                    {member.status === "inactive" ? (
-                        <View style={styles.inactiveCard}>
-                            <View style={styles.inactiveNotice}>
-                                <Ionicons name="exit-outline" size={18} color={theme.mutedForeground} />
-                                <Text style={styles.inactiveNoticeText}>This member has left and their seat has been freed.</Text>
-                            </View>
-                            {member.outstanding_balance > 0 && (
-                                <Text style={styles.inactiveDues}>
-                                    Left with <Text style={styles.inactiveDuesAmount}>{formatRupee(member.outstanding_balance)}</Text> pending - you can collect or waive it when readmitting.
+                <Modal visible={isPaymentSheetVisible} transparent animationType="slide" onRequestClose={() => setIsPaymentSheetVisible(false)}>
+                    <Pressable style={styles.editModalOverlay} onPress={() => setIsPaymentSheetVisible(false)} />
+                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
+                        <View style={styles.editModalSheet}>
+                            <Text style={styles.editModalTitle}>Record Payment</Text>
+                            {member && (
+                                <Text style={styles.paymentSheetSubtitle}>
+                                    {member.name} · Monthly fee {formatRupee(member.monthly_fee)}
+                                    {member.due_amount ? ` · ${formatRupee(member.due_amount)} due` : ""}
                                 </Text>
                             )}
-                            <Pressable accessibilityRole="button" style={styles.readmitButton} onPress={handleReadmit}>
-                                <Ionicons name="person-add-outline" size={18} color="#fff" />
-                                <Text style={styles.readmitButtonText}>Readmit Member</Text>
+
+                            <Text style={styles.inputLabel}>Amount Received</Text>
+                            <View style={styles.amountField}>
+                                <Text style={styles.amountPrefix}>₹</Text>
+                                <TextInput
+                                    style={styles.amountInput}
+                                    value={paymentAmount}
+                                    onChangeText={(text) => setPaymentAmount(text.replace(/[^0-9.]/g, ""))}
+                                    keyboardType="decimal-pad"
+                                    placeholder="0"
+                                    placeholderTextColor={theme.mutedForeground + "80"}
+                                />
+                            </View>
+                            <Text style={styles.paymentHint}>
+                                {paymentAmountValue <= 0
+                                    ? " "
+                                    : remainingAfterPayment > 0
+                                      ? member?.due_amount
+                                          ? `${formatRupee(remainingAfterPayment)} will still be due after this.`
+                                          : `Partial payment - ${formatRupee(remainingAfterPayment)} more needed to renew.`
+                                      : member?.due_amount
+                                        ? "Clears all dues and moves the renewal date forward."
+                                        : "Renews the membership for another month."}
+                            </Text>
+
+                            <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
+
+                            <Pressable style={[styles.editSaveBtn, isSavingPayment && { opacity: 0.7 }]} onPress={handleSavePayment} disabled={isSavingPayment}>
+                                {isSavingPayment ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Payment</Text>}
                             </Pressable>
                         </View>
-                    ) : (
-                        <Pressable style={[styles.leaveButton, isDeactivating && { opacity: 0.7 }]} onPress={handleMarkAsLeft} disabled={isDeactivating}>
-                            {isDeactivating ? (
-                                <ActivityIndicator color={theme.destructive} size="small" />
-                            ) : (
-                                <>
-                                    <Ionicons name="exit-outline" size={18} color={theme.destructive} />
-                                    <Text style={styles.leaveButtonText}>Mark as Left</Text>
-                                </>
-                            )}
-                        </Pressable>
-                    )}
-                </ScrollView>
-            )}
+                    </KeyboardAvoidingView>
+                </Modal>
 
-            <Modal visible={idProofModalVisible} transparent animationType="fade" onRequestClose={closeIdProofModal}>
-                <View style={styles.idProofModalOverlay}>
-                    <Pressable style={styles.idProofModalCloseBtn} onPress={closeIdProofModal}>
-                        <Ionicons name="close" size={28} color="#fff" />
-                    </Pressable>
-                    {viewingSide && <Text style={styles.idProofModalLabel}>{viewingSide === "front" ? "Front" : "Back"}</Text>}
-                    {idProofSource ? (
-                        <Image source={idProofSource} style={styles.idProofModalImage} resizeMode="contain" />
-                    ) : (
-                        <ActivityIndicator color="#fff" size="large" />
-                    )}
-                </View>
-            </Modal>
+                <Modal visible={isEditModalVisible} transparent animationType="slide" onRequestClose={() => setIsEditModalVisible(false)}>
+                    <Pressable style={styles.editModalOverlay} onPress={() => setIsEditModalVisible(false)} />
+                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
+                        <View style={styles.editModalSheet}>
+                            <Text style={styles.editModalTitle}>Edit Member</Text>
 
-            <IdProofSheet
-                visible={isIdProofSheetVisible}
-                onClose={() => setIsIdProofSheetVisible(false)}
-                // Re-uploading starts from the current ID type; the photos are retaken.
-                initial={member?.id_proof_type ? { type: member.id_proof_type as IdProofType } : null}
-                title={member?.has_id_proof_front ? "Re-upload ID Proof" : "Add ID Proof"}
-                onSave={handleSaveIdProof}
-                isSaving={isSavingIdProof}
-            />
+                            <Text style={styles.inputLabel}>Full Name</Text>
+                            <TextInput style={styles.inputField} value={editName} onChangeText={setEditName} autoCapitalize="words" placeholder="e.g. John Doe" placeholderTextColor={theme.mutedForeground + "80"} />
 
-            <Modal visible={isPaymentSheetVisible} transparent animationType="slide" onRequestClose={() => setIsPaymentSheetVisible(false)}>
-                <Pressable style={styles.editModalOverlay} onPress={() => setIsPaymentSheetVisible(false)} />
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-                    <View style={styles.editModalSheet}>
-                        <Text style={styles.editModalTitle}>Record Payment</Text>
-                        {member && (
-                            <Text style={styles.paymentSheetSubtitle}>
-                                {member.name} · Monthly fee {formatRupee(member.monthly_fee)}
-                                {member.due_amount ? ` · ${formatRupee(member.due_amount)} due` : ""}
-                            </Text>
-                        )}
-
-                        <Text style={styles.inputLabel}>Amount Received</Text>
-                        <View style={styles.amountField}>
-                            <Text style={styles.amountPrefix}>₹</Text>
+                            <Text style={styles.inputLabel}>Phone Number</Text>
                             <TextInput
-                                style={styles.amountInput}
-                                value={paymentAmount}
-                                onChangeText={(text) => setPaymentAmount(text.replace(/[^0-9.]/g, ""))}
-                                keyboardType="decimal-pad"
-                                placeholder="0"
+                                style={[styles.inputField, member?.status === "inactive" && styles.inputFieldDisabled]}
+                                value={editPhone}
+                                onChangeText={setEditPhone}
+                                keyboardType="phone-pad"
+                                maxLength={15}
+                                placeholder="10-digit mobile number"
                                 placeholderTextColor={theme.mutedForeground + "80"}
+                                editable={member?.status !== "inactive"}
                             />
+                            {member?.status === "inactive" && (
+                                <Text style={styles.inputHint}>Phone can&apos;t be changed once a member has left - it&apos;s used to recognize them if they rejoin.</Text>
+                            )}
+
+                            <ChoiceChips label="Gender (Optional)" value={editGender} options={GENDER_OPTIONS} onChange={setEditGender} allowDeselect />
+
+                            <Pressable style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={isSavingEdit}>
+                                {isSavingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+                            </Pressable>
                         </View>
-                        <Text style={styles.paymentHint}>
-                            {paymentAmountValue <= 0
-                                ? " "
-                                : remainingAfterPayment > 0
-                                  ? member?.due_amount
-                                      ? `${formatRupee(remainingAfterPayment)} will still be due after this.`
-                                      : `Partial payment - ${formatRupee(remainingAfterPayment)} more needed to renew.`
-                                  : member?.due_amount
-                                    ? "Clears all dues and moves the renewal date forward."
-                                    : "Renews the membership for another month."}
-                        </Text>
-
-                        <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
-
-                        <Pressable style={[styles.editSaveBtn, isSavingPayment && { opacity: 0.7 }]} onPress={handleSavePayment} disabled={isSavingPayment}>
-                            {isSavingPayment ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Payment</Text>}
-                        </Pressable>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
-
-            <Modal visible={isEditModalVisible} transparent animationType="slide" onRequestClose={() => setIsEditModalVisible(false)}>
-                <Pressable style={styles.editModalOverlay} onPress={() => setIsEditModalVisible(false)} />
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-                    <View style={styles.editModalSheet}>
-                        <Text style={styles.editModalTitle}>Edit Member</Text>
-
-                        <Text style={styles.inputLabel}>Full Name</Text>
-                        <TextInput style={styles.inputField} value={editName} onChangeText={setEditName} autoCapitalize="words" placeholder="e.g. John Doe" placeholderTextColor={theme.mutedForeground + "80"} />
-
-                        <Text style={styles.inputLabel}>Phone Number</Text>
-                        <TextInput
-                            style={[styles.inputField, member?.status === "inactive" && styles.inputFieldDisabled]}
-                            value={editPhone}
-                            onChangeText={setEditPhone}
-                            keyboardType="phone-pad"
-                            maxLength={15}
-                            placeholder="10-digit mobile number"
-                            placeholderTextColor={theme.mutedForeground + "80"}
-                            editable={member?.status !== "inactive"}
-                        />
-                        {member?.status === "inactive" && (
-                            <Text style={styles.inputHint}>Phone can&apos;t be changed once a member has left - it&apos;s used to recognize them if they rejoin.</Text>
-                        )}
-
-                        <ChoiceChips label="Gender (Optional)" value={editGender} options={GENDER_OPTIONS} onChange={setEditGender} allowDeselect />
-
-                        <Pressable style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={isSavingEdit}>
-                            {isSavingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
-                        </Pressable>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
-        </SafeAreaView>
+                    </KeyboardAvoidingView>
+                </Modal>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -602,7 +605,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",

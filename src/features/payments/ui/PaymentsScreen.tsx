@@ -29,6 +29,7 @@ import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 export function PaymentsScreen() {
     const router = useRouter();
@@ -153,159 +154,162 @@ export function PaymentsScreen() {
 
     if (showPaymentForm) {
         return (
-            <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
-                        <View style={styles.header}>
-                            <Pressable style={styles.headerActionCircle} onPress={() => setShowPaymentForm(false)}>
-                                <Ionicons name="close" size={24} color={theme.primary} />
-                            </Pressable>
-                            <View style={styles.headerText}>
-                                <Text style={styles.headerTitle}>Mark Payment</Text>
-                                <Text style={styles.headerSubtitle}>Record a student payment</Text>
-                            </View>
-                        </View>
-
-                        <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Member</Text>
-                                <Pressable style={styles.input} onPress={() => setMemberPickerVisible(true)}>
-                                    <Text style={[styles.pickerText, !selectedMember && { color: theme.mutedForeground + "80" }]}>
-                                        {selectedMember ? selectedMember.name : "Select a member"}
-                                    </Text>
+            <ScreenBackground>
+                <SafeAreaView style={styles.safe} edges={["top"]}>
+                    <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
+                            <View style={styles.header}>
+                                <Pressable style={styles.headerActionCircle} onPress={() => setShowPaymentForm(false)}>
+                                    <Ionicons name="close" size={24} color={theme.primary} />
                                 </Pressable>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Amount (₹)</Text>
-                                <TextInput style={styles.input} placeholder="e.g. 500" placeholderTextColor={theme.mutedForeground + "80"} keyboardType="numeric" value={amount} onChangeText={setAmount} />
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Payment Mode</Text>
-                                <View style={styles.modeRow}>
-                                    {(Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((mode) => (
-                                        <Pressable key={mode} style={[styles.modeChip, paymentMode === mode && styles.modeChipActive]} onPress={() => setPaymentMode(mode)}>
-                                            <Text style={[styles.modeChipText, paymentMode === mode && styles.modeChipTextActive]}>{PAYMENT_MODE_LABELS[mode]}</Text>
-                                        </Pressable>
-                                    ))}
+                                <View style={styles.headerText}>
+                                    <Text style={styles.headerTitle}>Mark Payment</Text>
+                                    <Text style={styles.headerSubtitle}>Record a student payment</Text>
                                 </View>
                             </View>
 
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Notes (Optional)</Text>
-                                <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. Cash payment for April" placeholderTextColor={theme.mutedForeground + "80"} multiline numberOfLines={4} value={notes} onChangeText={setNotes} />
-                            </View>
+                            <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+                                <View style={styles.formGroup}>
+                                    <Text style={styles.label}>Member</Text>
+                                    <Pressable style={styles.input} onPress={() => setMemberPickerVisible(true)}>
+                                        <Text style={[styles.pickerText, !selectedMember && { color: theme.mutedForeground + "80" }]}>
+                                            {selectedMember ? selectedMember.name : "Select a member"}
+                                        </Text>
+                                    </Pressable>
+                                </View>
 
-                            <Pressable style={[styles.primaryButton, isSubmitting && { opacity: 0.7 }]} onPress={handleMarkPayment} disabled={isSubmitting}>
-                                {isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryButtonText}>Confirm Payment</Text>}
-                            </Pressable>
-                        </ScrollView>
-                    </KeyboardAvoidingView>
-                </TouchableWithoutFeedback>
+                                <View style={styles.formGroup}>
+                                    <Text style={styles.label}>Amount (₹)</Text>
+                                    <TextInput style={styles.input} placeholder="e.g. 500" placeholderTextColor={theme.mutedForeground + "80"} keyboardType="numeric" value={amount} onChangeText={setAmount} />
+                                </View>
 
-                <Modal visible={isMemberPickerVisible} animationType="slide" transparent onRequestClose={() => setMemberPickerVisible(false)}>
-                    <Pressable style={styles.modalOverlay} onPress={() => setMemberPickerVisible(false)} />
-                    <View style={styles.memberPickerSheet}>
-                        <Text style={styles.memberPickerTitle}>Select Member</Text>
-                        <FlatList
-                            data={members}
-                            keyExtractor={(item) => item.id.toString()}
-                            style={{ maxHeight: 400 }}
-                            ListEmptyComponent={<Text style={styles.emptyText}>No members found.</Text>}
-                            renderItem={({ item }) => (
-                                <Pressable
-                                    style={styles.memberPickerRow}
-                                    onPress={() => {
-                                        setSelectedMember(item);
-                                        setMemberPickerVisible(false);
-                                    }}>
-                                    <Text style={styles.memberPickerName}>{item.name}</Text>
-                                    <Text style={styles.memberPickerPhone}>{item.phone}</Text>
+                                <View style={styles.formGroup}>
+                                    <Text style={styles.label}>Payment Mode</Text>
+                                    <View style={styles.modeRow}>
+                                        {(Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((mode) => (
+                                            <Pressable key={mode} style={[styles.modeChip, paymentMode === mode && styles.modeChipActive]} onPress={() => setPaymentMode(mode)}>
+                                                <Text style={[styles.modeChipText, paymentMode === mode && styles.modeChipTextActive]}>{PAYMENT_MODE_LABELS[mode]}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                <View style={styles.formGroup}>
+                                    <Text style={styles.label}>Notes (Optional)</Text>
+                                    <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. Cash payment for April" placeholderTextColor={theme.mutedForeground + "80"} multiline numberOfLines={4} value={notes} onChangeText={setNotes} />
+                                </View>
+
+                                <Pressable style={[styles.primaryButton, isSubmitting && { opacity: 0.7 }]} onPress={handleMarkPayment} disabled={isSubmitting}>
+                                    {isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryButtonText}>Confirm Payment</Text>}
                                 </Pressable>
-                            )}
-                        />
-                    </View>
-                </Modal>
-            </SafeAreaView>
+                            </ScrollView>
+                        </KeyboardAvoidingView>
+                    </TouchableWithoutFeedback>
+
+                    <Modal visible={isMemberPickerVisible} animationType="slide" transparent onRequestClose={() => setMemberPickerVisible(false)}>
+                        <Pressable style={styles.modalOverlay} onPress={() => setMemberPickerVisible(false)} />
+                        <View style={styles.memberPickerSheet}>
+                            <Text style={styles.memberPickerTitle}>Select Member</Text>
+                            <FlatList
+                                data={members}
+                                keyExtractor={(item) => item.id.toString()}
+                                style={{ maxHeight: 400 }}
+                                ListEmptyComponent={<Text style={styles.emptyText}>No members found.</Text>}
+                                renderItem={({ item }) => (
+                                    <Pressable
+                                        style={styles.memberPickerRow}
+                                        onPress={() => {
+                                            setSelectedMember(item);
+                                            setMemberPickerVisible(false);
+                                        }}>
+                                        <Text style={styles.memberPickerName}>{item.name}</Text>
+                                        <Text style={styles.memberPickerPhone}>{item.phone}</Text>
+                                    </Pressable>
+                                )}
+                            />
+                        </View>
+                    </Modal>
+                </SafeAreaView>
+            </ScreenBackground>
         );
     }
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Payments</Text>
-                    <Text style={styles.headerSubtitle}>Revenue & collections</Text>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                    </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Payments</Text>
+                        <Text style={styles.headerSubtitle}>Revenue & collections</Text>
+                    </View>
                 </View>
-            </View>
 
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Total Collected</Text>
-                    <Text style={[styles.summaryValue, { color: theme.accent }]}>₹{totalCollection.toLocaleString("en-IN")}</Text>
+                <View style={styles.summaryRow}>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Total Collected</Text>
+                        <Text style={[styles.summaryValue, { color: theme.accent }]}>₹{totalCollection.toLocaleString("en-IN")}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.summaryLabel}>Pending</Text>
+                        <Text style={[styles.summaryValue, { color: theme.primary }]}>₹{pendingAmount.toLocaleString("en-IN")}</Text>
+                    </View>
                 </View>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Pending</Text>
-                    <Text style={[styles.summaryValue, { color: theme.primary }]}>₹{pendingAmount.toLocaleString("en-IN")}</Text>
-                </View>
-            </View>
 
-            {pendingAmount > 0 && (
-                <Pressable style={[styles.remindAllBtn, isSendingBulkReminder && { opacity: 0.7 }]} onPress={handleRemindAllDue} disabled={isSendingBulkReminder}>
-                    {isSendingBulkReminder ? (
-                        <ActivityIndicator color={theme.accent} size="small" />
+                {pendingAmount > 0 && (
+                    <Pressable style={[styles.remindAllBtn, isSendingBulkReminder && { opacity: 0.7 }]} onPress={handleRemindAllDue} disabled={isSendingBulkReminder}>
+                        {isSendingBulkReminder ? (
+                            <ActivityIndicator color={theme.accent} size="small" />
+                        ) : (
+                            <>
+                                <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
+                                <Text style={styles.remindAllBtnText}>Remind everyone who&apos;s due (SMS)</Text>
+                            </>
+                        )}
+                    </Pressable>
+                )}
+
+                <View style={styles.listHeader}>
+                    <Text style={styles.listTitle}>Recent Transactions</Text>
+                    <View style={styles.filterRow}>
+                        <Pressable onPress={() => setFilterStatus("all")} style={[styles.filterBtn, filterStatus === "all" && { backgroundColor: theme.accent }]}>
+                            <Text style={[styles.filterBtnText, filterStatus === "all" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>All</Text>
+                        </Pressable>
+                        <Pressable onPress={() => setFilterStatus("paid")} style={[styles.filterBtn, filterStatus === "paid" && { backgroundColor: theme.accent }]}>
+                            <Text style={[styles.filterBtnText, filterStatus === "paid" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>Paid</Text>
+                        </Pressable>
+                    </View>
+                </View>
+
+                {isLoading ? (
+                    <LoadingState />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={fetchPayments} />
+                ) : filteredPayments.length === 0 ? (
+                    payments.length === 0 ? (
+                        <EmptyState icon="cash-outline" title="No payments recorded yet" subtitle="Payments you record will show up here." />
                     ) : (
-                        <>
-                            <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
-                            <Text style={styles.remindAllBtnText}>Remind everyone who&apos;s due (SMS)</Text>
-                        </>
-                    )}
-                </Pressable>
-            )}
-
-            <View style={styles.listHeader}>
-                <Text style={styles.listTitle}>Recent Transactions</Text>
-                <View style={styles.filterRow}>
-                    <Pressable onPress={() => setFilterStatus("all")} style={[styles.filterBtn, filterStatus === "all" && { backgroundColor: theme.accent }]}>
-                        <Text style={[styles.filterBtnText, filterStatus === "all" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>All</Text>
-                    </Pressable>
-                    <Pressable onPress={() => setFilterStatus("paid")} style={[styles.filterBtn, filterStatus === "paid" && { backgroundColor: theme.accent }]}>
-                        <Text style={[styles.filterBtnText, filterStatus === "paid" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>Paid</Text>
-                    </Pressable>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={fetchPayments} />
-            ) : filteredPayments.length === 0 ? (
-                payments.length === 0 ? (
-                    <EmptyState icon="cash-outline" title="No payments recorded yet" subtitle="Payments you record will show up here." />
+                        <EmptyState icon="search-outline" title="No transactions found" subtitle="Try adjusting your search or filters." />
+                    )
                 ) : (
-                    <EmptyState icon="search-outline" title="No transactions found" subtitle="Try adjusting your search or filters." />
-                )
-            ) : (
-                <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} />
-            )}
+                    <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} />
+                )}
 
-            <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
-                <Ionicons name="add" size={32} color={theme.background} />
-            </Pressable>
-        </SafeAreaView>
+                <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
+                    <Ionicons name="add" size={32} color={theme.background} />
+                </Pressable>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,

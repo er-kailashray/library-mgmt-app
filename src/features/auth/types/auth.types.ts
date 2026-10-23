@@ -15,3 +15,16 @@ export interface RegisterRequest {
 	library_name: string;
 	total_seats: string;
 }
+
+/** Response of POST /api/verify-otp for the register flow. */
+export interface VerifyOtpResponse {
+	message: string;
+	token: string;
+	user: AuthUser;
+}
+
+/** Response of POST /api/resend-otp; `retry_after` is the cooldown in seconds. */
+export interface ResendOtpResponse {
+	message: string;
+	retry_after: number;
+}

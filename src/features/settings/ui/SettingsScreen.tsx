@@ -14,6 +14,7 @@ import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 interface SettingsItem {
 	icon: keyof typeof Ionicons.glyphMap;
@@ -188,145 +189,145 @@ export function SettingsScreen() {
 	const styles = createStyles(theme);
 
 	return (
-		<SafeAreaView style={styles.safe} edges={["top"]}>
-			<View style={styles.headerWrapper}>
-				<View style={styles.header}>
-					<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-						<Ionicons name="arrow-back" size={24} color={theme.primary} />
-					</Pressable>
-					<View style={styles.headerText}>
-						<Text style={styles.headerTitle}>Settings</Text>
-						<Text style={styles.headerSubtitle}>Library & account preferences</Text>
-					</View>
-				</View>
-			</View>
-
-			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-				<View style={styles.profileCenterBlock}>
-					<Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={handleChangePhoto} disabled={isUploadingPhoto} style={styles.avatarHugeWrap}>
-						<View style={styles.avatarHugeBackground}>
-							{user?.profile_photo_url ? (
-								<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
-							) : (
-								<Text style={styles.avatarHugeText}>{getInitials(user?.name || "")}</Text>
-							)}
-							{isUploadingPhoto && (
-								<View style={styles.avatarHugeOverlay}>
-									<ActivityIndicator color="#fff" />
-								</View>
-							)}
-						</View>
-						<View style={styles.avatarCameraBadge}>
-							<Ionicons name="camera" size={16} color={theme.background} />
-						</View>
-					</Pressable>
-					<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
-					{user && (
-						<View style={styles.ownerInfoRow}>
-							<View style={styles.ownerInfoPill}>
-								<Ionicons name="person-outline" size={14} color={theme.mutedForeground} />
-								<Text style={styles.ownerInfoText}>{user.name}</Text>
-							</View>
-							<View style={styles.ownerInfoPill}>
-								<Ionicons name="call-outline" size={14} color={theme.mutedForeground} />
-								<Text style={styles.ownerInfoText}>{user.phone}</Text>
-							</View>
-						</View>
-					)}
-				</View>
-
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>App Preferences</Text>
-					<View style={styles.groupCard}>
-						<View style={styles.optionRowNoPress}>
-							<View style={styles.iconCircle}>
-								<Ionicons name="color-palette-outline" size={20} color={theme.primary} />
-							</View>
-							<View style={styles.themeToggleContainer}>
-								<Text style={styles.optionText}>Theme Mode</Text>
-								<View style={styles.segmentControl}>
-									{(["system", "light", "dark"] as const).map((m) => (
-										<Pressable key={m} onPress={() => setMode(m)} style={[styles.segment, mode === m && styles.segmentActive]}>
-											<Text style={[styles.segmentText, mode === m && styles.segmentTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
-										</Pressable>
-									))}
-								</View>
-							</View>
-						</View>
-					</View>
-				</View>
-
-				{SETTINGS_GROUPS.map((group, gIndex) => (
-					<View key={`group-${gIndex}`} style={styles.section}>
-						<Text style={styles.sectionTitle}>{group.title}</Text>
-						<View style={styles.groupCard}>
-							{group.items.map((item, iIndex) => (
-								<Pressable key={`item-${gIndex}-${iIndex}`} accessibilityRole="button" style={({ pressed }) => [styles.optionRow, pressed && styles.optionRowPressed, iIndex !== group.items.length - 1 && styles.optionRowBorder]} onPress={item.onPress} disabled={isLoggingOut && item.destructive}>
-									<View style={[styles.iconCircle, item.destructive && styles.iconCircleDestructive]}>
-										<Ionicons name={item.icon} size={20} color={item.destructive ? theme.destructive : theme.primary} />
-									</View>
-									<Text style={[styles.optionText, item.destructive && styles.logoutText]}>{item.label}</Text>
-									{item.badge && (
-										<Text style={[styles.optionBadge, { color: item.badge.color, backgroundColor: item.badge.color + "18" }]}>{item.badge.text}</Text>
-									)}
-									<Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
-								</Pressable>
-							))}
-						</View>
-					</View>
-				))}
-
-				<View style={styles.footerBlock}>
-					<Text style={styles.footerText}>Powered by Kailash Ray</Text>
-					<Text style={styles.versionText}>v1.0.0</Text>
-				</View>
-			</ScrollView>
-
-			<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
-				<Pressable style={styles.editModalOverlay} onPress={() => setIsEditProfileVisible(false)} />
-				<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-					<View style={styles.editModalSheet}>
-						<Text style={styles.editModalTitle}>Edit Profile</Text>
-
-						<Text style={styles.inputLabel}>Your Name</Text>
-						<TextInput
-							style={styles.inputField}
-							value={editProfileName}
-							onChangeText={setEditProfileName}
-							autoCapitalize="words"
-							placeholder="e.g. Asha Owner"
-							placeholderTextColor={theme.mutedForeground + "80"}
-						/>
-
-						<Text style={styles.inputLabel}>Phone Number</Text>
-						<TextInput
-							style={styles.inputField}
-							value={editProfilePhone}
-							onChangeText={setEditProfilePhone}
-							keyboardType="phone-pad"
-							maxLength={15}
-							placeholder="10-digit mobile number"
-							placeholderTextColor={theme.mutedForeground + "80"}
-						/>
-						<Text style={styles.inputHint}>This is the number you use to log in.</Text>
-
-						<Pressable style={[styles.editSaveBtn, isSavingProfile && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSavingProfile}>
-							{isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+		<ScreenBackground>
+			<SafeAreaView style={styles.safe} edges={["top"]}>
+				<View style={styles.headerWrapper}>
+					<View style={styles.header}>
+						<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+							<Ionicons name="arrow-back" size={24} color={theme.primary} />
 						</Pressable>
+						<View style={styles.headerText}>
+							<Text style={styles.headerTitle}>Settings</Text>
+							<Text style={styles.headerSubtitle}>Library & account preferences</Text>
+						</View>
 					</View>
-				</KeyboardAvoidingView>
-			</Modal>
-		</SafeAreaView>
+				</View>
+
+				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+					<View style={styles.profileCenterBlock}>
+						<Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={handleChangePhoto} disabled={isUploadingPhoto} style={styles.avatarHugeWrap}>
+							<View style={styles.avatarHugeBackground}>
+								{user?.profile_photo_url ? (
+									<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
+								) : (
+									<Text style={styles.avatarHugeText}>{getInitials(user?.name || "")}</Text>
+								)}
+								{isUploadingPhoto && (
+									<View style={styles.avatarHugeOverlay}>
+										<ActivityIndicator color="#fff" />
+									</View>
+								)}
+							</View>
+							<View style={styles.avatarCameraBadge}>
+								<Ionicons name="camera" size={16} color={theme.background} />
+							</View>
+						</Pressable>
+						<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
+						{user && (
+							<View style={styles.ownerInfoRow}>
+								<View style={styles.ownerInfoPill}>
+									<Ionicons name="person-outline" size={14} color={theme.mutedForeground} />
+									<Text style={styles.ownerInfoText}>{user.name}</Text>
+								</View>
+								<View style={styles.ownerInfoPill}>
+									<Ionicons name="call-outline" size={14} color={theme.mutedForeground} />
+									<Text style={styles.ownerInfoText}>{user.phone}</Text>
+								</View>
+							</View>
+						)}
+					</View>
+
+					<View style={styles.section}>
+						<Text style={styles.sectionTitle}>App Preferences</Text>
+						<View style={styles.groupCard}>
+							<View style={styles.optionRowNoPress}>
+								<View style={styles.iconCircle}>
+									<Ionicons name="color-palette-outline" size={20} color={theme.primary} />
+								</View>
+								<View style={styles.themeToggleContainer}>
+									<Text style={styles.optionText}>Theme Mode</Text>
+									<View style={styles.segmentControl}>
+										{(["system", "light", "dark"] as const).map((m) => (
+											<Pressable key={m} onPress={() => setMode(m)} style={[styles.segment, mode === m && styles.segmentActive]}>
+												<Text style={[styles.segmentText, mode === m && styles.segmentTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
+											</Pressable>
+										))}
+									</View>
+								</View>
+							</View>
+						</View>
+					</View>
+
+					{SETTINGS_GROUPS.map((group, gIndex) => (
+						<View key={`group-${gIndex}`} style={styles.section}>
+							<Text style={styles.sectionTitle}>{group.title}</Text>
+							<View style={styles.groupCard}>
+								{group.items.map((item, iIndex) => (
+									<Pressable key={`item-${gIndex}-${iIndex}`} accessibilityRole="button" style={({ pressed }) => [styles.optionRow, pressed && styles.optionRowPressed, iIndex !== group.items.length - 1 && styles.optionRowBorder]} onPress={item.onPress} disabled={isLoggingOut && item.destructive}>
+										<View style={[styles.iconCircle, item.destructive && styles.iconCircleDestructive]}>
+											<Ionicons name={item.icon} size={20} color={item.destructive ? theme.destructive : theme.primary} />
+										</View>
+										<Text style={[styles.optionText, item.destructive && styles.logoutText]}>{item.label}</Text>
+										{item.badge && (
+											<Text style={[styles.optionBadge, { color: item.badge.color, backgroundColor: item.badge.color + "18" }]}>{item.badge.text}</Text>
+										)}
+										<Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
+									</Pressable>
+								))}
+							</View>
+						</View>
+					))}
+
+					<View style={styles.footerBlock}>
+						<Text style={styles.footerText}>Powered by Kailash Ray</Text>
+						<Text style={styles.versionText}>v1.0.0</Text>
+					</View>
+				</ScrollView>
+
+				<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
+					<Pressable style={styles.editModalOverlay} onPress={() => setIsEditProfileVisible(false)} />
+					<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
+						<View style={styles.editModalSheet}>
+							<Text style={styles.editModalTitle}>Edit Profile</Text>
+
+							<Text style={styles.inputLabel}>Your Name</Text>
+							<TextInput
+								style={styles.inputField}
+								value={editProfileName}
+								onChangeText={setEditProfileName}
+								autoCapitalize="words"
+								placeholder="e.g. Asha Owner"
+								placeholderTextColor={theme.mutedForeground + "80"}
+							/>
+
+							<Text style={styles.inputLabel}>Phone Number</Text>
+							<TextInput
+								style={styles.inputField}
+								value={editProfilePhone}
+								onChangeText={setEditProfilePhone}
+								keyboardType="phone-pad"
+								maxLength={15}
+								placeholder="10-digit mobile number"
+								placeholderTextColor={theme.mutedForeground + "80"}
+							/>
+							<Text style={styles.inputHint}>This is the number you use to log in.</Text>
+
+							<Pressable style={[styles.editSaveBtn, isSavingProfile && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSavingProfile}>
+								{isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+							</Pressable>
+						</View>
+					</KeyboardAvoidingView>
+				</Modal>
+			</SafeAreaView>
+		</ScreenBackground>
 	);
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: theme.background,
 	},
 	headerWrapper: {
-		backgroundColor: theme.background,
 		paddingTop: 8,
 		borderBottomWidth: 1,
 		borderBottomColor: theme.border,

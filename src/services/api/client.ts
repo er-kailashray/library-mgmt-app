@@ -11,13 +11,25 @@ export function apiUrl(path: string) {
 	return buildUrl(path);
 }
 
+/** Thrown for non-OK responses; keeps the status and body so callers can branch on them. */
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+		readonly data: any,
+	) {
+		super(message);
+		this.name = "ApiError";
+	}
+}
+
 async function parseJsonResponse<T>(response: Response): Promise<T> {
 	const text = await response.text();
 	const json = text.length ? JSON.parse(text) : null;
 
 	if (!response.ok) {
 		notifyIfSubscriptionExpired(response.status, json);
-		throw new Error(json?.message ?? response.statusText ?? "Request failed");
+		throw new ApiError(json?.message ?? response.statusText ?? "Request failed", response.status, json);
 	}
 
 	return json as T;

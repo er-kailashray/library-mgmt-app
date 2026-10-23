@@ -12,6 +12,7 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", {
@@ -78,62 +79,64 @@ export function RenewalsScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Renewals</Text>
-                    <Text style={styles.headerSubtitle}>{data ? `Renewing within ${data.window_days} days` : "Upcoming renewals"}</Text>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={refetch} />
-            ) : renewals.length === 0 ? (
-                <EmptyState icon="refresh-outline" title="No renewals coming up" subtitle="You'll see members here as their membership gets close to renewing." />
-            ) : (
-                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                    <Pressable style={[styles.remindAllBtn, isSendingBulk && { opacity: 0.7 }]} onPress={handleRemindAll} disabled={isSendingBulk}>
-                        {isSendingBulk ? (
-                            <ActivityIndicator color={theme.accent} size="small" />
-                        ) : (
-                            <>
-                                <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
-                                <Text style={styles.remindAllBtnText}>Remind everyone renewing soon (SMS)</Text>
-                            </>
-                        )}
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <View style={styles.header}>
+                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
                     </Pressable>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerTitle}>Renewals</Text>
+                        <Text style={styles.headerSubtitle}>{data ? `Renewing within ${data.window_days} days` : "Upcoming renewals"}</Text>
+                    </View>
+                </View>
 
-                    {renewals.map((renewal) => (
-                        <View key={renewal.member_id} style={styles.renewalCard}>
-                            <View style={styles.renewalInfo}>
-                                <Text style={styles.renewalName}>{renewal.name}</Text>
-                                <Text style={styles.renewalMeta}>
-                                    Renews in {renewal.days_until_renewal} day{renewal.days_until_renewal === 1 ? "" : "s"} · {formatRupee(renewal.amount)}
-                                </Text>
+                {isLoading ? (
+                    <LoadingState />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={refetch} />
+                ) : renewals.length === 0 ? (
+                    <EmptyState icon="refresh-outline" title="No renewals coming up" subtitle="You'll see members here as their membership gets close to renewing." />
+                ) : (
+                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                        <Pressable style={[styles.remindAllBtn, isSendingBulk && { opacity: 0.7 }]} onPress={handleRemindAll} disabled={isSendingBulk}>
+                            {isSendingBulk ? (
+                                <ActivityIndicator color={theme.accent} size="small" />
+                            ) : (
+                                <>
+                                    <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
+                                    <Text style={styles.remindAllBtnText}>Remind everyone renewing soon (SMS)</Text>
+                                </>
+                            )}
+                        </Pressable>
+
+                        {renewals.map((renewal) => (
+                            <View key={renewal.member_id} style={styles.renewalCard}>
+                                <View style={styles.renewalInfo}>
+                                    <Text style={styles.renewalName}>{renewal.name}</Text>
+                                    <Text style={styles.renewalMeta}>
+                                        Renews in {renewal.days_until_renewal} day{renewal.days_until_renewal === 1 ? "" : "s"} · {formatRupee(renewal.amount)}
+                                    </Text>
+                                </View>
+                                <View style={styles.renewalActions}>
+                                    <Pressable style={[styles.iconBtn, styles.whatsappBtn]} onPress={() => handleWhatsAppRemind(renewal)}>
+                                        <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+                                    </Pressable>
+                                    <Pressable style={[styles.iconBtn, styles.smsBtn]} onPress={() => handleSmsRemind(renewal)} disabled={sendingMemberId === renewal.member_id}>
+                                        {sendingMemberId === renewal.member_id ? (
+                                            <ActivityIndicator color={theme.primary} size="small" />
+                                        ) : (
+                                            <Ionicons name="chatbox-ellipses-outline" size={18} color={theme.primary} />
+                                        )}
+                                    </Pressable>
+                                </View>
                             </View>
-                            <View style={styles.renewalActions}>
-                                <Pressable style={[styles.iconBtn, styles.whatsappBtn]} onPress={() => handleWhatsAppRemind(renewal)}>
-                                    <Ionicons name="logo-whatsapp" size={18} color="#fff" />
-                                </Pressable>
-                                <Pressable style={[styles.iconBtn, styles.smsBtn]} onPress={() => handleSmsRemind(renewal)} disabled={sendingMemberId === renewal.member_id}>
-                                    {sendingMemberId === renewal.member_id ? (
-                                        <ActivityIndicator color={theme.primary} size="small" />
-                                    ) : (
-                                        <Ionicons name="chatbox-ellipses-outline" size={18} color={theme.primary} />
-                                    )}
-                                </Pressable>
-                            </View>
-                        </View>
-                    ))}
-                </ScrollView>
-            )}
-        </SafeAreaView>
+                        ))}
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -141,7 +144,6 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         header: {
             flexDirection: "row",
