@@ -15,6 +15,14 @@ export interface DashboardData {
     expected_collection: number; // for progress bar
 
     due_members_count: number;
+    due_total: number;
+    /** Most overdue first; a few of them, for naming on the Home dues card. */
+    top_dues: {
+        member_id: number;
+        name: string;
+        amount: number;
+        days_overdue: number;
+    }[];
     critical_dues_count: number;
     this_month_dues_count: number;
 

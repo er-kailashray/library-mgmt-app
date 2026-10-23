@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -40,7 +40,11 @@ export function MembersScreen() {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterStatus, setFilterStatus] = useState<MemberFilter>("active");
+    // Home's "See all dues" opens this list pre-filtered.
+    const { filter: initialFilter } = useLocalSearchParams<{ filter?: MemberFilter }>();
+    const [filterStatus, setFilterStatus] = useState<MemberFilter>(
+        initialFilter && FILTERS.some((f) => f.key === initialFilter) ? initialFilter : "active"
+    );
 
     const { data, isLoading, error, refetch: fetchMembers } = useApiData(getMembersApi, []);
     const members = data ?? [];
