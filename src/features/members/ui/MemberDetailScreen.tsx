@@ -286,6 +286,14 @@ export function MemberDetailScreen() {
                 <View style={styles.headerText}>
                     <Text style={styles.headerTitle}>Member Details</Text>
                 </View>
+                {/* Temporary: compare with the redesigned screen (MemberDetailScreenV2). */}
+                <Pressable
+                    accessibilityRole="button"
+                    style={styles.designSwitch}
+                    onPress={() => router.replace({ pathname: "/members/v2/[id]", params: { id: String(id) } })}>
+                    <Ionicons name="swap-horizontal" size={14} color={theme.accent} />
+                    <Text style={styles.designSwitchText}>New design</Text>
+                </Pressable>
             </View>
 
             {isLoading ? (
@@ -603,6 +611,22 @@ const createStyles = (theme: any) =>
             paddingTop: 8,
             paddingBottom: 16,
             gap: 16,
+        },
+        // Temporary: jumps between the original and redesigned member screens for comparison.
+        designSwitch: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 10,
+            height: 30,
+            borderRadius: 15,
+            borderWidth: 1,
+            borderColor: theme.accent,
+        },
+        designSwitchText: {
+            fontFamily: "sans-bold",
+            fontSize: 12,
+            color: theme.accent,
         },
         headerActionCircle: {
             width: 44,
