@@ -356,10 +356,11 @@ export function HomeScreen() {
 						</View>
 					)}
 
-					{/* Everything here needs batches first, so it only appears once some exist. */}
-					{hasBatches && (
-						<View style={styles.quickAccessRow}>
-							{QUICK_ACCESS.map((item) => (
+					{/* Two rows of one-tap actions. The first needs batches, so it only appears once some exist;
+					    the second (Seats, Batches, Renewals, Settings) is always there. */}
+					{[...(hasBatches ? [QUICK_ACCESS] : []), MORE_MENU].map((row, rowIndex, rows) => (
+						<View key={rowIndex} style={[styles.quickAccessRow, rowIndex < rows.length - 1 && styles.quickAccessRowStacked]}>
+							{row.map((item) => (
 								<Pressable
 									key={item.key}
 									accessibilityRole="button"
@@ -375,7 +376,7 @@ export function HomeScreen() {
 								</Pressable>
 							))}
 						</View>
-					)}
+					))}
 
 					{isNewLibrary && (
 						<View style={styles.firstMemberCard}>
@@ -727,27 +728,6 @@ export function HomeScreen() {
 							</View>
 						</>
 					)}
-
-					<Text style={styles.sectionTitle}>More</Text>
-					<View style={styles.menuList}>
-						{MORE_MENU.map((item, index) => (
-							<Pressable
-								key={item.key}
-								accessibilityRole="button"
-								accessibilityLabel={item.label}
-								style={({ pressed }) => [styles.menuRow, index > 0 && styles.menuRowBorder, pressed && styles.menuRowPressed]}
-								onPress={() => router.push(item.href)}>
-								<View style={styles.menuIconCircle}>
-									<Ionicons name={item.icon} size={18} color={theme.accent} />
-								</View>
-								<View style={styles.menuText}>
-									<Text style={styles.menuLabel}>{item.label}</Text>
-									<Text style={styles.menuHint}>{item.hint}</Text>
-								</View>
-								<Ionicons name="chevron-forward" size={16} color={theme.mutedForeground} />
-							</Pressable>
-						))}
-					</View>
 				</ScrollView>
 			</SafeAreaView>
 		</View>
@@ -769,6 +749,10 @@ const createStyles = (theme: any) =>
 		// Transparent so the gradient behind shows through the header.
 		safe: {
 			flex: 1,
+		},
+		// Tighter gap when another action row follows directly underneath.
+		quickAccessRowStacked: {
+			marginBottom: 14,
 		},
 		quickAccessRow: {
 			flexDirection: "row",
@@ -1153,18 +1137,6 @@ const createStyles = (theme: any) =>
 			marginBottom: 24,
 			gap: 8,
 		},
-		panelBar: {
-			height: 5,
-			borderRadius: 3,
-			backgroundColor: theme.muted,
-			overflow: "hidden",
-			marginTop: 2,
-		},
-		panelBarFill: {
-			height: "100%",
-			borderRadius: 3,
-			backgroundColor: theme.accent,
-		},
 		// --- occupancy column chart ---
 		chart: {
 			paddingTop: 4,
@@ -1486,22 +1458,11 @@ const createStyles = (theme: any) =>
 			textTransform: "uppercase",
 			marginBottom: 16,
 		},
-		menuList: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			borderWidth: 1,
-			borderColor: theme.border,
-			paddingHorizontal: 14,
-		},
 		menuRow: {
 			flexDirection: "row",
 			alignItems: "center",
 			gap: 12,
 			paddingVertical: 12,
-		},
-		menuRowBorder: {
-			borderTopWidth: StyleSheet.hairlineWidth,
-			borderTopColor: theme.border,
 		},
 		menuRowPressed: {
 			opacity: 0.6,
@@ -1510,27 +1471,5 @@ const createStyles = (theme: any) =>
 		menuCellPressed: {
 			opacity: 0.8,
 			transform: [{ scale: 0.98 }],
-		},
-		menuIconCircle: {
-			width: 36,
-			height: 36,
-			borderRadius: RADIUS.sm,
-			backgroundColor: theme.accent + "15",
-			alignItems: "center",
-			justifyContent: "center",
-		},
-		menuText: {
-			flex: 1,
-		},
-		menuLabel: {
-			fontFamily: "sans-bold",
-			fontSize: 14,
-			color: theme.primary,
-		},
-		menuHint: {
-			fontFamily: "sans-medium",
-			fontSize: 12,
-			color: theme.mutedForeground,
-			marginTop: 1,
 		},
 	});
