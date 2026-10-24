@@ -10,6 +10,7 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 export function LibraryProfileScreen() {
     const router = useRouter();
@@ -63,15 +64,7 @@ export function LibraryProfileScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Library Profile</Text>
-                        <Text style={styles.headerSubtitle}>Name & total seats</Text>
-                    </View>
-                </View>
+                <ScreenHeader title="Library Profile" subtitle="Name & total seats" />
 
                 {isLoading ? (
                     <LoadingState />
@@ -126,37 +119,6 @@ const createStyles = (theme: any) =>
         },
         flex: {
             flex: 1,
-        },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 16,
-            gap: 16,
-        },
-        headerActionCircle: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: theme.card,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1.5,
-            borderColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        headerTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 20,
-            color: theme.primary,
-        },
-        headerSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 14,
-            color: theme.mutedForeground,
         },
         scroll: {
             paddingHorizontal: 20,

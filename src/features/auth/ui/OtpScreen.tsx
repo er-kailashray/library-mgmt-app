@@ -21,6 +21,7 @@ import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -90,16 +91,11 @@ export function OtpScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable style={styles.backButton} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.title}>Verify Account</Text>
-                        <Text style={styles.subtitle}>Enter the code sent to {phone}</Text>
-                    </View>
-                    <Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />
-                </View>
+                <ScreenHeader
+                    title="Verify Account"
+                    subtitle={`Enter the code sent to ${phone}`}
+                    right={<Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />}
+                />
 
                 <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                     <View style={styles.content}>
@@ -167,47 +163,14 @@ const createStyles = (theme: any) => StyleSheet.create({
     flex: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        gap: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-    },
-    headerText: {
-        flex: 1,
-    },
     headerLogo: {
         width: 40,
         height: 40,
     },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    title: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-        marginBottom: 2,
-    },
-    subtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
-    },
     content: {
         flex: 1,
         padding: 20,
-        paddingTop: 40,
+        paddingTop: 24,
     },
     otpCard: {
         backgroundColor: theme.card,

@@ -20,6 +20,7 @@ import { registerApi } from "@/features/auth/logic/auth-register.api";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 export function RegisterScreen() {
     const router = useRouter();
@@ -78,16 +79,11 @@ export function RegisterScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable style={styles.backButton} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.title}>Create Account</Text>
-                        <Text style={styles.subtitle}>Setup your library profile</Text>
-                    </View>
-                    <Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />
-                </View>
+                <ScreenHeader
+                    title="Create Account"
+                    subtitle="Set up your library profile"
+                    right={<Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />}
+                />
 
                 <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -99,7 +95,7 @@ export function RegisterScreen() {
                                 <Text style={styles.label}>Library Name</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="e.g. Yash Library"
+                                    placeholder="e.g. Gyan Library"
                                     placeholderTextColor={theme.mutedForeground + "4D"}
                                     value={libraryName}
                                     onChangeText={setLibraryName}
@@ -126,7 +122,7 @@ export function RegisterScreen() {
                                 <Text style={styles.label}>Full Name</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="e.g. Kailash Ray"
+                                    placeholder="e.g. Suresh Kumar"
                                     placeholderTextColor={theme.mutedForeground + "4D"}
                                     value={name}
                                     onChangeText={setName}
@@ -192,42 +188,9 @@ const createStyles = (theme: any) => StyleSheet.create({
     flex: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        gap: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-    },
-    headerText: {
-        flex: 1,
-    },
     headerLogo: {
         width: 40,
         height: 40,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    title: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-        marginBottom: 2,
-    },
-    subtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
     },
     scroll: {
         paddingHorizontal: 20,

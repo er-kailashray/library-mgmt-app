@@ -9,10 +9,12 @@ import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { getUpcomingRenewalsApi, remindAllUpcomingRenewalsApi } from "@/features/renewals/logic/renewals-api";
 import { UpcomingRenewal } from "@/features/renewals/types/renewals.types";
 import { useApiData } from "@/shared/hooks/useApiData";
+import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", {
@@ -82,15 +84,7 @@ export function RenewalsScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Renewals</Text>
-                        <Text style={styles.headerSubtitle}>{data ? `Renewing within ${data.window_days} days` : "Upcoming renewals"}</Text>
-                    </View>
-                </View>
+                <ScreenHeader title="Renewals" subtitle={data ? `Renewing within ${data.window_days} days` : "Upcoming renewals"} />
 
                 {isLoading ? (
                     <LoadingState />
@@ -145,41 +139,9 @@ const createStyles = (theme: any) =>
         safe: {
             flex: 1,
         },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 16,
-            gap: 16,
-        },
-        headerActionCircle: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: theme.card,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1.5,
-            borderColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        headerTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 22,
-            color: theme.primary,
-            marginBottom: 2,
-        },
-        headerSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 14,
-            color: theme.mutedForeground,
-        },
         scroll: {
             paddingHorizontal: 20,
-            paddingTop: 8,
+            paddingTop: 24,
             paddingBottom: 40,
         },
         remindAllBtn: {
@@ -203,7 +165,7 @@ const createStyles = (theme: any) =>
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: theme.card,
-            borderRadius: 18,
+            borderRadius: RADIUS.md,
             padding: 16,
             marginBottom: 12,
             borderWidth: 1.5,

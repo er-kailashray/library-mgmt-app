@@ -9,9 +9,11 @@ import { durationLabel, findClash, formatTime, fromMinutes, runsPastMidnight, to
 import { createBatchApi, deleteBatchApi, getBatchesApi, updateBatchApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
 import { useApiData } from "@/shared/hooks/useApiData";
+import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { HeaderIconButton, ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 import { BatchTimeWheelPicker } from "./BatchTimeWheelPicker";
 
@@ -164,23 +166,11 @@ export function BatchesScreen() {
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
 				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-				<View style={styles.headerWrapper}>
-					<View style={styles.header}>
-						<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-							<Ionicons name="arrow-back" size={24} color={theme.primary} />
-						</Pressable>
-						<View style={styles.headerText}>
-							<Text style={styles.headerTitle}>Seat Batches</Text>
-							<Text style={styles.headerSubtitle}>Manage timeslots & pricing</Text>
-						</View>
-						<Pressable
-							accessibilityRole="button"
-							style={[styles.headerActionCircle, { backgroundColor: theme.primary, borderColor: theme.primary }]}
-							onPress={openCreate}>
-							<Ionicons name="add" size={24} color={theme.background} />
-						</Pressable>
-					</View>
-				</View>
+				<ScreenHeader
+					title="Batches"
+					subtitle="Manage timeslots & pricing"
+					right={<HeaderIconButton icon="add" label="Add batch" onPress={openCreate} filled />}
+				/>
 
 				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 					<View style={styles.summaryContainer}>
@@ -246,7 +236,7 @@ export function BatchesScreen() {
 									</View>
 
 									<Text style={styles.inputLabel}>Batch Name</Text>
-									<TextInput style={styles.modalInput} placeholder="e.g. Morning Focus" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
+									<TextInput style={styles.modalInput} placeholder="e.g. Morning Batch" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
 
 									<View style={styles.modalRowGroup}>
 										<View style={{ flex: 1 }}>
@@ -281,7 +271,7 @@ export function BatchesScreen() {
 									)}
 
 									<Text style={styles.inputLabel}>Monthly Fee (Rs)</Text>
-									<TextInput style={styles.modalInput} placeholder="500" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
+									<TextInput style={styles.modalInput} placeholder="e.g. 800" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
 
 									{feeChangedWithMembers && (
 										<Text style={styles.feeWarning}>
@@ -329,43 +319,6 @@ const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
 	},
-	headerWrapper: {
-		paddingTop: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: theme.border,
-		zIndex: 10,
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingBottom: 16,
-		gap: 16,
-	},
-	headerText: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 22,
-		color: theme.primary,
-		marginBottom: 2,
-	},
-	headerSubtitle: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-	},
-	headerActionCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: theme.card,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
-	},
 	scroll: {
 		paddingHorizontal: 20,
 		paddingTop: 24,
@@ -375,22 +328,15 @@ const createStyles = (theme: any) => StyleSheet.create({
 		marginBottom: 16,
 	},
 	sectionTitle: {
-		fontFamily: "sans-bold",
-		fontSize: 14,
-		letterSpacing: 1.2,
-		color: theme.mutedForeground,
-		textTransform: "uppercase",
+		fontFamily: "sans-extrabold",
+		fontSize: 15,
+		color: theme.primary,
 	},
 	batchCard: {
 		backgroundColor: theme.card,
-		borderRadius: 20,
+		borderRadius: RADIUS.md,
 		padding: 20,
 		marginBottom: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.08,
-		shadowRadius: 20,
-		elevation: 4,
 		borderWidth: 1.5,
 		borderColor: theme.border,
 	},

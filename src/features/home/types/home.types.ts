@@ -17,6 +17,8 @@ export interface DashboardData {
         end_time: string;
         occupied: number;
         total: number;
+        /** Checked in to this batch today (for the live batch card). */
+        checked_in_today?: number;
     }[];
 
     monthly_collection: number;
@@ -73,10 +75,18 @@ export interface DashboardData {
     };
 
     recent_payments: {
+        member_id?: number;
         name: string;
         seat: number;
         amount: number;
         time_ago: string;
+        /** PAID / PARTIAL / REFUNDED */
+        status?: string;
+        method?: string;
+        date?: string;
+        recorded_at?: string | null;
+        period_start?: string | null;
+        period_end?: string | null;
     }[];
 }
 

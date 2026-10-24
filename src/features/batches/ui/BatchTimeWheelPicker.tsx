@@ -16,6 +16,8 @@ type Props = {
 	title: string;
 	/** "HH:MM" (24h) the picker opens on. */
 	initialValue: string;
+	/** Minute steps on the wheel; batches use 15 (the default), arrival times 5. */
+	minuteStep?: number;
 	onDone: (value: string) => void;
 	onCancel: () => void;
 };
@@ -61,17 +63,19 @@ function Wheel({ items, index, onChange }: { items: string[]; index: number; onC
 }
 
 /** Hour / minute (15-minute steps) / AM-PM scroll wheels, shown in place of the batch form. */
-export function BatchTimeWheelPicker({ title, initialValue, onDone, onCancel }: Props) {
+export function BatchTimeWheelPicker({ title, initialValue, minuteStep = 15, onDone, onCancel }: Props) {
 	const { theme } = useTheme();
 	const styles = createStyles(theme);
 
 	const [initialHours, initialMinutes] = initialValue.split(":").map(Number);
 	const [hourIndex, setHourIndex] = useState(HOURS.indexOf(initialHours % 12 || 12));
-	const [minuteIndex, setMinuteIndex] = useState(Math.max(0, MINUTE_STEPS.indexOf(initialMinutes as (typeof MINUTE_STEPS)[number])));
+	const minutes = minuteStep === 15 ? [...MINUTE_STEPS] : Array.from({ length: 60 / minuteStep }, (_, i) => i * minuteStep);
+	// Round the starting time down to the nearest step.
+	const [minuteIndex, setMinuteIndex] = useState(Math.max(0, Math.floor(initialMinutes / minuteStep)));
 	const [periodIndex, setPeriodIndex] = useState(initialHours >= 12 ? 1 : 0);
 
 	const hours24 = (HOURS[hourIndex] % 12) + (periodIndex === 1 ? 12 : 0);
-	const value = `${String(hours24).padStart(2, "0")}:${String(MINUTE_STEPS[minuteIndex]).padStart(2, "0")}`;
+	const value = `${String(hours24).padStart(2, "0")}:${String(minutes[minuteIndex]).padStart(2, "0")}`;
 
 	return (
 		<View>
@@ -82,7 +86,7 @@ export function BatchTimeWheelPicker({ title, initialValue, onDone, onCancel }: 
 				<View pointerEvents="none" style={styles.selectionBand} />
 				<Wheel items={HOURS.map(String)} index={hourIndex} onChange={setHourIndex} />
 				<Text style={styles.colon}>:</Text>
-				<Wheel items={MINUTE_STEPS.map((m) => String(m).padStart(2, "0"))} index={minuteIndex} onChange={setMinuteIndex} />
+				<Wheel items={minutes.map((m) => String(m).padStart(2, "0"))} index={minuteIndex} onChange={setMinuteIndex} />
 				<Wheel items={PERIODS} index={periodIndex} onChange={setPeriodIndex} />
 			</View>
 

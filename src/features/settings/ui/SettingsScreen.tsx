@@ -15,6 +15,7 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 interface SettingsItem {
 	icon: keyof typeof Ionicons.glyphMap;
@@ -163,7 +164,7 @@ export function SettingsScreen() {
 				},
 				{
 					icon: "star-outline",
-					label: "Amenities (AC, Wi-Fi, Water)",
+					label: "Facilities (AC, Wi-Fi, Newspaper)",
 					onPress: () => router.push("/library-amenities"),
 				},
 			],
@@ -191,17 +192,7 @@ export function SettingsScreen() {
 	return (
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
-				<View style={styles.headerWrapper}>
-					<View style={styles.header}>
-						<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-							<Ionicons name="arrow-back" size={24} color={theme.primary} />
-						</Pressable>
-						<View style={styles.headerText}>
-							<Text style={styles.headerTitle}>Settings</Text>
-							<Text style={styles.headerSubtitle}>Library & account preferences</Text>
-						</View>
-					</View>
-				</View>
+				<ScreenHeader title="Settings" subtitle="Library & account preferences" />
 
 				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 					<View style={styles.profileCenterBlock}>
@@ -296,7 +287,7 @@ export function SettingsScreen() {
 								value={editProfileName}
 								onChangeText={setEditProfileName}
 								autoCapitalize="words"
-								placeholder="e.g. Asha Owner"
+								placeholder="e.g. Suresh Kumar"
 								placeholderTextColor={theme.mutedForeground + "80"}
 							/>
 
@@ -326,43 +317,6 @@ export function SettingsScreen() {
 const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-	},
-	headerWrapper: {
-		paddingTop: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: theme.border,
-		zIndex: 10,
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingBottom: 16,
-		gap: 16,
-	},
-	headerText: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 22,
-		color: theme.primary,
-		marginBottom: 2,
-	},
-	headerSubtitle: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-	},
-	headerActionCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: theme.card,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
 	},
 	scroll: {
 		paddingHorizontal: 20,

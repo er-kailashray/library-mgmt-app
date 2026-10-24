@@ -11,14 +11,17 @@ import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { formatShortDate } from "@/shared/utils/dates";
 import { getInitials } from "@/shared/utils/text";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { FilterChip } from "@/shared/ui/FilterChip";
+import { HeaderIconButton, ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 type MemberFilter = "active" | "due" | "inactive" | "all";
 
 const FILTERS: { key: MemberFilter; label: string }[] = [
     { key: "active", label: "Active" },
-    { key: "due", label: "Dues Pending" },
+    { key: "due", label: "Due" },
     { key: "inactive", label: "Inactive" },
     { key: "all", label: "All" },
 ];
@@ -93,6 +96,7 @@ export function MembersScreen() {
                             {item.phone}
                             {isInactive && item.outstanding_balance > 0 ? ` · ₹${Math.round(item.outstanding_balance).toLocaleString("en-IN")} pending` : ""}
                         </Text>
+                        {!!item.join_date && <Text style={styles.memberMeta}>Joined {formatShortDate(item.join_date, true)}</Text>}
                     </View>
                     <View style={[styles.badge, { backgroundColor: badge.color + "15" }]}>
                         <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
@@ -106,20 +110,12 @@ export function MembersScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Members</Text>
-                        <Text style={styles.headerSubtitle}>
-                            {filterCounts.active} active{filterCounts.inactive > 0 ? ` · ${filterCounts.inactive} inactive` : ""}
-                        </Text>
-                    </View>
-                    <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => Alert.alert("Export", "Member list export coming soon!")}>
-                        <Ionicons name="download-outline" size={22} color={theme.primary} />
-                    </Pressable>
-                </View>
+                {/* Counts live on the filter chips below, so the subtitle says what the screen is for. */}
+                <ScreenHeader
+                    title="Members"
+                    subtitle="Seats, fees and renewals at a glance"
+                    right={<HeaderIconButton icon="download-outline" label="Export members" onPress={() => Alert.alert("Export", "Member list export coming soon!")} />}
+                />
 
                 <View style={styles.searchSection}>
                     <View style={styles.searchBar}>
@@ -134,11 +130,7 @@ export function MembersScreen() {
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
                         {FILTERS.map((f) => (
-                            <Pressable key={f.key} style={[styles.filterChip, filterStatus === f.key && styles.filterChipActive]} onPress={() => setFilterStatus(f.key)}>
-                                <Text style={[styles.filterText, filterStatus === f.key && styles.filterTextActive]}>
-                                    {f.label} ({filterCounts[f.key]})
-                                </Text>
-                            </Pressable>
+                            <FilterChip key={f.key} label={`${f.label} (${filterCounts[f.key]})`} selected={filterStatus === f.key} onPress={() => setFilterStatus(f.key)} />
                         ))}
                     </ScrollView>
                 </View>
@@ -175,43 +167,12 @@ const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 16,
-        gap: 16,
-    },
-    headerActionCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    headerText: {
-        flex: 1,
-    },
-    headerTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-        marginBottom: 2,
-    },
-    headerSubtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
-    },
     searchSection: {
         paddingHorizontal: 20,
         paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
+        paddingTop: 24,
     },
     searchBar: {
         flexDirection: "row",
@@ -233,26 +194,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     filterScroll: {
         gap: 8,
-    },
-    filterChip: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: RADIUS.md,
-        backgroundColor: theme.card,
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    filterChipActive: {
-        backgroundColor: theme.accent,
-        borderColor: theme.accent,
-    },
-    filterText: {
-        fontFamily: "sans-bold",
-        fontSize: 13,
-        color: theme.mutedForeground,
-    },
-    filterTextActive: {
-        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
     },
     listContent: {
         paddingHorizontal: 20,

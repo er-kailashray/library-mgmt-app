@@ -14,6 +14,7 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 function formatRupee(amount: number): string {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
@@ -111,15 +112,7 @@ export function SubscriptionScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={isDark ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                    </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Subscription</Text>
-                        <Text style={styles.headerSubtitle}>Your plan & billing</Text>
-                    </View>
-                </View>
+                <ScreenHeader title="Subscription" subtitle="Your plan & billing" />
 
                 {isLoading && !info ? (
                     <LoadingState />
@@ -242,40 +235,9 @@ const createStyles = (theme: any) =>
         safe: {
             flex: 1,
         },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 16,
-            gap: 16,
-        },
-        headerActionCircle: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: theme.card,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1.5,
-            borderColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        headerTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 20,
-            color: theme.primary,
-        },
-        headerSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 14,
-            color: theme.mutedForeground,
-        },
         scroll: {
             paddingHorizontal: 20,
-            paddingTop: 8,
+            paddingTop: 24,
         },
         statusCard: {
             flexDirection: "row",

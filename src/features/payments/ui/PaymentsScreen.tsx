@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -24,20 +24,61 @@ import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
 import { createPaymentApi, getPaymentsApi } from "@/features/payments/logic/payments-api";
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode } from "@/features/payments/types/payments.types";
-import { remindAllOverdueApi } from "@/features/reminders/logic/reminders-api";
+import { describePaymentPeriod, formatPaymentWhen, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
+import { remindAllOverdueApi, remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { FilterChip } from "@/shared/ui/FilterChip";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { formatShortDate } from "@/shared/utils/dates";
+
+import { MonthPickerSheet } from "./MonthPickerSheet";
+
+
+type Tab = "received" | "due";
+type ReceivedFilter = "all" | "PAID" | "PARTIAL" | "REFUNDED";
+
+const RECEIVED_FILTERS: { key: ReceivedFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "PAID", label: "Paid" },
+    { key: "PARTIAL", label: "Partial" },
+    { key: "REFUNDED", label: "Refunds" },
+];
+
+/** "YYYY-MM" for the current month. */
+function currentMonth(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "YYYY-MM" shifted by whole months. */
+function shiftMonth(month: string, delta: number): string {
+    const [y, m] = month.split("-").map(Number);
+    const date = new Date(y, m - 1 + delta, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "October 2026" from "YYYY-MM". */
+function formatMonth(month: string, short = false): string {
+    return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: short ? "short" : "long", year: "numeric" });
+}
 
 export function PaymentsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
     const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const params = useLocalSearchParams<{ tab?: string }>();
+    // Two views: money that came in (by month), and who owes money now.
+    const [tab, setTab] = useState<Tab>(params.tab === "due" ? "due" : "received");
+    const [month, setMonth] = useState(currentMonth());
+    const [isMonthPickerVisible, setMonthPickerVisible] = useState(false);
+    const [receivedFilter, setReceivedFilter] = useState<ReceivedFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "pending">("all");
+    const [remindingId, setRemindingId] = useState<string | null>(null);
 
     const { data, isLoading, error, refetch: fetchPayments } = useApiData(getPaymentsApi, []);
     const payments = data ?? [];
@@ -71,14 +112,37 @@ export function PaymentsScreen() {
         }
     }, []);
 
-    const totalCollection = payments.reduce((sum, p) => (p.status === "PAID" ? sum + p.amount : sum), 0);
-    const pendingAmount = payments.reduce((sum, p) => (p.status === "PENDING" ? sum + p.amount : sum), 0);
+    // The API returns money received (payments, partial payments, refunds) and current dues (PENDING) together.
+    const { received, dues } = useMemo(
+        () => ({ received: payments.filter((p) => p.status !== "PENDING"), dues: payments.filter((p) => p.status === "PENDING") }),
+        [payments]
+    );
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = (p: Payment) => !query || p.member_name.toLowerCase().includes(query);
 
-    const filteredPayments = payments.filter((p) => {
-        const matchesSearch = p.member_name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = filterStatus === "all" || p.status.toLowerCase() === filterStatus;
-        return matchesSearch && matchesStatus;
-    });
+    const monthReceived = received.filter((p) => p.date.startsWith(month));
+    // Net of refunds, which are stored as negative amounts - the same figure Home shows for the month.
+    const collectedInMonth = monthReceived.reduce((sum, p) => sum + p.amount, 0);
+    const dueTotal = dues.reduce((sum, p) => sum + p.amount, 0);
+
+    const visibleReceived = monthReceived.filter((p) => matchesSearch(p) && (receivedFilter === "all" || p.status === receivedFilter));
+    const visibleDues = dues.filter(matchesSearch);
+    const isCurrentMonth = month === currentMonth();
+
+    // Collecting happens on the member's page, where the payment sheet shows the period it covers.
+    const openCollect = (item: Payment) => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id), collect: "1" } });
+
+    const handleRemind = async (item: Payment) => {
+        try {
+            setRemindingId(item.id);
+            await remindMemberApi(item.member_id);
+            Alert.alert("Sent", `An SMS reminder was sent to ${item.member_name}.`);
+        } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to send reminder.");
+        } finally {
+            setRemindingId(null);
+        }
+    };
 
     const handleMarkPayment = useCallback(async () => {
         if (!selectedMember || !amount) {
@@ -123,12 +187,14 @@ export function PaymentsScreen() {
 
     const renderPaymentItem = ({ item }: { item: Payment }) => {
         const hasLeft = item.member_status === "inactive";
+        const look = PAYMENT_STATUS_LOOK[item.status] ?? PAYMENT_STATUS_LOOK.PENDING;
+        const color = look.color(theme);
         return (
             <Pressable
                 style={[styles.paymentCard, hasLeft && styles.paymentCardFaded]}
                 onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
-                <View style={[styles.paymentIconBox, { backgroundColor: item.status === "PAID" ? theme.success + "15" : theme.accent + "15" }]}>
-                    <Ionicons name={item.status === "PAID" ? "checkmark-circle" : "time"} size={24} color={item.status === "PAID" ? theme.success : theme.accent} />
+                <View style={[styles.paymentIconBox, { backgroundColor: color + "15" }]}>
+                    <Ionicons name={look.icon} size={24} color={color} />
                 </View>
                 <View style={styles.paymentInfo}>
                     <View style={styles.paymentNameRow}>
@@ -139,18 +205,60 @@ export function PaymentsScreen() {
                             </View>
                         )}
                     </View>
-                    <Text style={styles.paymentDate}>{item.date}</Text>
+                    {/* When and how it was paid */}
+                    <View style={styles.paymentWhenRow}>
+                        <Text style={styles.paymentDate}>{formatPaymentWhen(item)}</Text>
+                        {!!item.method && (
+                            <View style={styles.methodChip}>
+                                <Text style={styles.methodChipText}>{item.method}</Text>
+                            </View>
+                        )}
+                    </View>
+                    {/* What it was for: the days it covers (or, for a refund, gives back) */}
+                    {!!describePaymentPeriod(item) && <Text style={styles.paymentFor}>{describePaymentPeriod(item)}</Text>}
                 </View>
                 <View style={styles.paymentAmountBlock}>
-                    <Text style={[styles.paymentAmount, { color: item.status === "PAID" ? theme.success : theme.accent }]}>
-                        {item.status === "PAID" ? "+" : ""}
-                        ₹{item.amount}
+                    <Text style={[styles.paymentAmount, { color }]}>
+                        {look.sign}₹{Math.abs(item.amount).toLocaleString("en-IN")}
                     </Text>
-                    <Text style={styles.paymentStatus}>{item.status}</Text>
+                    <Text style={styles.paymentStatus}>{look.label}</Text>
                 </View>
             </Pressable>
         );
     };
+
+    const renderDueItem = ({ item }: { item: Payment }) => (
+        <View style={[styles.paymentCard, styles.dueCard]}>
+            <Pressable style={styles.dueMain} onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
+                <View style={[styles.paymentIconBox, { backgroundColor: theme.destructive + "15" }]}>
+                    <Ionicons name="time" size={24} color={theme.destructive} />
+                </View>
+                <View style={styles.paymentInfo}>
+                    <Text style={styles.paymentName} numberOfLines={1}>
+                        {item.member_name}
+                    </Text>
+                    <Text style={styles.paymentDate}>Due since {formatShortDate(item.date, true)}</Text>
+                </View>
+                <Text style={[styles.paymentAmount, { color: theme.destructive }]}>₹{item.amount.toLocaleString("en-IN")}</Text>
+            </Pressable>
+            <View style={styles.dueActions}>
+                <Pressable accessibilityRole="button" style={styles.dueActionSecondary} onPress={() => handleRemind(item)} disabled={remindingId === item.id}>
+                    {remindingId === item.id ? (
+                        <ActivityIndicator size="small" color={theme.primary} />
+                    ) : (
+                        <>
+                            <Ionicons name="chatbox-ellipses-outline" size={15} color={theme.primary} />
+                            <Text style={styles.dueActionSecondaryText}>Remind</Text>
+                        </>
+                    )}
+                </Pressable>
+                <Pressable accessibilityRole="button" style={styles.dueActionPrimary} onPress={() => openCollect(item)}>
+                    <Ionicons name="wallet-outline" size={15} color="#fff" />
+                    <Text style={styles.dueActionPrimaryText}>Collect</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
 
     if (showPaymentForm) {
         return (
@@ -159,15 +267,7 @@ export function PaymentsScreen() {
                     <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
-                            <View style={styles.header}>
-                                <Pressable style={styles.headerActionCircle} onPress={() => setShowPaymentForm(false)}>
-                                    <Ionicons name="close" size={24} color={theme.primary} />
-                                </Pressable>
-                                <View style={styles.headerText}>
-                                    <Text style={styles.headerTitle}>Mark Payment</Text>
-                                    <Text style={styles.headerSubtitle}>Record a student payment</Text>
-                                </View>
-                            </View>
+                            <ScreenHeader title="Mark Payment" subtitle="Record a student payment" onBack={() => setShowPaymentForm(false)} />
 
                             <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
                                 <View style={styles.formGroup}>
@@ -197,7 +297,7 @@ export function PaymentsScreen() {
 
                                 <View style={styles.formGroup}>
                                     <Text style={styles.label}>Notes (Optional)</Text>
-                                    <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. Cash payment for April" placeholderTextColor={theme.mutedForeground + "80"} multiline numberOfLines={4} value={notes} onChangeText={setNotes} />
+                                    <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. Partial payment, rest next week" placeholderTextColor={theme.mutedForeground + "80"} multiline numberOfLines={4} value={notes} onChangeText={setNotes} />
                                 </View>
 
                                 <Pressable style={[styles.primaryButton, isSubmitting && { opacity: 0.7 }]} onPress={handleMarkPayment} disabled={isSubmitting}>
@@ -239,65 +339,145 @@ export function PaymentsScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.header}>
-                    <Pressable style={styles.headerActionCircle} onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.primary} />
+                <ScreenHeader title="Payments" subtitle="Revenue & collections" />
+
+                {/* The two cards are the tabs: each shows its total and switches the list below. */}
+                <View style={styles.summaryRow} accessibilityRole="tablist">
+                    <Pressable
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: tab === "received" }}
+                        style={[styles.summaryCard, tab === "received" && styles.summaryCardActive]}
+                        onPress={() => setTab("received")}>
+                        <Text style={[styles.summaryLabel, tab === "received" && styles.summaryLabelActive]}>Received · {formatMonth(month, true)}</Text>
+                        <Text style={[styles.summaryValue, { color: theme.success }]}>₹{collectedInMonth.toLocaleString("en-IN")}</Text>
                     </Pressable>
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Payments</Text>
-                        <Text style={styles.headerSubtitle}>Revenue & collections</Text>
-                    </View>
+                    <Pressable
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: tab === "due" }}
+                        style={[styles.summaryCard, tab === "due" && styles.summaryCardActive]}
+                        onPress={() => setTab("due")}>
+                        <Text style={[styles.summaryLabel, tab === "due" && styles.summaryLabelActive]}>Due now</Text>
+                        <Text style={[styles.summaryValue, { color: dueTotal > 0 ? theme.destructive : theme.primary }]}>₹{dueTotal.toLocaleString("en-IN")}</Text>
+                        <Text style={styles.summarySub}>
+                            {dues.length} {dues.length === 1 ? "person" : "people"}
+                        </Text>
+                    </Pressable>
                 </View>
 
-                <View style={styles.summaryRow}>
-                    <View style={styles.summaryCard}>
-                        <Text style={styles.summaryLabel}>Total Collected</Text>
-                        <Text style={[styles.summaryValue, { color: theme.accent }]}>₹{totalCollection.toLocaleString("en-IN")}</Text>
-                    </View>
-                    <View style={styles.summaryCard}>
-                        <Text style={styles.summaryLabel}>Pending</Text>
-                        <Text style={[styles.summaryValue, { color: theme.primary }]}>₹{pendingAmount.toLocaleString("en-IN")}</Text>
-                    </View>
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={18} color={theme.mutedForeground} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search by member name"
+                        placeholderTextColor={theme.mutedForeground + "80"}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    {!!searchQuery && (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearchQuery("")} hitSlop={8}>
+                            <Ionicons name="close-circle" size={18} color={theme.mutedForeground} />
+                        </Pressable>
+                    )}
                 </View>
 
-                {pendingAmount > 0 && (
-                    <Pressable style={[styles.remindAllBtn, isSendingBulkReminder && { opacity: 0.7 }]} onPress={handleRemindAllDue} disabled={isSendingBulkReminder}>
-                        {isSendingBulkReminder ? (
-                            <ActivityIndicator color={theme.accent} size="small" />
+                {tab === "received" ? (
+                    <>
+                        {/* Older payments: step back a month, or tap the month to jump to any month. */}
+                        <View style={styles.monthRow}>
+                            <Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => setMonth((m) => shiftMonth(m, -1))} hitSlop={8} style={styles.monthArrow}>
+                                <Ionicons name="chevron-back" size={20} color={theme.primary} />
+                            </Pressable>
+                            <Pressable accessibilityRole="button" accessibilityLabel="Pick a month" onPress={() => setMonthPickerVisible(true)} style={styles.monthLabelButton}>
+                                <Ionicons name="calendar-outline" size={16} color={theme.accent} />
+                                <Text style={styles.monthLabel}>{formatMonth(month)}</Text>
+                                <Ionicons name="chevron-down" size={14} color={theme.mutedForeground} />
+                            </Pressable>
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel="Next month"
+                                disabled={isCurrentMonth}
+                                onPress={() => setMonth((m) => shiftMonth(m, 1))}
+                                hitSlop={8}
+                                style={[styles.monthArrow, isCurrentMonth && { opacity: 0.25 }]}>
+                                <Ionicons name="chevron-forward" size={20} color={theme.primary} />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
+                            {RECEIVED_FILTERS.map((f) => (
+                                <FilterChip key={f.key} label={f.label} selected={receivedFilter === f.key} onPress={() => setReceivedFilter(f.key)} />
+                            ))}
+                        </ScrollView>
+
+                        {isLoading ? (
+                            <LoadingState />
+                        ) : error ? (
+                            <ErrorState message={error} onRetry={fetchPayments} />
+                        ) : visibleReceived.length === 0 ? (
+                            <EmptyState
+                                icon="cash-outline"
+                                title={monthReceived.length === 0 ? `Nothing received in ${formatMonth(month)}` : "No payments match"}
+                                subtitle={monthReceived.length === 0 ? "Use the arrows or tap the month to see other months." : "Try a different name or filter."}
+                            />
                         ) : (
-                            <>
-                                <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
-                                <Text style={styles.remindAllBtnText}>Remind everyone who&apos;s due (SMS)</Text>
-                            </>
+                            <FlatList
+                                style={styles.list}
+                                data={visibleReceived}
+                                renderItem={renderPaymentItem}
+                                keyExtractor={(item) => item.id}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                                showsVerticalScrollIndicator={false}
+                            />
                         )}
-                    </Pressable>
-                )}
-
-                <View style={styles.listHeader}>
-                    <Text style={styles.listTitle}>Recent Transactions</Text>
-                    <View style={styles.filterRow}>
-                        <Pressable onPress={() => setFilterStatus("all")} style={[styles.filterBtn, filterStatus === "all" && { backgroundColor: theme.accent }]}>
-                            <Text style={[styles.filterBtnText, filterStatus === "all" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>All</Text>
-                        </Pressable>
-                        <Pressable onPress={() => setFilterStatus("paid")} style={[styles.filterBtn, filterStatus === "paid" && { backgroundColor: theme.accent }]}>
-                            <Text style={[styles.filterBtnText, filterStatus === "paid" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>Paid</Text>
-                        </Pressable>
-                    </View>
-                </View>
-
-                {isLoading ? (
-                    <LoadingState />
-                ) : error ? (
-                    <ErrorState message={error} onRetry={fetchPayments} />
-                ) : filteredPayments.length === 0 ? (
-                    payments.length === 0 ? (
-                        <EmptyState icon="cash-outline" title="No payments recorded yet" subtitle="Payments you record will show up here." />
-                    ) : (
-                        <EmptyState icon="search-outline" title="No transactions found" subtitle="Try adjusting your search or filters." />
-                    )
+                    </>
                 ) : (
-                    <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} />
+                    <>
+                        {dues.length > 0 && (
+                            <Pressable style={[styles.remindAllBtn, isSendingBulkReminder && { opacity: 0.7 }]} onPress={handleRemindAllDue} disabled={isSendingBulkReminder}>
+                                {isSendingBulkReminder ? (
+                                    <ActivityIndicator color={theme.accent} size="small" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
+                                        <Text style={styles.remindAllBtnText}>Remind everyone who&apos;s due (SMS)</Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        )}
+
+                        {isLoading ? (
+                            <LoadingState />
+                        ) : error ? (
+                            <ErrorState message={error} onRetry={fetchPayments} />
+                        ) : visibleDues.length === 0 ? (
+                            <EmptyState
+                                icon="checkmark-done-outline"
+                                title={dues.length === 0 ? "Nobody owes anything" : "No one matches"}
+                                subtitle={dues.length === 0 ? "Everyone is paid up." : "Try a different name."}
+                            />
+                        ) : (
+                            <FlatList
+                                style={styles.list}
+                                data={visibleDues}
+                                renderItem={renderDueItem}
+                                keyExtractor={(item) => item.id}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                                showsVerticalScrollIndicator={false}
+                            />
+                        )}
+                    </>
                 )}
+
+                <MonthPickerSheet
+                    visible={isMonthPickerVisible}
+                    value={month}
+                    maxMonth={currentMonth()}
+                    onPick={(picked) => {
+                        setMonth(picked);
+                        setMonthPickerVisible(false);
+                    }}
+                    onClose={() => setMonthPickerVisible(false)}
+                />
 
                 <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
                     <Ionicons name="add" size={32} color={theme.background} />
@@ -314,42 +494,12 @@ const createStyles = (theme: any) => StyleSheet.create({
     flex: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 20,
-        gap: 16,
-    },
-    headerActionCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    headerText: {
-        flex: 1,
-    },
-    headerTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-    },
-    headerSubtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
-    },
     summaryRow: {
         flexDirection: "row",
         paddingHorizontal: 20,
         gap: 12,
         marginBottom: 24,
+        paddingTop: 24,
     },
     summaryCard: {
         flex: 1,
@@ -390,34 +540,123 @@ const createStyles = (theme: any) => StyleSheet.create({
         fontSize: 13,
         color: theme.accent,
     },
-    listHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        marginBottom: 16,
+    summaryCardActive: {
+        borderColor: theme.accent,
+        backgroundColor: theme.accent + "12",
     },
-    listTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 18,
-        color: theme.primary,
+    summaryLabelActive: {
+        color: theme.accent,
     },
-    filterRow: {
-        flexDirection: "row",
-        gap: 8,
-    },
-    filterBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: RADIUS.sm,
-        backgroundColor: theme.card,
-        borderWidth: 1,
-        borderColor: theme.border,
-    },
-    filterBtnText: {
-        fontFamily: "sans-bold",
+    summarySub: {
+        fontFamily: "sans-medium",
         fontSize: 12,
         color: theme.mutedForeground,
+        marginTop: 2,
+    },
+    searchBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        marginHorizontal: 20,
+        marginBottom: 12,
+        paddingHorizontal: 14,
+        backgroundColor: theme.card,
+        borderRadius: RADIUS.md,
+        borderWidth: 1.5,
+        borderColor: theme.border,
+    },
+    searchInput: {
+        flex: 1,
+        fontFamily: "sans-medium",
+        fontSize: 15,
+        color: theme.primary,
+        paddingVertical: 12,
+    },
+    monthRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginHorizontal: 20,
+        marginBottom: 10,
+    },
+    monthArrow: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    monthLabelButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: RADIUS.md,
+    },
+    monthLabel: {
+        fontFamily: "sans-extrabold",
+        fontSize: 16,
+        color: theme.primary,
+    },
+    // ScrollViews grow and shrink by default; without this the list below squeezes the chips to nothing.
+    chipScroll: {
+        flexGrow: 0,
+        flexShrink: 0,
+        marginBottom: 12,
+    },
+    list: {
+        flex: 1,
+    },
+    chipRow: {
+        paddingHorizontal: 20,
+        gap: 8,
+    },
+    // Name and amount on top, Remind / Collect underneath.
+    dueCard: {
+        flexDirection: "column",
+        alignItems: "stretch",
+    },
+    dueMain: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    dueActions: {
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 12,
+    },
+    dueActionSecondary: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: RADIUS.sm,
+        borderWidth: 1.5,
+        borderColor: theme.border,
+    },
+    dueActionSecondaryText: {
+        fontFamily: "sans-bold",
+        fontSize: 13,
+        color: theme.primary,
+    },
+    dueActionPrimary: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: RADIUS.sm,
+        backgroundColor: theme.accent,
+    },
+    dueActionPrimaryText: {
+        fontFamily: "sans-bold",
+        fontSize: 13,
+        color: "#fff",
     },
     listContent: {
         paddingHorizontal: 20,
@@ -470,6 +709,30 @@ const createStyles = (theme: any) => StyleSheet.create({
         letterSpacing: 0.5,
         color: theme.mutedForeground,
     },
+    paymentWhenRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 2,
+    },
+    methodChip: {
+        backgroundColor: theme.muted,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    methodChipText: {
+        fontFamily: "sans-bold",
+        fontSize: 11,
+        color: theme.primary,
+    },
+    paymentFor: {
+        fontFamily: "sans-medium",
+        fontSize: 12,
+        lineHeight: 16,
+        color: theme.mutedForeground,
+        marginTop: 3,
+    },
     paymentDate: {
         fontFamily: "sans-medium",
         fontSize: 12,
@@ -493,6 +756,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     formScroll: {
         paddingHorizontal: 20,
         paddingBottom: 40,
+        paddingTop: 24,
     },
     formGroup: {
         marginBottom: 20,

@@ -12,6 +12,8 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { FilterChip } from "@/shared/ui/FilterChip";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const COLUMNS = 6;
 const SECTION_SIZE = 20;
@@ -201,17 +203,11 @@ export function SeatsScreen() {
                 {/* 2. FILTER CHIPS */}
                 <View style={styles.filterSection}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-                        <Pressable
-                            style={[styles.filterChip, selectedBatchIds.length === 0 && styles.filterChipSelected]}
-                            onPress={() => setSelectedBatchIds([])}>
-                            <Text style={[styles.filterChipText, selectedBatchIds.length === 0 && styles.filterChipTextSelected]}>All</Text>
-                        </Pressable>
+                        <FilterChip label="All" selected={selectedBatchIds.length === 0} onPress={() => setSelectedBatchIds([])} />
                         {batchesFilter.map((b) => {
                             const isSelected = selectedBatchIds.includes(b.id);
                             return (
-                                <Pressable key={b.id} style={[styles.filterChip, isSelected && styles.filterChipSelected]} onPress={() => toggleBatch(b.id)}>
-                                    <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>{b.name}</Text>
-                                </Pressable>
+                                <FilterChip key={b.id} label={b.name} selected={isSelected} onPress={() => toggleBatch(b.id)} />
                             );
                         })}
                     </ScrollView>
@@ -243,17 +239,7 @@ export function SeatsScreen() {
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
                 <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <View style={styles.headerWrapper}>
-                    <View style={styles.header}>
-                        <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                            <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                        </Pressable>
-                        <View style={styles.headerText}>
-                            <Text style={styles.headerTitle}>Seat Management</Text>
-                            <Text style={styles.headerSubtitle}>Check availability across batches</Text>
-                        </View>
-                    </View>
-                </View>
+                <ScreenHeader title="Seats" subtitle="Check availability across batches" />
 
                 {isLoading ? (
                     <LoadingState />
@@ -332,45 +318,8 @@ const createStyles = (theme: any, seatChipSize: number) =>
         safe: {
             flex: 1,
         },
-        headerWrapper: {
-            paddingTop: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.border,
-            zIndex: 10,
-        },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingBottom: 16,
-            gap: 16,
-        },
-        headerText: {
-            flex: 1,
-        },
-        headerTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 22,
-            color: theme.primary,
-            marginBottom: 2,
-        },
-        headerSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 14,
-            color: theme.mutedForeground,
-        },
-        headerActionCircle: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: theme.card,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1.5,
-            borderColor: theme.border,
-        },
         listContent: {
-            paddingTop: 16,
+            paddingTop: 24,
             paddingBottom: 40,
         },
         filterSection: {
@@ -380,26 +329,6 @@ const createStyles = (theme: any, seatChipSize: number) =>
             paddingHorizontal: 20,
             gap: 8,
             paddingBottom: 8,
-        },
-        filterChip: {
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            backgroundColor: theme.card,
-            borderRadius: RADIUS.sm,
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        filterChipSelected: {
-            backgroundColor: theme.primary,
-            borderColor: theme.primary,
-        },
-        filterChipText: {
-            fontFamily: "sans-bold",
-            fontSize: 14,
-            color: theme.primary,
-        },
-        filterChipTextSelected: {
-            color: theme.background,
         },
         searchRow: {
             flexDirection: "row",
@@ -509,7 +438,7 @@ const createStyles = (theme: any, seatChipSize: number) =>
             padding: 20,
             marginHorizontal: 20,
             marginBottom: 16,
-            borderWidth: 1,
+            borderWidth: 1.5,
             borderColor: theme.border,
         },
         summaryTop: {

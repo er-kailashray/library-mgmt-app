@@ -6,19 +6,9 @@ export async function createAdmissionApi(payload: CreateAdmissionRequest): Promi
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");
 
-    const response = await apiPost<{ data: { id: number } }>(
-        "/api/admission",
-        {
-            name: payload.name,
-            phone: payload.phone,
-            gender: payload.gender,
-            allocations: payload.allocations,
-            payment: payload.payment,
-            previous_dues_paid: payload.previous_dues_paid,
-            previous_dues_mode: payload.previous_dues_mode,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-    );
+    // Send the whole request: a hand-picked list here once silently dropped new fields
+    // (address, joining date, "paid till").
+    const response = await apiPost<{ data: { id: number } }>("/api/admission", payload, { headers: { Authorization: `Bearer ${token}` } });
 
     return { memberId: response.data.id };
 }

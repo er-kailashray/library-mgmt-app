@@ -2,21 +2,27 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
 import { getDashboardApi, getMonthlyCollectionApi } from "@/features/home/logic/home-api";
+import { getSetupCelebrationState, setSetupCelebrationState, type SetupCelebrationState } from "@/features/home/logic/setup-celebration-storage";
 import { DashboardData, MonthlyCollection } from "@/features/home/types/home.types";
+import { describePaymentPeriod, formatPaymentWhen, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { SubscriptionBanner } from "@/features/subscription/ui/SubscriptionBanner";
 import { RADIUS } from "@/shared/constants/layout";
+import type { Theme } from "@/shared/constants/theme";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+
+import { CelebrationBurst } from "./CelebrationBurst";
+import { LiveBatchCard } from "./LiveBatchCard";
 
 type MenuItem = {
 	key: string;
@@ -45,6 +51,8 @@ const MORE_MENU = MENU.filter((item) => !QUICK_ACCESS_KEYS.includes(item.key));
 type SetupStep = {
 	key: string;
 	label: string;
+	/** Shown on the "You're all set" card once the step is done. */
+	doneLabel: string;
 	hint: string;
 	icon: keyof typeof Ionicons.glyphMap;
 	done: boolean;
@@ -106,6 +114,120 @@ function PanelLink({ label, onPress, styles, theme }: { label: string; onPress: 
 			<Text style={styles.panelLinkText}>{label}</Text>
 			<Ionicons name="arrow-forward" size={14} color={theme.accent} />
 		</Pressable>
+	);
+}
+
+/** How long the congratulations card stays before giving way to "Add your first member". */
+const CELEBRATION_VISIBLE_MS = 6000;
+
+/** Fades its content in when it first appears. */
+function FadeIn({ children }: { children: React.ReactNode }) {
+	const value = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		Animated.timing(value, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+	}, [value]);
+
+	return <Animated.View style={{ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>{children}</Animated.View>;
+}
+
+/** Replaces the setup card once every step is done, then fades away on its own. */
+function SetupCompleteCard({ steps, onDismiss, styles, theme }: { steps: SetupStep[]; onDismiss: () => void; styles: HomeStyles; theme: Theme }) {
+	const appear = useRef(new Animated.Value(0)).current;
+	const leaving = useRef(false);
+
+	// Fade and shrink away, then hand over to the "Add your first member" card.
+	const leave = useCallback(() => {
+		if (leaving.current) return;
+		leaving.current = true;
+		Animated.timing(appear, { toValue: 0, duration: 380, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => onDismiss());
+	}, [appear, onDismiss]);
+
+	useEffect(() => {
+		const timer = setTimeout(leave, CELEBRATION_VISIBLE_MS);
+		return () => clearTimeout(timer);
+	}, [leave]);
+	const bloom = useRef(new Animated.Value(0)).current;
+	const wobble = useRef(new Animated.Value(0)).current;
+	const stepIn = useRef(steps.map(() => new Animated.Value(0))).current;
+
+	// Card settles in, then the flower blooms and wobbles, then the finished steps tick in one by one.
+	useEffect(() => {
+		Animated.sequence([
+			Animated.spring(appear, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }),
+			Animated.parallel([
+				Animated.spring(bloom, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }),
+				Animated.sequence(
+					[1, -1, 0.6, -0.6, 0].map((toValue) => Animated.timing(wobble, { toValue, duration: 110, easing: Easing.inOut(Easing.quad), useNativeDriver: true }))
+				),
+			]),
+			Animated.stagger(
+				120,
+				stepIn.map((value) => Animated.timing(value, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }))
+			),
+		]).start();
+	}, [appear, bloom, wobble, stepIn]);
+
+	return (
+		<Animated.View
+			style={[
+				styles.celebrationCard,
+				{ opacity: appear, transform: [{ scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }] },
+			]}>
+			<LinearGradient
+				pointerEvents="none"
+				colors={[theme.accent + "2E", theme.subscription + "1F", theme.card]}
+				locations={[0, 0.55, 1]}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+				style={StyleSheet.absoluteFill}
+			/>
+			<Pressable accessibilityRole="button" accessibilityLabel="Dismiss" style={styles.celebrationClose} onPress={leave} hitSlop={10}>
+				<Ionicons name="close" size={18} color={theme.mutedForeground} />
+			</Pressable>
+
+			<View style={styles.celebrationFlowerArea}>
+				{/* Small blossoms around the main flower. */}
+				<Ionicons name="flower" size={16} color={theme.subscription} style={[styles.celebrationPetal, { top: 4, left: 6 }]} />
+				<Ionicons name="flower" size={12} color="#F59E0B" style={[styles.celebrationPetal, { top: 0, right: 10 }]} />
+				<Ionicons name="flower" size={14} color="#F472B6" style={[styles.celebrationPetal, { bottom: 2, right: 0 }]} />
+				<Animated.View
+					style={[
+						styles.celebrationFlowerWrap,
+						{
+							transform: [
+								{ scale: bloom },
+								{ rotate: wobble.interpolate({ inputRange: [-1, 1], outputRange: ["-14deg", "14deg"] }) },
+							],
+						},
+					]}>
+					<Ionicons name="flower" size={44} color={theme.accent} />
+				</Animated.View>
+			</View>
+
+			<Text style={styles.celebrationTitle}>Congratulations!</Text>
+			<Text style={styles.celebrationSubtitle}>Your library is ready to use</Text>
+			<Text style={styles.celebrationCopy}>Next, add your first member. Seats, collections and dues will show up here as members join and pay.</Text>
+
+			<View style={styles.celebrationSteps}>
+				{steps.map((step, i) => (
+					<Animated.View
+						key={step.key}
+						style={[
+							styles.celebrationStep,
+							{ opacity: stepIn[i], transform: [{ translateX: stepIn[i].interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }] },
+						]}>
+						<Ionicons name="checkmark-circle" size={18} color={theme.success} />
+						<Text style={styles.celebrationStepText}>{step.doneLabel}</Text>
+					</Animated.View>
+				))}
+			</View>
+
+			<Pressable accessibilityRole="button" style={({ pressed }) => [styles.celebrationBtn, pressed && { opacity: 0.85 }]} onPress={leave}>
+				<Text style={styles.celebrationBtnText}>Let's go</Text>
+				<Ionicons name="arrow-forward" size={16} color="#fff" />
+			</Pressable>
+		</Animated.View>
 	);
 }
 
@@ -188,6 +310,7 @@ export function HomeScreen() {
 					{
 						key: "batches",
 						label: "Set up your batches",
+						doneLabel: "Batches set up",
 						hint: "Add your daily time slots, then assign seats",
 						icon: "calendar-outline",
 						done: batches.length > 0,
@@ -197,6 +320,7 @@ export function HomeScreen() {
 					{
 						key: "location",
 						label: "Pin library on map",
+						doneLabel: "Library pinned on the map",
 						hint: "So students can get directions",
 						icon: "location-outline",
 						done: !!dashboard.library_address,
@@ -205,6 +329,7 @@ export function HomeScreen() {
 					{
 						key: "photo",
 						label: "Add profile photo",
+						doneLabel: "Profile photo added",
 						hint: "Shown to your students",
 						icon: "camera-outline",
 						done: !!dashboard.owner_photo,
@@ -214,12 +339,37 @@ export function HomeScreen() {
 				]
 			: [];
 	const completedSteps = setupSteps.filter((step) => step.done).length;
+	// The one step to do next gets "Start here"; other unfinished required steps say "Required".
+	const nextStepKey = setupSteps.find((step) => step.required && !step.done)?.key;
 	const showSetupCard = setupSteps.length > 0 && completedSteps < setupSteps.length;
+	const allStepsDone = setupSteps.length > 0 && completedSteps === setupSteps.length;
 
-	// Which of the three summary tiles is expanded below the grid. Until the owner picks one,
-	// show dues if anyone owes money, otherwise collections.
-	const [pickedStat, setPickedStat] = useState<StatKey | null>(null);
-	const selectedStat: StatKey = pickedStat ?? (dashboard && dashboard.due_members_count > 0 ? "dues" : "collections");
+	// undefined until read from storage. The congratulations card only follows a setup card the
+	// owner actually saw unfinished, so libraries set up before this existed don't get it.
+	const [celebration, setCelebration] = useState<SetupCelebrationState | null | undefined>(undefined);
+
+	useEffect(() => {
+		void getSetupCelebrationState().then(setCelebration);
+	}, []);
+
+	useEffect(() => {
+		if (showSetupCard && celebration !== undefined && celebration !== "pending") {
+			setCelebration("pending");
+			void setSetupCelebrationState("pending");
+		}
+	}, [showSetupCard, celebration]);
+
+	const showSetupComplete = allStepsDone && celebration === "pending";
+	const showFirstMemberCard = isNewLibrary && hasBatches && !showSetupCard && !showSetupComplete && celebration !== undefined;
+
+	const dismissSetupComplete = useCallback(() => {
+		setCelebration("done");
+		void setSetupCelebrationState("done");
+	}, []);
+
+	// Which summary tile is opened below the grid. None at first, so Home opens calm; tap a tile to
+	// open its detail, tap it again to close it.
+	const [selectedStat, setSelectedStat] = useState<StatKey | null>(null);
 	const busiestBatch = dashboard?.batch_occupancy.reduce<DashboardData["batch_occupancy"][number] | null>(
 		(best, batch) => (!best || batch.occupied / Math.max(1, batch.total) > best.occupied / Math.max(1, best.total) ? batch : best),
 		null
@@ -318,7 +468,7 @@ export function HomeScreen() {
 							</View>
 
 							{setupSteps.map((step, index) => {
-								const highlight = step.required && !step.done;
+								const highlight = step.key === nextStepKey;
 								return (
 									<Pressable
 										key={step.key}
@@ -334,7 +484,7 @@ export function HomeScreen() {
 											<View style={styles.setupLabelRow}>
 												<Text style={styles.setupRowLabel}>{step.label}</Text>
 												{!step.done && (
-													<Text style={[styles.setupTag, highlight ? styles.setupTagRequired : styles.setupTagOptional]}>{step.required ? "Start here" : "Optional"}</Text>
+													<Text style={[styles.setupTag, highlight ? styles.setupTagRequired : styles.setupTagOptional]}>{highlight ? "Start here" : step.required ? "Required" : "Optional"}</Text>
 												)}
 											</View>
 											<Text style={styles.setupRowHint}>{step.hint}</Text>
@@ -350,6 +500,27 @@ export function HomeScreen() {
 								);
 							})}
 						</View>
+					)}
+
+					{showSetupComplete && <SetupCompleteCard steps={setupSteps} onDismiss={dismissSetupComplete} styles={styles} theme={theme} />}
+
+					{/* Comes after setup and its congratulations; members need a batch to sit in. */}
+					{showFirstMemberCard && (
+						<FadeIn>
+							<View style={styles.firstMemberCard}>
+								<View style={styles.firstMemberIconWrap}>
+									<Ionicons name="person-add-outline" size={26} color={theme.accent} />
+								</View>
+								<Text style={styles.firstMemberTitle}>Add your first member</Text>
+								<Text style={styles.firstMemberCopy}>
+									Admit a student, give them a seat and record their first payment. Your seats, collections and dues will show up here.
+								</Text>
+								<Pressable accessibilityRole="button" style={styles.firstMemberCta} onPress={() => router.push("/admission")}>
+									<Ionicons name="add" size={18} color="#fff" />
+									<Text style={styles.firstMemberCtaText}>Add member</Text>
+								</Pressable>
+							</View>
+						</FadeIn>
 					)}
 
 					{/* Two rows of one-tap actions, shown once batches exist. Before that the setup card is the
@@ -374,49 +545,14 @@ export function HomeScreen() {
 						</View>
 					))}
 
-					{/* Members need a batch, so this only appears once the setup card's first step is done. */}
-					{isNewLibrary && hasBatches && (
-						<View style={styles.firstMemberCard}>
-							<View style={styles.firstMemberIconWrap}>
-								<Ionicons name="person-add-outline" size={26} color={theme.accent} />
-							</View>
-							<Text style={styles.firstMemberTitle}>Add your first member</Text>
-							<Text style={styles.firstMemberCopy}>
-								Admit a student, give them a seat and record their first payment. Your seats, collections and dues will show up here.
-							</Text>
-							<Pressable accessibilityRole="button" style={styles.firstMemberCta} onPress={() => router.push("/admission")}>
-								<Ionicons name="add" size={18} color="#fff" />
-								<Text style={styles.firstMemberCtaText}>Add member</Text>
-							</Pressable>
-						</View>
-					)}
-
-					{batchNow && !isNewLibrary && (
-						<View style={[styles.nowPill, { backgroundColor: (batchNow.current ? theme.success : theme.mutedForeground) + "18" }]}>
-							<View style={[styles.nowDot, { backgroundColor: batchNow.current ? theme.success : theme.mutedForeground }]} />
-							<Text style={styles.nowText} numberOfLines={1}>
-								{batchNow.current ? (
-									<>
-										<Text style={[styles.nowStrong, { color: theme.success }]}>{batchNow.current.name}</Text> is on · {formatTime(batchNow.current.start_time)} – {formatTime(batchNow.current.end_time)}
-									</>
-								) : (
-									<>
-										No batch running
-										{batchNow.next ? (
-											<>
-												{" · next "}
-												<Text style={styles.nowStrong}>{batchNow.next.name}</Text> at {formatTime(batchNow.next.start_time)}
-											</>
-										) : null}
-									</>
-								)}
-							</Text>
-						</View>
+					{/* The batch running now (or next), live - tap for attendance. */}
+					{dashboard && batches && batches.length > 0 && !isNewLibrary && (
+						<LiveBatchCard batches={batches} occupancy={dashboard.batch_occupancy} onPress={() => router.push("/attendance")} />
 					)}
 
 					{dashboard && !isNewLibrary && (
 						<>
-							<View style={styles.statGrid}>
+							<View style={[styles.statGrid, !selectedStat && styles.statGridClosed]}>
 								{(
 									[
 										{
@@ -449,7 +585,7 @@ export function HomeScreen() {
 											accessibilityRole="tab"
 											accessibilityState={{ selected: isSelected }}
 											style={({ pressed }) => [styles.statTile, isSelected && styles.statTileSelected, pressed && styles.menuCellPressed]}
-											onPress={() => setPickedStat(tile.key)}>
+											onPress={() => setSelectedStat((current) => (current === tile.key ? null : tile.key))}>
 											{isSelected && <LinearGradient pointerEvents="none" colors={[theme.accent, shade(theme.accent, 0.18)]} style={styles.statTileGradient} />}
 											<View style={[styles.statTileIcon, isSelected && styles.statTileIconSelected]}>
 												<Ionicons name={tile.icon} size={16} color={isSelected ? "#fff" : tile.alert ? theme.destructive : theme.accent} />
@@ -466,13 +602,15 @@ export function HomeScreen() {
 								})}
 							</View>
 							{/* Pointer from the selected tile into its detail card, so they read as one unit. */}
-							<View style={styles.caretRow} pointerEvents="none">
-								{STAT_ORDER.map((key) => (
-									<View key={key} style={styles.caretSlot}>
-										{selectedStat === key && <View style={styles.caret} />}
-									</View>
-								))}
-							</View>
+							{selectedStat && (
+								<View style={styles.caretRow} pointerEvents="none">
+									{STAT_ORDER.map((key) => (
+										<View key={key} style={styles.caretSlot}>
+											{selectedStat === key && <View style={styles.caret} />}
+										</View>
+									))}
+								</View>
+							)}
 						</>
 					)}
 
@@ -571,8 +709,8 @@ export function HomeScreen() {
 								<PanelLink
 									styles={styles}
 									theme={theme}
-									label="Open members"
-									onPress={() => router.push({ pathname: "/members", params: dashboard.due_members_count > 0 ? { filter: "due" } : {} })}
+									label="Open dues"
+									onPress={() => router.push({ pathname: "/payments", params: { tab: "due" } })}
 								/>
 							</View>
 						</View>
@@ -694,21 +832,34 @@ export function HomeScreen() {
 							</View>
 							<View style={styles.recentCard}>
 								{dashboard.recent_payments.length > 0 ? (
-									recentPayments.map((payment, index) => (
-										<View key={`${payment.name}-${index}`} style={[styles.recentRow, index !== recentPayments.length - 1 && styles.recentRowBorder]}>
-											<View style={styles.recentIconCircle}>
-												<Ionicons name="checkmark-circle" size={18} color={theme.success} />
-											</View>
-											<View style={styles.recentInfo}>
-												<Text style={styles.recentName}>{payment.name}</Text>
-												<Text style={styles.recentMeta}>
-													{payment.seat ? `Seat ${payment.seat} · ` : ""}
-													{payment.time_ago}
+									recentPayments.map((payment, index) => {
+										// Same as the Payments list: when and how, then the days it covers.
+										const look = PAYMENT_STATUS_LOOK[payment.status ?? "PAID"] ?? PAYMENT_STATUS_LOOK.PAID;
+										const color = look.color(theme);
+										const period = payment.status ? describePaymentPeriod({ status: payment.status, period_start: payment.period_start, period_end: payment.period_end }) : "";
+										return (
+											<Pressable
+												key={`${payment.name}-${index}`}
+												style={[styles.recentRow, index !== recentPayments.length - 1 && styles.recentRowBorder]}
+												onPress={() => payment.member_id && router.push({ pathname: "/members/[id]", params: { id: String(payment.member_id) } })}>
+												<View style={[styles.recentIconCircle, { backgroundColor: color + "15" }]}>
+													<Ionicons name={look.icon} size={18} color={color} />
+												</View>
+												<View style={styles.recentInfo}>
+													<Text style={styles.recentName}>{payment.name}</Text>
+													<Text style={styles.recentMeta}>
+														{payment.date ? formatPaymentWhen({ date: payment.date, recorded_at: payment.recorded_at }) : payment.time_ago}
+														{payment.method ? ` · ${payment.method}` : ""}
+													</Text>
+													{!!period && <Text style={styles.recentMeta}>{period}</Text>}
+												</View>
+												<Text style={[styles.recentAmount, { color }]}>
+													{look.sign}
+													{formatRupee(Math.abs(payment.amount))}
 												</Text>
-											</View>
-											<Text style={styles.recentAmount}>{formatRupee(payment.amount)}</Text>
-										</View>
-									))
+											</Pressable>
+										);
+									})
 								) : (
 									<Text style={styles.recentEmptyText}>No payments yet.</Text>
 								)}
@@ -717,6 +868,8 @@ export function HomeScreen() {
 					)}
 				</ScrollView>
 			</SafeAreaView>
+			{/* Flowers fall over the whole screen once, when setup is first complete. */}
+			{showSetupComplete && <CelebrationBurst />}
 		</ScreenBackground>
 	);
 }
@@ -829,6 +982,150 @@ const createStyles = (theme: any) =>
 			padding: 18,
 			marginBottom: 24,
 		},
+		firstMemberCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.md,
+			borderWidth: 1,
+			borderColor: theme.border,
+			padding: 24,
+			alignItems: "center",
+			marginBottom: 24,
+		},
+		firstMemberIconWrap: {
+			width: 56,
+			height: 56,
+			borderRadius: 28,
+			backgroundColor: theme.accent + "15",
+			alignItems: "center",
+			justifyContent: "center",
+			marginBottom: 14,
+		},
+		firstMemberTitle: {
+			fontFamily: "sans-extrabold",
+			fontSize: 18,
+			color: theme.primary,
+			marginBottom: 6,
+		},
+		firstMemberCopy: {
+			fontFamily: "sans-medium",
+			fontSize: 13,
+			color: theme.mutedForeground,
+			lineHeight: 19,
+			textAlign: "center",
+			marginBottom: 18,
+		},
+		firstMemberCta: {
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+			gap: 6,
+			backgroundColor: theme.accent,
+			borderRadius: RADIUS.sm,
+			paddingVertical: 12,
+			paddingHorizontal: 22,
+		},
+		firstMemberCtaText: {
+			fontFamily: "sans-bold",
+			fontSize: 14,
+			color: "#fff",
+		},
+		celebrationCard: {
+			backgroundColor: theme.card,
+			borderRadius: RADIUS.lg,
+			borderWidth: 1,
+			borderColor: theme.accent + "40",
+			paddingHorizontal: 20,
+			paddingTop: 24,
+			paddingBottom: 20,
+			marginBottom: 24,
+			alignItems: "center",
+			overflow: "hidden",
+		},
+		celebrationClose: {
+			position: "absolute",
+			top: 12,
+			right: 12,
+			padding: 4,
+			zIndex: 1,
+		},
+		celebrationFlowerArea: {
+			width: 104,
+			height: 92,
+			alignItems: "center",
+			justifyContent: "center",
+			marginBottom: 8,
+		},
+		celebrationPetal: {
+			position: "absolute",
+		},
+		celebrationFlowerWrap: {
+			width: 76,
+			height: 76,
+			borderRadius: 38,
+			backgroundColor: theme.card,
+			borderWidth: 2,
+			borderColor: theme.accent + "33",
+			alignItems: "center",
+			justifyContent: "center",
+		},
+		celebrationTitle: {
+			fontFamily: "sans-extrabold",
+			fontSize: 24,
+			color: theme.primary,
+			letterSpacing: -0.3,
+		},
+		celebrationSubtitle: {
+			fontFamily: "sans-bold",
+			fontSize: 16,
+			color: theme.accent,
+			marginTop: 4,
+			marginBottom: 8,
+		},
+		celebrationCopy: {
+			fontFamily: "sans-medium",
+			fontSize: 13,
+			lineHeight: 19,
+			color: theme.mutedForeground,
+			textAlign: "center",
+			marginBottom: 16,
+			maxWidth: 280,
+		},
+		celebrationSteps: {
+			alignSelf: "stretch",
+			backgroundColor: theme.card,
+			borderWidth: 1,
+			borderColor: theme.success + "33",
+			borderRadius: RADIUS.md,
+			paddingVertical: 12,
+			paddingHorizontal: 14,
+			gap: 10,
+			marginBottom: 16,
+		},
+		celebrationStep: {
+			flexDirection: "row",
+			alignItems: "center",
+			gap: 10,
+		},
+		celebrationStepText: {
+			fontFamily: "sans-semibold",
+			fontSize: 14,
+			color: theme.primary,
+		},
+		celebrationBtn: {
+			alignSelf: "stretch",
+			flexDirection: "row",
+			alignItems: "center",
+			justifyContent: "center",
+			gap: 8,
+			backgroundColor: theme.accent,
+			borderRadius: RADIUS.md,
+			paddingVertical: 14,
+		},
+		celebrationBtnText: {
+			fontFamily: "sans-extrabold",
+			fontSize: 15,
+			color: "#fff",
+		},
 		setupHeaderRow: {
 			flexDirection: "row",
 			alignItems: "center",
@@ -935,78 +1232,6 @@ const createStyles = (theme: any) =>
 		pastMonthLoader: {
 			marginVertical: 24,
 		},
-		firstMemberCard: {
-			backgroundColor: theme.card,
-			borderRadius: RADIUS.md,
-			borderWidth: 1,
-			borderColor: theme.border,
-			padding: 24,
-			alignItems: "center",
-			marginBottom: 32,
-		},
-		firstMemberIconWrap: {
-			width: 56,
-			height: 56,
-			borderRadius: 28,
-			backgroundColor: theme.accent + "15",
-			alignItems: "center",
-			justifyContent: "center",
-			marginBottom: 14,
-		},
-		firstMemberTitle: {
-			fontFamily: "sans-extrabold",
-			fontSize: 18,
-			color: theme.primary,
-			marginBottom: 6,
-		},
-		firstMemberCopy: {
-			fontFamily: "sans-medium",
-			fontSize: 13,
-			color: theme.mutedForeground,
-			lineHeight: 19,
-			textAlign: "center",
-			marginBottom: 18,
-		},
-		firstMemberCta: {
-			flexDirection: "row",
-			alignItems: "center",
-			justifyContent: "center",
-			gap: 6,
-			backgroundColor: theme.accent,
-			borderRadius: RADIUS.sm,
-			paddingVertical: 12,
-			paddingHorizontal: 22,
-		},
-		firstMemberCtaText: {
-			fontFamily: "sans-bold",
-			fontSize: 14,
-			color: "#fff",
-		},
-		nowPill: {
-			flexDirection: "row",
-			alignItems: "center",
-			alignSelf: "flex-start",
-			gap: 8,
-			paddingVertical: 7,
-			paddingHorizontal: 12,
-			borderRadius: 20,
-			marginBottom: 14,
-			maxWidth: "100%",
-		},
-		nowDot: {
-			width: 8,
-			height: 8,
-			borderRadius: 4,
-		},
-		nowText: {
-			flexShrink: 1,
-			fontFamily: "sans-medium",
-			fontSize: 13,
-			color: theme.primary,
-		},
-		nowStrong: {
-			fontFamily: "sans-bold",
-		},
 		statGrid: {
 			flexDirection: "row",
 			gap: 10,
@@ -1067,6 +1292,10 @@ const createStyles = (theme: any) =>
 			color: "#fff",
 		},
 		// Same 3-column layout as the grid, so the caret lines up under the selected tile.
+		// With no tile open there's no panel (and its bottom margin) below, so keep the same gap here.
+		statGridClosed: {
+			marginBottom: 24,
+		},
 		caretRow: {
 			flexDirection: "row",
 			gap: 10,

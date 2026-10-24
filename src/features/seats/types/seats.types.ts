@@ -2,6 +2,8 @@ export interface MatrixBatchRef {
     id: number;
     name: string;
     monthly_fee: string;
+    start_time: string;
+    end_time: string;
 }
 
 export interface SeatMatrixBatchInfo {

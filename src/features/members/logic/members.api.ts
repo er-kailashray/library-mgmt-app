@@ -1,5 +1,6 @@
 import { IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { Gender, MemberDetailResponse, MembersResponse } from "@/features/members/types/members.types";
+import { PaymentMode } from "@/features/payments/types/payments.types";
 import { getStoredAuthToken } from "@/services/api/auth.api";
 import { apiFetch, apiPost, apiUrl } from "@/services/api/client";
 import { uploadImage } from "@/shared/utils/image-upload";
@@ -50,11 +51,26 @@ export async function deleteMemberIdProofApi(id: number | string, side?: IdProof
     });
 }
 
-export async function deactivateMemberApi(id: number | string): Promise<{ status: boolean; message?: string }> {
+export async function deactivateMemberApi(
+    id: number | string,
+    refund?: { refund_amount: number; refund_mode: PaymentMode }
+): Promise<{ status: boolean; message?: string }> {
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");
 
-    return apiPost(`/api/members/${id}/deactivate`, undefined, {
+    return apiPost(`/api/members/${id}/deactivate`, refund ?? {}, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
+/** Back after a break, paying later: due from `startDate` ("YYYY-MM-DD"); the gap isn't charged. */
+export async function restartMemberApi(id: number | string, startDate: string): Promise<{ status: boolean; message?: string }> {
+    const token = await getStoredAuthToken();
+    if (!token) throw new Error("No auth token");
+
+    return apiPost(`/api/members/${id}/restart`, { start_date: startDate }, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
@@ -63,7 +79,7 @@ export async function deactivateMemberApi(id: number | string): Promise<{ status
 
 export async function updateMemberApi(
     id: number | string,
-    payload: { name: string; phone: string; gender?: Gender | null }
+    payload: { name: string; phone: string; gender?: Gender | null; address?: string | null }
 ): Promise<{ status: boolean; message?: string }> {
     const token = await getStoredAuthToken();
     if (!token) throw new Error("No auth token");
