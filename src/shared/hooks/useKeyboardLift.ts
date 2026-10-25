@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, Platform, View } from "react-native";
+import { Keyboard, Platform, ViewInstance } from "react-native";
 
 /**
  * For bottom sheets in a Modal, which the keyboard would otherwise cover (Android especially).
@@ -12,7 +12,7 @@ import { Keyboard, Platform, View } from "react-native";
  * the sheet by `lift`, and cap its height with `rootHeight - lift`.
  */
 export function useKeyboardLift(initialHeight: number) {
-	const rootRef = useRef<View>(null);
+	const rootRef = useRef<ViewInstance>(null);
 	const [lift, setLift] = useState(0);
 	const [rootHeight, setRootHeight] = useState(initialHeight);
 

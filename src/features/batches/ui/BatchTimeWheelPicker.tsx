@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from "react-native";
 
 import { formatTime, MINUTE_STEPS } from "@/features/batches/logic/batch-time";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -26,7 +26,7 @@ type Props = {
 function Wheel({ items, index, onChange }: { items: string[]; index: number; onChange: (index: number) => void }) {
 	const { theme } = useTheme();
 	const styles = createStyles(theme);
-	const ref = useRef<ScrollView>(null);
+	const ref = useRef<ScrollViewInstance>(null);
 
 	// Open on the starting value without animating.
 	useEffect(() => {

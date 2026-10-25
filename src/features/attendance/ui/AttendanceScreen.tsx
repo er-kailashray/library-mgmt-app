@@ -302,7 +302,7 @@ export function AttendanceScreen() {
                         keyExtractor={(m) => String(m.member_id)}
                         renderItem={renderMember}
                         ListHeaderComponent={header}
-                        ListFooterComponent={footer}
+                        ListFooterComponent={footer ?? undefined}
                         ListEmptyComponent={
                             <Text style={styles.emptyText}>{enrolled === 0 ? "No one is seated in this batch yet." : "No one matches that search."}</Text>
                         }

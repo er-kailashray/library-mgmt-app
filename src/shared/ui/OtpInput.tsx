@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, TextInputInstance, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
@@ -20,7 +20,7 @@ type OtpInputProps = {
  */
 export function OtpInput({ value, onChangeText, length = 6 }: OtpInputProps) {
 	const { theme } = useTheme();
-	const inputRef = useRef<TextInput>(null);
+	const inputRef = useRef<TextInputInstance>(null);
 	const styles = createStyles(theme);
 
 	return (
