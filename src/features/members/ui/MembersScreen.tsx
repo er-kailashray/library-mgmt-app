@@ -15,12 +15,13 @@ import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
+import { MemberAvatar } from "@/shared/ui/MemberAvatar";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { SegmentedControl } from "@/shared/ui/SegmentedControl";
 import { Text, TextInput } from "@/shared/ui/Text";
 import { formatRupee } from "@/shared/utils/currency";
 import { formatShortDate, fromIsoDate, todayIso } from "@/shared/utils/dates";
-import { getInitials } from "@/shared/utils/text";
 
 type MemberFilter = "active" | "due" | "inactive" | "all";
 
@@ -31,9 +32,6 @@ const FILTERS: { key: MemberFilter; label: string }[] = [
     { key: "inactive", label: "Left" },
     { key: "all", label: "All" },
 ];
-
-/** Soft, distinct avatar colours; each member keeps the same one (picked from their id). */
-const AVATAR_COLORS = ["#E26D4D", "#14B8A6", "#6366F1", "#F59E0B", "#0EA5E9", "#EC4899", "#10B981", "#8B5CF6"];
 
 /** Renewals this close are called out in the accent colour. */
 const RENEWS_SOON_DAYS = 3;
@@ -87,12 +85,6 @@ function matchesSearch(member: Member, query: string): boolean {
         member.phone.includes(q) ||
         (member.seats ?? []).some((seat) => (seat.batch_name ?? "").toLowerCase().includes(q) || String(seat.seat_number ?? "") === seatQuery)
     );
-}
-
-function avatarColor(member: Member): string {
-    const n = Number(member.id);
-    const index = Number.isFinite(n) ? n : member.name.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    return AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
 }
 
 function daysUntil(iso: string): number {
@@ -217,25 +209,11 @@ export function MembersScreen() {
                         )}
                     </View>
 
-                    <View style={styles.segments} accessibilityRole="tablist">
-                        {FILTERS.map((f) => {
-                            const selected = filter === f.key;
-                            const alert = f.key === "due" && counts.due > 0;
-                            return (
-                                <Pressable
-                                    key={f.key}
-                                    accessibilityRole="tab"
-                                    accessibilityState={{ selected }}
-                                    accessibilityLabel={`${f.label}, ${counts[f.key]}`}
-                                    style={[styles.segment, selected && styles.segmentSelected]}
-                                    onPress={() => setFilter(f.key)}
-                                >
-                                    <Text style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}>{f.label}</Text>
-                                    <Text style={[styles.segmentCount, alert && styles.segmentCountAlert]}>{counts[f.key]}</Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
+                    <SegmentedControl
+                        segments={FILTERS.map((f) => ({ key: f.key, label: f.label, count: counts[f.key], alert: f.key === "due" && counts.due > 0 }))}
+                        value={filter}
+                        onChange={setFilter}
+                    />
                 </View>
 
                 {isLoading && !data ? (
@@ -301,7 +279,6 @@ const MemberRow = memo(function MemberRow({
     styles: Styles;
     theme: Theme;
 }) {
-    const color = avatarColor(member);
     const isLeft = member.status === "inactive";
     const seats = member.seats ?? [];
     const seatText = isLeft
@@ -320,8 +297,8 @@ const MemberRow = memo(function MemberRow({
             onPress={() => onPress(member)}
             style={({ pressed }) => [styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, pressed && styles.rowPressed]}
         >
-            <View style={[styles.avatar, { backgroundColor: color + "22" }, isLeft && styles.faded]}>
-                <Text style={[styles.avatarText, { color }]}>{member.initials || getInitials(member.name)}</Text>
+            <View style={styles.avatar}>
+                <MemberAvatar id={member.id} name={member.name} size={AVATAR_SIZE} faded={isLeft} />
             </View>
 
             <View style={[styles.rowMain, !isLast && styles.rowDivider]}>
@@ -408,46 +385,6 @@ const createStyles = (theme: Theme) =>
             fontSize: 15,
             color: theme.primary,
         },
-        segments: {
-            flexDirection: "row",
-            padding: 3,
-            borderRadius: RADIUS.md,
-            backgroundColor: theme.muted,
-        },
-        segment: {
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 5,
-            paddingVertical: 8,
-            borderRadius: RADIUS.sm + 1,
-        },
-        segmentSelected: {
-            backgroundColor: theme.card,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.08,
-            shadowRadius: 3,
-            elevation: 1,
-        },
-        segmentLabel: {
-            fontFamily: "sans-medium",
-            fontSize: 13,
-            color: theme.mutedForeground,
-        },
-        segmentLabelSelected: {
-            fontFamily: "sans-semibold",
-            color: theme.primary,
-        },
-        segmentCount: {
-            fontFamily: "sans-medium",
-            fontSize: 12,
-            color: theme.mutedForeground,
-        },
-        segmentCountAlert: {
-            color: theme.destructive,
-        },
         listContent: {
             paddingHorizontal: 20,
             paddingTop: 4,
@@ -485,16 +422,7 @@ const createStyles = (theme: Theme) =>
             backgroundColor: theme.muted,
         },
         avatar: {
-            width: AVATAR_SIZE,
-            height: AVATAR_SIZE,
-            borderRadius: AVATAR_SIZE / 2,
-            alignItems: "center",
-            justifyContent: "center",
             marginRight: AVATAR_GAP,
-        },
-        avatarText: {
-            fontFamily: "sans-semibold",
-            fontSize: 15,
         },
         rowMain: {
             flex: 1,
