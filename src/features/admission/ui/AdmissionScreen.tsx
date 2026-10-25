@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -57,6 +57,22 @@ export function AdmissionScreen() {
     const [seatsByBatch, setSeatsByBatch] = useState<Record<number, number>>({});
     // Which seat the picker sheet is choosing: the shared seat, one batch's seat, or closed.
     const [pickerFor, setPickerFor] = useState<"common" | number | null>(null);
+
+    // "Admit here" on the Seats screen opens this with that batch and seat already chosen.
+    const preset = useLocalSearchParams<{ batch_id?: string; seat_id?: string }>();
+    const presetApplied = useRef(false);
+    useEffect(() => {
+        if (presetApplied.current || !preset.batch_id || batches.length === 0 || seatsData.length === 0) return;
+        presetApplied.current = true;
+        const batchId = Number(preset.batch_id);
+        if (!batches.some((b) => b.id === batchId)) return;
+        // Someone may have taken it since; then the next free seat in that batch, as usual.
+        const seat = seatsData.find((s) => s.seat_id === Number(preset.seat_id) && isSeatFree(s, [batchId])) ?? firstFreeSeat(seatsData, [batchId]);
+        setSelectedBatchIds([batchId]);
+        setAssignMode("common");
+        setCommonSeatId(seat?.seat_id ?? null);
+        setSeatsByBatch({});
+    }, [preset.batch_id, preset.seat_id, batches, seatsData]);
 
     const [name, setName] = useState(readmit.name ?? "");
     const [phone, setPhone] = useState(readmit.phone ?? "");

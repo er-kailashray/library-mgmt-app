@@ -13,7 +13,10 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
   carries `seats[]` `{ batch_id, batch_name, start_time, end_time, seat_number }` — where the member
   sits now, one per active batch in the day's order (empty for members who left).
 - `GET /api/batches`, `POST /api/batches`
-- `GET /api/seat-matrix`
+- `GET /api/seat-matrix` — every seat with, per batch, `available` and `occupant` (`null` when free,
+  else `{ member_id, name, renewal_date, is_due }`; `is_due` once the renewal date is reached).
+  The Seats map uses it to show who sits where; Admission only reads `available`. Admission also
+  accepts `?batch_id=&seat_id=` to open with that batch and seat chosen ("Admit" on a free seat).
 - `POST /api/admission`
 - `GET /api/payments`, `POST /api/payments`
 - `GET /api/dashboard`
