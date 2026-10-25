@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
-import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -15,7 +15,8 @@ import { formatShortDate } from "@/shared/utils/dates";
 import { getInitials } from "@/shared/utils/text";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { FilterChip } from "@/shared/ui/FilterChip";
-import { HeaderIconButton, ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 type MemberFilter = "active" | "due" | "inactive" | "all";
 
@@ -114,7 +115,6 @@ export function MembersScreen() {
                 <ScreenHeader
                     title="Members"
                     subtitle="Seats, fees and renewals at a glance"
-                    right={<HeaderIconButton icon="download-outline" label="Export members" onPress={() => Alert.alert("Export", "Member list export coming soon!")} />}
                 />
 
                 <View style={styles.searchSection}>
@@ -150,14 +150,12 @@ export function MembersScreen() {
                         data={filteredMembers}
                         renderItem={renderMemberItem}
                         keyExtractor={(item) => item.id.toString()}
-                        contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                        contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + insets.bottom }]}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
 
-                <Pressable accessibilityRole="button" style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={() => router.push("/admission")}>
-                    <Ionicons name="add" size={32} color={theme.background} />
-                </Pressable>
+                <FloatingActionButton label="New admission" onPress={() => router.push("/admission")} />
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -251,18 +249,5 @@ const createStyles = (theme: any) => StyleSheet.create({
         fontSize: 10,
         textTransform: "uppercase",
         letterSpacing: 0.5,
-    },
-    fab: {
-        position: "absolute",
-        right: 20,
-        bottom: 30,
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: theme.accent,
-        alignItems: "center",
-        justifyContent: "center",
-        ...FLOATING_SHADOW,
-        shadowColor: theme.accent,
     },
 });

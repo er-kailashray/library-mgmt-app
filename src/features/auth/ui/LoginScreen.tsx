@@ -2,14 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { clearOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
+import { AuthBrand } from "@/features/auth/ui/AuthBrand";
 import { loginApi, saveAuthData } from "@/services/api/auth.api";
 import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
 const PHONE_MIN = 10;
@@ -64,15 +66,11 @@ export function LoginScreen() {
 				<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
 					<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 						<View style={styles.brandBlock}>
-							<View style={styles.logoWrap}>
-								<Image source={require("@/assets/images/logo.png")} style={styles.logoMark} />
-								<View>
-									<Text style={styles.wordmark}>Librum</Text>
-									<Text style={styles.wordmarkSub}>Seats, members & fees</Text>
-								</View>
+							<View style={styles.brandRow}>
+								<AuthBrand />
 							</View>
-							<Text style={styles.screenTitle}>Welcome back</Text>
-							<Text style={styles.screenSubtitle}>Sign in with your phone number and password.</Text>
+							<Text style={styles.screenTitle}>Sign in to your library</Text>
+							<Text style={styles.screenSubtitle}>Use your registered phone number and password.</Text>
 						</View>
 
 						<View style={styles.card}>
@@ -119,7 +117,7 @@ export function LoginScreen() {
 									) : null}
 								</View>
 
-								<Pressable accessibilityRole="button" onPress={() => { }}>
+								<Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/forgot-password", params: { phone } })}>
 									<Text style={styles.forgot}>Forgot password?</Text>
 								</Pressable>
 								{apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
@@ -139,22 +137,7 @@ export function LoginScreen() {
 							</Pressable>
 						</View>
 
-						{/* Development builds only (stripped from release): replay the first-run onboarding. */}
-						{__DEV__ && (
-							<Pressable
-								accessibilityRole="button"
-								style={styles.devLink}
-								onPress={async () => {
-									await clearOnboardingComplete();
-									router.replace("/onboarding");
-								}}>
-								<Text style={styles.devLinkText}>Dev: replay onboarding</Text>
-							</Pressable>
-						)}
-
-						<View style={styles.poweredByBlock}>
-							<Text style={styles.poweredByText}>Powered by Kailash Ray</Text>
-						</View>
+						<PoweredBy />
 					</ScrollView>
 				</KeyboardAvoidingView>
 			</SafeAreaView>
@@ -163,18 +146,6 @@ export function LoginScreen() {
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
-	devLink: {
-		alignSelf: "center",
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		marginTop: 8,
-	},
-	devLinkText: {
-		fontFamily: "sans-semibold",
-		fontSize: 12,
-		color: theme.mutedForeground,
-		textDecorationLine: "underline",
-	},
 	safe: {
 		flex: 1,
 	},
@@ -191,41 +162,21 @@ const createStyles = (theme: any) => StyleSheet.create({
 		alignItems: "center",
 		marginBottom: 32,
 	},
-	logoWrap: {
-		alignItems: "center",
-		gap: 12,
-		marginBottom: 24,
-	},
-	logoMark: {
-		width: 64,
-		height: 64,
-	},
-	wordmark: {
-		fontFamily: "sans-extrabold",
-		fontSize: 28,
-		color: theme.primary,
-		letterSpacing: -0.5,
-		textAlign: "center",
-	},
-	wordmarkSub: {
-		fontFamily: "sans-medium",
-		fontSize: 15,
-		color: theme.mutedForeground,
-		marginTop: -2,
-		textAlign: "center",
+	brandRow: {
+		marginBottom: 56,
 	},
 	screenTitle: {
 		fontFamily: "sans-extrabold",
-		fontSize: 28,
+		fontSize: 22,
 		color: theme.primary,
-		marginBottom: 8,
+		marginBottom: 6,
 		textAlign: "center",
 	},
 	screenSubtitle: {
 		fontFamily: "sans-medium",
-		fontSize: 16,
+		fontSize: 15,
 		color: theme.mutedForeground,
-		lineHeight: 22,
+		lineHeight: 21,
 		textAlign: "center",
 	},
 	card: {
@@ -297,8 +248,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		opacity: 0.6,
 	},
 	primaryButtonText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 16,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 	apiError: {
@@ -323,14 +273,5 @@ const createStyles = (theme: any) => StyleSheet.create({
 		fontFamily: "sans-bold",
 		color: theme.accent,
 		fontSize: 14,
-	},
-	poweredByBlock: {
-		alignItems: "center",
-		marginTop: 32,
-	},
-	poweredByText: {
-		fontFamily: "sans-medium",
-		color: theme.mutedForeground,
-		fontSize: 13,
 	},
 });

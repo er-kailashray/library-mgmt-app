@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
@@ -10,10 +10,14 @@ import { getSubscriptionApi, subscriptionChipLabel } from "@/features/subscripti
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
 import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
+import { updateNotificationSettingsApi } from "@/services/api/push.api";
+import { registerForPushNotifications } from "@/services/push/push-notifications";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
@@ -114,6 +118,34 @@ export function SettingsScreen() {
 		}
 	}, [editProfileName, editProfilePhone]);
 
+	const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+	const notificationsOn = user?.push_notifications_enabled ?? true;
+
+	const handleToggleNotifications = useCallback(
+		async (enabled: boolean) => {
+			if (!user) return;
+			setIsSavingNotifications(true);
+			try {
+				if (enabled && (await registerForPushNotifications()) === "denied") {
+					Alert.alert("Notifications are blocked", "Allow notifications for Librum in your phone's settings, then turn this on again.", [
+						{ text: "Not now", style: "cancel" },
+						{ text: "Open Settings", onPress: () => void Linking.openSettings() },
+					]);
+					return;
+				}
+				const response = await updateNotificationSettingsApi(enabled);
+				const updated = { ...user, push_notifications_enabled: response.data.push_notifications_enabled };
+				await updateStoredAuthUser(updated);
+				setUser(updated);
+			} catch (err: any) {
+				Alert.alert("Error", err.message || "Couldn't update notifications.");
+			} finally {
+				setIsSavingNotifications(false);
+			}
+		},
+		[user]
+	);
+
 	const onLogout = useCallback(async () => {
 		Alert.alert("Logout", "Are you sure you want to log out?", [
 			{ text: "Cancel", style: "cancel" },
@@ -176,6 +208,11 @@ export function SettingsScreen() {
 					icon: "person-circle-outline",
 					label: "Edit Profile (Name & Number)",
 					onPress: openEditProfile,
+				},
+				{
+					icon: "key-outline",
+					label: "Change Password",
+					onPress: () => router.push("/change-password"),
 				},
 				{
 					icon: "log-out-outline",
@@ -246,6 +283,27 @@ export function SettingsScreen() {
 									</View>
 								</View>
 							</View>
+							<View style={[styles.optionRowNoPress, styles.optionRowTopBorder]}>
+								<View style={styles.iconCircle}>
+									<Ionicons name="notifications-outline" size={20} color={theme.primary} />
+								</View>
+								<View style={styles.optionTextBlock}>
+									<Text style={styles.optionText}>Push Notifications</Text>
+									<Text style={styles.optionHint}>Dues, renewals, batch start & plan alerts</Text>
+								</View>
+								{isSavingNotifications ? (
+									<ActivityIndicator color={theme.accent} />
+								) : (
+									<Switch
+										value={notificationsOn}
+										onValueChange={handleToggleNotifications}
+										disabled={!user}
+										trackColor={{ false: theme.muted, true: theme.accent }}
+										thumbColor="#fff"
+										accessibilityLabel="Push notifications"
+									/>
+								)}
+							</View>
 						</View>
 					</View>
 
@@ -269,10 +327,9 @@ export function SettingsScreen() {
 						</View>
 					))}
 
-					<View style={styles.footerBlock}>
-						<Text style={styles.footerText}>Powered by Kailash Ray</Text>
+					<PoweredBy style={styles.footerBlock}>
 						<Text style={styles.versionText}>v1.0.0</Text>
-					</View>
+					</PoweredBy>
 				</ScrollView>
 
 				<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
@@ -470,6 +527,20 @@ const createStyles = (theme: any) => StyleSheet.create({
 	optionRowPressed: {
 		backgroundColor: theme.muted + "40",
 	},
+	optionRowTopBorder: {
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: theme.border,
+	},
+	optionTextBlock: {
+		flex: 1,
+		marginRight: 8,
+	},
+	optionHint: {
+		fontFamily: "sans-medium",
+		fontSize: 12,
+		color: theme.mutedForeground,
+		marginTop: 2,
+	},
 	optionRowBorder: {
 		borderBottomWidth: StyleSheet.hairlineWidth,
 		borderBottomColor: theme.border,
@@ -508,15 +579,8 @@ const createStyles = (theme: any) => StyleSheet.create({
 		color: theme.destructive,
 	},
 	footerBlock: {
-		alignItems: "center",
-		marginTop: 20,
+		paddingTop: 20,
 		marginBottom: 20,
-	},
-	footerText: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-		marginBottom: 4,
 	},
 	versionText: {
 		fontFamily: "sans-bold",
@@ -581,8 +645,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		marginTop: 8,
 	},
 	editSaveBtnText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 15,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 });

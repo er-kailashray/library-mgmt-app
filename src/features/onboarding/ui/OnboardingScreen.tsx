@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 
@@ -235,8 +236,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		paddingVertical: 18,
 	},
 	primaryBtnText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 17,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 });

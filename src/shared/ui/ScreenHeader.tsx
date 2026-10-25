@@ -79,21 +79,21 @@ const createStyles = (theme: Theme) =>
 			flexDirection: "row",
 			alignItems: "center",
 			paddingHorizontal: 20,
-			paddingBottom: 16,
-			gap: 16,
+			paddingBottom: 14,
+			gap: 14,
 		},
 		text: {
 			flex: 1,
 		},
 		title: {
 			fontFamily: "sans-extrabold",
-			fontSize: 22,
+			fontSize: 19,
 			color: theme.primary,
-			marginBottom: 2,
+			marginBottom: 1,
 		},
 		subtitle: {
 			fontFamily: "sans-medium",
-			fontSize: 14,
+			fontSize: 13,
 			color: theme.mutedForeground,
 		},
 		iconButton: {

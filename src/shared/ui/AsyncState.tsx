@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 export function LoadingState({ style }: { style?: StyleProp<ViewStyle> }) {
@@ -83,7 +84,7 @@ const createStyles = (theme: Theme) =>
             marginTop: 16,
         },
         retryBtnText: {
-            fontFamily: "sans-extrabold",
+            ...BUTTON_TEXT,
             fontSize: 14,
             color: "#fff",
         },

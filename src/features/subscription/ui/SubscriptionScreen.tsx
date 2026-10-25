@@ -10,6 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { formatSubscriptionDate, getSubscriptionApi, getSubscriptionInvoicesApi, startCheckoutApi } from "@/features/subscription/logic/subscription-api";
 import { SubscriptionInfo, SubscriptionPlan, SubscriptionStateKey } from "@/features/subscription/types/subscription.types";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -412,8 +413,7 @@ const createStyles = (theme: any) =>
             marginTop: 24,
         },
         ctaText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
         finePrint: {

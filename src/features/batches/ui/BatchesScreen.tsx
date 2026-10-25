@@ -10,10 +10,12 @@ import { createBatchApi, deleteBatchApi, getBatchesApi, updateBatchApi } from "@
 import { Batch } from "@/features/batches/types/batches.types";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
-import { HeaderIconButton, ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
 
 import { BatchTimeWheelPicker } from "./BatchTimeWheelPicker";
 
@@ -169,10 +171,9 @@ export function BatchesScreen() {
 				<ScreenHeader
 					title="Batches"
 					subtitle="Manage timeslots & pricing"
-					right={<HeaderIconButton icon="add" label="Add batch" onPress={openCreate} filled />}
 				/>
 
-				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: FAB_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
 					<View style={styles.summaryContainer}>
 						<Text style={styles.sectionTitle}>Active Batches ({batchList.length})</Text>
 					</View>
@@ -210,6 +211,8 @@ export function BatchesScreen() {
 						))
 					)}
 				</ScrollView>
+
+				<FloatingActionButton label="Add batch" onPress={openCreate} />
 
 				<Modal visible={isAddModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsAddModalVisible(false)}>
 					<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
@@ -482,8 +485,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		elevation: 4,
 	},
 	modalSubmitText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 16,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 	deleteBtn: {

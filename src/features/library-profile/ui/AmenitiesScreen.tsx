@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { getLibraryProfileApi, updateLibraryAmenitiesApi } from "@/features/library-profile/logic/library-profile-api";
 import { AMENITY_GROUPS, AMENITY_ICONS, AMENITY_LABELS, Amenity } from "@/features/library-profile/types/library-profile.types";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -273,8 +274,7 @@ const createStyles = (theme: any) =>
             paddingVertical: 12,
         },
         barSaveText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
         savedNote: {

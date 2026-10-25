@@ -13,6 +13,7 @@ import { createPaymentApi } from "@/features/payments/logic/payments-api";
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode, PaymentStatus } from "@/features/payments/types/payments.types";
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -1492,8 +1493,7 @@ const createStyles = (theme: any) =>
             marginTop: 8,
         },
         editSaveBtnText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
     });

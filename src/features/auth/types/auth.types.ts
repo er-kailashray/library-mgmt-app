@@ -5,6 +5,7 @@ export interface AuthUser {
 	phone: string;
 	role: string;
 	profile_photo_url?: string | null;
+	push_notifications_enabled?: boolean;
 }
 
 /** Registration Payload */

@@ -58,4 +58,4 @@ App-wide theme is a React context (`useTheme()` → `{ theme, mode, setMode, isD
 
 Screens consume theme values via `useTheme().theme` and build their `StyleSheet.create(...)` styles from them (typically through a local `createStyles(theme)` function), rather than using nativewind `className` props — even though nativewind/Tailwind is wired up at the build level (`babel.config.js`, `metro.config.js`, `global.css`, `postcss.config.mjs`). When adding new screens, match the existing `StyleSheet` + `useTheme()` pattern already used throughout `src/features/*/ui/*Screen.tsx` rather than introducing className-based styling, unless asked otherwise.
 
-Fonts are the "PlusJakartaSans" family, loaded once in `app/_layout.tsx` under keys `sans-regular` / `sans-bold` / `sans-medium` / `sans-semibold` / `sans-extrabold` / `sans-light`, referenced in styles via `fontFamily`.
+Fonts are the "Inter" family (`assets/fonts/Inter-*.ttf`, OFL licence alongside), loaded once in `app/_layout.tsx` under keys `sans-regular` / `sans-bold` / `sans-medium` / `sans-semibold` / `sans-extrabold` / `sans-light`, referenced in styles via `fontFamily`.

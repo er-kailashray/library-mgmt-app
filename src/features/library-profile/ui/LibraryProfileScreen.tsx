@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLibraryProfileApi, updateLibraryProfileApi } from "@/features/library-profile/logic/library-profile-api";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -160,8 +161,7 @@ const createStyles = (theme: any) =>
             marginTop: 12,
         },
         saveBtnText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
     });

@@ -24,6 +24,16 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
   (`config('library.dues.upcoming_renewal_window_days')`, 7 by default) but isn't overdue yet;
   `POST /api/renewals/upcoming/remind` sends an SMS to all of them (same `{sent, failed,
   failed_members}` shape as the overdue bulk endpoint)
+- `POST /api/forgot-password` `{ phone }` — sends a `forgot_password` OTP (30 s cooldown, 429 with
+  `retry_after`); `POST /api/reset-password` `{ phone, otp, password, password_confirmation }` —
+  sets the new password and revokes every token
+- `POST /api/me/password` `{ current_password, password, password_confirmation }` — change password
+  while signed in; 422 on a wrong current password; other devices' tokens are revoked
+- `POST /api/me/push-tokens` `{ token, platform? }` — register this device's Expo push token
+  (`ExponentPushToken[...]`); a token already on another account moves to the caller.
+  `POST /api/me/push-tokens/remove` `{ token }` on logout. `POST /api/me/notification-settings`
+  `{ enabled }` — the owner's single on/off switch, returned as `push_notifications_enabled` on `/me`.
+  Notifications carry `data.url` (an app route such as `/payments`) that the app opens on tap.
 
 `POST /api/members/{id}/remind` is channel-smart: it sends the overdue message if the member owes
 money, the renewal message if they don't but are renewing soon, otherwise a generic nudge — same

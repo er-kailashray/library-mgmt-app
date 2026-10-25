@@ -10,7 +10,6 @@ import {
     Pressable,
     StyleSheet,
     Text,
-    TextInput,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,7 +18,10 @@ import { resendRegisterOtpApi, verifyRegisterOtpApi } from "@/features/auth/logi
 import { saveAuthData } from "@/services/api/auth.api";
 import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { OtpInput } from "@/shared/ui/OtpInput";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
@@ -103,15 +105,9 @@ export function OtpScreen() {
                             <Ionicons name="mail-unread-outline" size={48} color={theme.accent} style={{ alignSelf: "center", marginBottom: 20 }} />
                             <Text style={styles.instruction}>We've sent a 6-digit confirmation code to your mobile number.</Text>
 
-                            <TextInput
-                                style={[styles.otpInput, { letterSpacing: 8 }]}
-                                placeholder="000000"
-                                placeholderTextColor={theme.mutedForeground + "4D"}
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                value={otp}
-                                onChangeText={setOtp}
-                            />
+                            <View style={styles.otpInput}>
+                                <OtpInput value={otp} onChangeText={setOtp} />
+                            </View>
 
                             {notice && <Text style={styles.noticeText}>{notice}</Text>}
 
@@ -146,9 +142,7 @@ export function OtpScreen() {
                             </Pressable>
                         </View>
 
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>Powered by Kailash Ray</Text>
-                        </View>
+                        <PoweredBy style={styles.footer} />
                     </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
@@ -188,15 +182,6 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginBottom: 32,
     },
     otpInput: {
-        fontFamily: "sans-extrabold",
-        fontSize: 32,
-        backgroundColor: theme.background,
-        borderWidth: 1,
-        borderColor: theme.border,
-        borderRadius: RADIUS.md,
-        paddingVertical: 20,
-        textAlign: "center",
-        color: theme.primary,
         marginBottom: 24,
     },
     submitButton: {
@@ -206,9 +191,8 @@ const createStyles = (theme: any) => StyleSheet.create({
         alignItems: "center",
     },
     submitButtonText: {
-        fontFamily: "sans-extrabold",
-        fontSize: 15,
-        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
+        ...BUTTON_TEXT,
+        color: "#fff",
     },
     resendButton: {
         marginTop: 24,
@@ -242,13 +226,6 @@ const createStyles = (theme: any) => StyleSheet.create({
         flex: 1,
     },
     footer: {
-        alignItems: "center",
-        marginTop: "auto",
         paddingBottom: 20,
-    },
-    footerText: {
-        fontFamily: "sans-medium",
-        fontSize: 13,
-        color: theme.mutedForeground,
     },
 });

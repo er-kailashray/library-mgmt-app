@@ -10,6 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { getLibraryProfileApi, updateLibraryLocationApi } from "@/features/library-profile/logic/library-profile-api";
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from "@/features/library-profile/logic/map-style";
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -522,8 +523,7 @@ const createStyles = (theme: any) =>
 			marginTop: 16,
 		},
 		saveBtnText: {
-			fontFamily: "sans-extrabold",
-			fontSize: 15,
+			...BUTTON_TEXT,
 			color: "#fff",
 		},
 	});

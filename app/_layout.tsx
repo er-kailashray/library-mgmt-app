@@ -30,12 +30,12 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
 	const [fontsLoaded, error] = useFonts({
-		"sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
-		"sans-bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
-		"sans-medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
-		"sans-semibold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
-		"sans-extrabold": require("../assets/fonts/PlusJakartaSans-ExtraBold.ttf"),
-		"sans-light": require("../assets/fonts/PlusJakartaSans-Light.ttf"),
+		"sans-regular": require("../assets/fonts/Inter-Regular.ttf"),
+		"sans-bold": require("../assets/fonts/Inter-Bold.ttf"),
+		"sans-medium": require("../assets/fonts/Inter-Medium.ttf"),
+		"sans-semibold": require("../assets/fonts/Inter-SemiBold.ttf"),
+		"sans-extrabold": require("../assets/fonts/Inter-ExtraBold.ttf"),
+		"sans-light": require("../assets/fonts/Inter-Light.ttf"),
 	});
 
 	const [bootstrap, setBootstrap] = useState<{ done: boolean; onboardingComplete: boolean } | null>(null);

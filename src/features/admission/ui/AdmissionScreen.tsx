@@ -18,6 +18,7 @@ import { PAYMENT_MODE_LABELS, PaymentMode } from "@/features/payments/types/paym
 const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: PAYMENT_MODE_LABELS[value] }));
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -1125,8 +1126,7 @@ const createStyles = (theme: any) => StyleSheet.create({
         alignItems: "center",
     },
     submitButtonText: {
-        fontFamily: "sans-extrabold",
-        fontSize: 16,
+        ...BUTTON_TEXT,
         color: "#fff",
     },
 });

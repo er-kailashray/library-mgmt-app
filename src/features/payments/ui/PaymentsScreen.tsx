@@ -26,10 +26,12 @@ import { createPaymentApi, getPaymentsApi } from "@/features/payments/logic/paym
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode } from "@/features/payments/types/payments.types";
 import { describePaymentPeriod, formatPaymentWhen, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
 import { remindAllOverdueApi, remindMemberApi } from "@/features/reminders/logic/reminders-api";
-import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { FilterChip } from "@/shared/ui/FilterChip";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
@@ -425,7 +427,7 @@ export function PaymentsScreen() {
                                 data={visibleReceived}
                                 renderItem={renderPaymentItem}
                                 keyExtractor={(item) => item.id}
-                                contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + insets.bottom }]}
                                 showsVerticalScrollIndicator={false}
                             />
                         )}
@@ -461,7 +463,7 @@ export function PaymentsScreen() {
                                 data={visibleDues}
                                 renderItem={renderDueItem}
                                 keyExtractor={(item) => item.id}
-                                contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + insets.bottom }]}
                                 showsVerticalScrollIndicator={false}
                             />
                         )}
@@ -479,9 +481,7 @@ export function PaymentsScreen() {
                     onClose={() => setMonthPickerVisible(false)}
                 />
 
-                <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
-                    <Ionicons name="add" size={32} color={theme.background} />
-                </Pressable>
+                <FloatingActionButton label="Record payment" onPress={openPaymentForm} />
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -860,22 +860,8 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginTop: 12,
     },
     primaryButtonText: {
-        fontFamily: "sans-extrabold",
-        fontSize: 16,
-        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
-    },
-    fab: {
-        position: "absolute",
-        right: 20,
-        bottom: 30,
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: theme.accent,
-        alignItems: "center",
-        justifyContent: "center",
-        ...FLOATING_SHADOW,
-        shadowColor: theme.accent,
+        ...BUTTON_TEXT,
+        color: "#fff",
     },
     emptyText: {
         fontFamily: "sans-bold",

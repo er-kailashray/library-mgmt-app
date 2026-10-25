@@ -35,6 +35,18 @@ export async function updateProfileApi(payload: { name: string; phone: string })
 	});
 }
 
+/** Other devices are signed out; this one keeps its token. */
+export async function changePasswordApi(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+	const token = await getStoredAuthToken();
+	if (!token) throw new Error("No auth token");
+
+	return apiPost<{ message: string }>(
+		"/api/me/password",
+		{ current_password: currentPassword, password: newPassword, password_confirmation: newPassword },
+		{ headers: { Authorization: `Bearer ${token}` } },
+	);
+}
+
 export async function uploadProfilePhotoApi(uri: string): Promise<{ message: string; user: AuthUser }> {
 	const token = await getStoredAuthToken();
 	if (!token) throw new Error("No auth token");

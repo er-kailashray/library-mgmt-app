@@ -16,6 +16,7 @@ import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/
 import { SubscriptionBanner } from "@/features/subscription/ui/SubscriptionBanner";
 import { RADIUS } from "@/shared/constants/layout";
 import type { Theme } from "@/shared/constants/theme";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
@@ -1025,8 +1026,7 @@ const createStyles = (theme: any) =>
 			paddingHorizontal: 22,
 		},
 		firstMemberCtaText: {
-			fontFamily: "sans-bold",
-			fontSize: 14,
+			...BUTTON_TEXT,
 			color: "#fff",
 		},
 		celebrationCard: {
@@ -1122,8 +1122,7 @@ const createStyles = (theme: any) =>
 			paddingVertical: 14,
 		},
 		celebrationBtnText: {
-			fontFamily: "sans-extrabold",
-			fontSize: 15,
+			...BUTTON_TEXT,
 			color: "#fff",
 		},
 		setupHeaderRow: {
