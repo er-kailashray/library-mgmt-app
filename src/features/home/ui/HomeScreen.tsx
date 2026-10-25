@@ -3,12 +3,13 @@ import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
 import { getDashboardApi, getMonthlyCollectionApi } from "@/features/home/logic/home-api";
+import { refreshUnreadCount } from "@/features/notifications/logic/unread-count";
 import { getSetupCelebrationState, setSetupCelebrationState, type SetupCelebrationState } from "@/features/home/logic/setup-celebration-storage";
 import { DashboardData, MonthlyCollection } from "@/features/home/types/home.types";
 import { describePaymentPeriod, formatPaymentWhen, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
@@ -280,6 +281,17 @@ export function HomeScreen() {
 		}, [refetchDashboard, refetchBatches])
 	);
 
+	// Pull to refresh: reloads everything on Home. `refreshCount` also tells the parts that load
+	// their own data (the past-month collection, the plan banner) to reload.
+	const [refreshCount, setRefreshCount] = useState(0);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+	const handleRefresh = useCallback(async () => {
+		setIsRefreshing(true);
+		setRefreshCount((count) => count + 1);
+		await Promise.all([refetchDashboard(), refetchBatches(), refreshUnreadCount()]);
+		setIsRefreshing(false);
+	}, [refetchDashboard, refetchBatches]);
+
 	// Only true once batches have actually loaded, so batch-dependent sections don't flash in.
 	const hasBatches = batches !== null && batches.length > 0;
 	// Brand-new library: every number on Home would be 0, so guide the owner to their first member instead.
@@ -401,7 +413,7 @@ export function HomeScreen() {
 		return () => {
 			cancelled = true;
 		};
-	}, [monthOffset, viewedMonth]);
+	}, [monthOffset, viewedMonth, refreshCount]);
 
 	// Average across batches: all bookings / (seats x batches). A library full in the morning and
 	// empty in the evening is 50% used, not 100%.
@@ -453,8 +465,11 @@ export function HomeScreen() {
 					</View>
 				</View>
 
-				<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-					<SubscriptionBanner />
+				<ScrollView
+					contentContainerStyle={styles.scroll}
+					showsVerticalScrollIndicator={false}
+					refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
+					<SubscriptionBanner refreshSignal={refreshCount} />
 
 					{showSetupCard && (
 						<View style={styles.setupCard}>

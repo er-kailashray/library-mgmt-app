@@ -1,14 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import type { NotificationResponse } from "expo-notifications";
 import { Platform } from "react-native";
 
 import { registerPushTokenApi, removePushTokenApi } from "@/services/api/push.api";
+import { Notifications } from "@/services/push/notifications-module";
 import { STORAGE_KEYS } from "@/shared/constants/storage";
 
 // Show notifications as banners even while the app is open.
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
 	handleNotification: async () => ({
 		shouldShowBanner: true,
 		shouldShowList: true,
@@ -24,8 +25,8 @@ export type PushRegistrationResult = "registered" | "denied" | "unsupported";
  * sends it to the backend. Safe to call on every app start; the backend upserts the token.
  */
 export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
-	// Simulators can't receive push; Expo Go on Android doesn't support remote push either.
-	if (!Device.isDevice || Platform.OS === "web") return "unsupported";
+	// Simulators can't receive push, and Expo Go on Android has no remote push (see notifications-module).
+	if (!Notifications || !Device.isDevice || Platform.OS === "web") return "unsupported";
 
 	if (Platform.OS === "android") {
 		// The backend sends with channelId "default".
@@ -68,7 +69,7 @@ export async function unregisterPushToken(): Promise<void> {
 }
 
 /** The in-app screen a notification opens, from the `url` the backend puts in its data. */
-export function notificationUrl(response: Notifications.NotificationResponse | null): string | null {
+export function notificationUrl(response: NotificationResponse | null): string | null {
 	const url = response?.notification.request.content.data?.url;
 	return typeof url === "string" && url.startsWith("/") ? url : null;
 }

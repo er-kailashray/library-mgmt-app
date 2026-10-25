@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { FLOATING_SHADOW } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 type FloatingActionButtonProps = {
@@ -22,14 +21,14 @@ export const FAB_CLEARANCE = 30 + 60 + 16;
  */
 export function FloatingActionButton({ label, onPress, icon = "add" }: FloatingActionButtonProps) {
 	const { theme } = useTheme();
-	const insets = useSafeAreaInsets();
+	const bottomInset = useScreenBottomInset();
 	const styles = createStyles(theme);
 
 	return (
 		<Pressable
 			accessibilityRole="button"
 			accessibilityLabel={label}
-			style={({ pressed }) => [styles.fab, { bottom: 30 + insets.bottom }, pressed && styles.fabPressed]}
+			style={({ pressed }) => [styles.fab, { bottom: 30 + bottomInset }, pressed && styles.fabPressed]}
 			onPress={onPress}
 		>
 			<Ionicons name={icon} size={30} color="#fff" />

@@ -3,10 +3,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { SeatMatrixSeat } from "@/features/seats/types/seats.types";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -42,7 +43,7 @@ interface SeatSection {
 export function SeatsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
-    const insets = useSafeAreaInsets();
+    const bottomInset = useScreenBottomInset();
     const { width: screenWidth } = useWindowDimensions();
 
     const { data, isLoading, error, refetch: fetchData } = useApiData(getSeatMatrixApi, []);
@@ -264,7 +265,7 @@ export function SeatsScreen() {
                         renderSectionHeader={renderSectionHeader}
                         ListHeaderComponent={renderListHeader}
                         stickySectionHeadersEnabled
-                        contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
+                        contentContainerStyle={[styles.listContent, { paddingBottom: 40 + bottomInset }]}
                         showsVerticalScrollIndicator={false}
                         initialNumToRender={10}
                         windowSize={10}

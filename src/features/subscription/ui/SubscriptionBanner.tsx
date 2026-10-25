@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatSubscriptionDate, getSubscriptionApi } from "@/features/subscription/logic/subscription-api";
@@ -28,8 +28,11 @@ function bannerFor(info: SubscriptionInfo, theme: any): { icon: keyof typeof Ion
     }
 }
 
-/** Home-screen nudge shown near the end of a trial/plan, during grace, and once expired. */
-export function SubscriptionBanner() {
+/**
+ * Home-screen nudge shown near the end of a trial/plan, during grace, and once expired.
+ * `refreshSignal` reloads it when it changes (Home's pull to refresh).
+ */
+export function SubscriptionBanner({ refreshSignal = 0 }: { refreshSignal?: number }) {
     const router = useRouter();
     const { theme } = useTheme();
     const { data: info, refetch } = useApiData(getSubscriptionApi, []);
@@ -39,6 +42,10 @@ export function SubscriptionBanner() {
             void refetch();
         }, [refetch])
     );
+
+    useEffect(() => {
+        if (refreshSignal > 0) void refetch();
+    }, [refreshSignal, refetch]);
 
     const banner = info ? bannerFor(info, theme) : null;
     if (!banner) return null;

@@ -27,7 +27,7 @@ There is no configured lint, test, or typecheck script in `package.json`. To typ
 
 Uses **Expo Router** (file-based routing) with typed routes enabled. Route groups:
 - `app/(auth)/` — login, OTP, register (unauthenticated flow)
-- `app/(app)/` — home, members, batches, seats, payments, admission, attendance, settings (authenticated flow)
+- `app/(app)/` — authenticated flow: a `Stack` whose first child is `(tabs)/`, the bottom tab bar (home, members, payments, reports, notifications — labelled "Alerts", with an unread badge from `features/notifications/logic/unread-count.ts`). Every other screen (member detail, admission, batches, seats, settings — reached from Home's profile button —, attendance, renewals, subscription, library profile, …) sits beside `(tabs)` in the stack, so it opens full-screen over the tab bar. Groups don't change URLs, so `/members` is the tab and `/members/[id]` the pushed detail. On a tab screen `ScreenHeader` hides its back button unless given `onBack`, and bottom padding should come from `useScreenBottomInset()` (0 inside tabs, where the tab bar already covers the home indicator) rather than `insets.bottom`.
 - `app/index.tsx` — entry point that decides where to redirect based on onboarding + auth state
 - `app/onboarding.tsx` — first-run onboarding, gated by `getOnboardingComplete()`
 
@@ -45,6 +45,10 @@ Each feature follows the same three-folder convention:
 Cross-feature/shared API helpers live in `src/services/api/` (`client.ts` for the generic fetch wrapper, `auth.api.ts` for auth-token storage and login/logout). Feature-specific API calls (e.g. `src/features/admission/logic/admission-api.ts`) import `apiFetch`/`apiPost` from `src/services/api/client.ts` and pull the bearer token via `getStoredAuthToken()` from `src/services/api/auth.api.ts`.
 
 Path aliases (`tsconfig.json`): `@/*` → repo root, `@/features/*` → `src/features/*`, `@/services/*` → `src/services/*`, `@/shared/*` → `src/shared/*`.
+
+### Push notifications (`src/services/push/`)
+
+**Never `import * as Notifications from "expo-notifications"` directly — use `Notifications` from `src/services/push/notifications-module.ts`** (null where unavailable; `import type` from the package is fine). Expo Go on Android has had no remote push since SDK 53, and there the package's entry throws "Cannot find native module 'ExpoTopicSubscriptionModule'" as soon as it's loaded. The wrapper skips loading it in that one environment, so the app runs without push in Expo Go on Android; iOS Expo Go and development/store builds get push as normal. To test push on Android, use a development build (`npx expo run:android` or an EAS development build).
 
 ### API client (`src/services/api/client.ts`)
 

@@ -39,7 +39,7 @@ const createStyles = (theme: Theme) =>
 			borderColor: theme.accent,
 		},
 		text: {
-			fontFamily: "sans-bold",
+			fontFamily: "sans-semibold",
 			fontSize: 13,
 			color: theme.mutedForeground,
 		},

@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { useIsInTabs } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 type ScreenHeaderProps = {
 	title: string;
 	/** One short line saying what the screen is for. */
 	subtitle?: string;
-	/** Defaults to going back. */
+	/** Defaults to going back. Tab screens show no back button unless this is given. */
 	onBack?: () => void;
 	/** Buttons on the right, usually one or two HeaderIconButtons. */
 	right?: ReactNode;
@@ -19,16 +20,18 @@ type ScreenHeaderProps = {
 /**
  * The header every inner screen uses: round back button, title, a one-line subtitle and optional
  * actions on the right, with a hairline underneath. Keeps sizes identical from screen to screen.
+ * On a bottom-tab screen there is nothing to go back to, so the back button is left out.
  */
 export function ScreenHeader({ title, subtitle, onBack, right }: ScreenHeaderProps) {
 	const router = useRouter();
 	const { theme } = useTheme();
 	const styles = createStyles(theme);
+	const showBack = !!onBack || !useIsInTabs();
 
 	return (
 		<View style={styles.wrapper}>
 			<View style={styles.row}>
-				<HeaderIconButton icon="arrow-back" label="Go back" onPress={onBack ?? (() => router.back())} />
+				{showBack && <HeaderIconButton icon="arrow-back" label="Go back" onPress={onBack ?? (() => router.back())} />}
 				<View style={styles.text}>
 					<Text style={styles.title} numberOfLines={1}>
 						{title}

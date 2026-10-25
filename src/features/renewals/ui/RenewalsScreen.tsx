@@ -106,7 +106,13 @@ export function RenewalsScreen() {
                         </Pressable>
 
                         {renewals.map((renewal) => (
-                            <View key={renewal.member_id} style={styles.renewalCard}>
+                            // The card opens the member's profile; the WhatsApp/SMS buttons inside keep their own taps.
+                            <Pressable
+                                key={renewal.member_id}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Open ${renewal.name}'s profile`}
+                                style={({ pressed }) => [styles.renewalCard, pressed && styles.renewalCardPressed]}
+                                onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(renewal.member_id) } })}>
                                 <View style={styles.renewalInfo}>
                                     <Text style={styles.renewalName}>{renewal.name}</Text>
                                     <Text style={styles.renewalMeta}>
@@ -114,18 +120,28 @@ export function RenewalsScreen() {
                                     </Text>
                                 </View>
                                 <View style={styles.renewalActions}>
-                                    <Pressable style={[styles.iconBtn, styles.whatsappBtn]} onPress={() => handleWhatsAppRemind(renewal)}>
+                                    <Pressable
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Remind ${renewal.name} on WhatsApp`}
+                                        style={[styles.iconBtn, styles.whatsappBtn]}
+                                        onPress={() => handleWhatsAppRemind(renewal)}>
                                         <Ionicons name="logo-whatsapp" size={18} color="#fff" />
                                     </Pressable>
-                                    <Pressable style={[styles.iconBtn, styles.smsBtn]} onPress={() => handleSmsRemind(renewal)} disabled={sendingMemberId === renewal.member_id}>
+                                    <Pressable
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Remind ${renewal.name} by SMS`}
+                                        style={[styles.iconBtn, styles.smsBtn]}
+                                        onPress={() => handleSmsRemind(renewal)}
+                                        disabled={sendingMemberId === renewal.member_id}>
                                         {sendingMemberId === renewal.member_id ? (
                                             <ActivityIndicator color={theme.primary} size="small" />
                                         ) : (
                                             <Ionicons name="chatbox-ellipses-outline" size={18} color={theme.primary} />
                                         )}
                                     </Pressable>
+                                    <Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} style={styles.chevron} />
                                 </View>
-                            </View>
+                            </Pressable>
                         ))}
                     </ScrollView>
                 )}
@@ -171,8 +187,15 @@ const createStyles = (theme: any) =>
             borderWidth: 1.5,
             borderColor: theme.border,
         },
+        renewalCardPressed: {
+            opacity: 0.85,
+        },
         renewalInfo: {
             flex: 1,
+        },
+        chevron: {
+            alignSelf: "center",
+            marginLeft: -2,
         },
         renewalName: {
             fontFamily: "sans-extrabold",

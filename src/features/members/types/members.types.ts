@@ -28,10 +28,27 @@ export interface Member {
     status: "active" | "inactive";
     payment_status: "Paid" | "Due" | string;
     active_allocations_count: number;
+    /** Where they sit now, one per batch in the day's order; empty for members who left. */
+    seats?: MemberSeat[];
+    /** What they owe now and for how long; null when nothing is due. */
+    due_amount?: number | null;
+    days_overdue?: number | null;
+    /** Earliest renewal across their seats ("YYYY-MM-DD"); null without a seat. */
+    next_renewal_date?: string | null;
+    /** For members who left: when their last seat ended. */
+    left_on?: string | null;
     /** Owed when the member left; 0 for active members. */
     outstanding_balance: number;
     // UI-only derived fields
     initials?: string;
+}
+
+export interface MemberSeat {
+    batch_id: number;
+    batch_name: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    seat_number: number | string | null;
 }
 
 export interface MembersResponse {

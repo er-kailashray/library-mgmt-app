@@ -1,8 +1,9 @@
-import * as Notifications from "expo-notifications";
+import type { NotificationResponse } from "expo-notifications";
 import { Href, Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 
 import { setSubscriptionExpiredHandler } from "@/services/api/subscription-guard";
+import { Notifications } from "@/services/push/notifications-module";
 import { notificationUrl, registerForPushNotifications } from "@/services/push/push-notifications";
 
 export default function AppGroupLayout() {
@@ -21,17 +22,20 @@ export default function AppGroupLayout() {
 
 	// Tapping a notification opens the screen it is about, including when it launched the app.
 	useEffect(() => {
-		const open = (response: Notifications.NotificationResponse | null) => {
+		// Not available in Expo Go on Android (see notifications-module).
+		const notifications = Notifications;
+		if (!notifications) return;
+		const open = (response: NotificationResponse | null) => {
 			const url = notificationUrl(response);
 			if (url) router.push(url as Href);
 		};
 
 		// Cleared once handled, so signing in again later doesn't reopen an old notification.
-		open(Notifications.getLastNotificationResponse());
-		Notifications.clearLastNotificationResponse();
-		const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+		open(notifications.getLastNotificationResponse());
+		notifications.clearLastNotificationResponse();
+		const subscription = notifications.addNotificationResponseReceivedListener((response) => {
 			open(response);
-			Notifications.clearLastNotificationResponse();
+			notifications.clearLastNotificationResponse();
 		});
 		return () => subscription.remove();
 	}, [router]);

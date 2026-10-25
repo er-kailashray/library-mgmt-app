@@ -1,24 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { deleteLibraryPhotoApi, getLibraryProfileApi, uploadLibraryPhotoApi } from "@/features/library-profile/logic/library-profile-api";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const MAX_PHOTOS = 10;
+/** Longest side of an uploaded photo, in pixels. */
+const MAX_PHOTO_EDGE = 1920;
+const COLUMNS = 3;
+const GRID_GAP = 12;
+const SIDE_PADDING = 20;
+
+/**
+ * The backend takes JPG/PNG up to 5 MB, but gallery originals are often HEIC or larger than that.
+ * Re-saving as a JPEG no bigger than MAX_PHOTO_EDGE always passes and keeps the gallery quick to load.
+ */
+async function toUploadableJpeg(asset: ImagePicker.ImagePickerAsset): Promise<string> {
+    const context = ImageManipulator.manipulate(asset.uri);
+    if (Math.max(asset.width, asset.height) > MAX_PHOTO_EDGE) {
+        context.resize(asset.width >= asset.height ? { width: MAX_PHOTO_EDGE } : { height: MAX_PHOTO_EDGE });
+    }
+    const image = await context.renderAsync();
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
+    return saved.uri;
+}
 
 export function LibraryPhotosScreen() {
     const router = useRouter();
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    // Exact pixel squares: percentage widths with aspectRatio left the add tile's icon off-centre
+    // and the last column short of the edge.
+    const tileSize = Math.floor((width - SIDE_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
+    const tileStyle = { width: tileSize, height: tileSize };
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
     const { data: profile, isLoading, error, refetch } = useApiData(getLibraryProfileApi, []);
     const photos = profile?.photos ?? [];
@@ -29,37 +56,71 @@ export function LibraryPhotosScreen() {
         }, [refetch])
     );
 
-    const [isUploading, setIsUploading] = useState(false);
+    // Several gallery picks upload one after another; this drives the "2 / 4" on the add tile.
+    const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+    const isUploading = uploadProgress !== null;
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const remainingSlots = MAX_PHOTOS - photos.length;
 
     const pickAndUpload = useCallback(
         async (source: "camera" | "gallery") => {
-            const permission =
-                source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-            if (!permission.granted) {
-                Alert.alert("Permission needed", `Please allow ${source === "camera" ? "camera" : "photo library"} access to add a photo.`);
-                return;
+            // The gallery uses the system photo picker, which needs no permission (asking for it
+            // only blocked the gallery for anyone who had once said no).
+            if (source === "camera") {
+                const permission = await ImagePicker.requestCameraPermissionsAsync();
+                if (!permission.granted) {
+                    Alert.alert("Permission needed", "Please allow camera access to take a photo.");
+                    return;
+                }
             }
 
+            const options: ImagePicker.ImagePickerOptions = {
+                mediaTypes: ["images"],
+                quality: 0.7,
+                // iOS: hand back a JPEG-compatible copy rather than the HEIC original.
+                preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            };
             const result =
                 source === "camera"
-                    ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7 })
-                    : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+                    ? await ImagePicker.launchCameraAsync(options)
+                    : await ImagePicker.launchImageLibraryAsync({
+                          ...options,
+                          // Pick several at once, up to the free slots; ordered so they upload in the order tapped.
+                          allowsMultipleSelection: remainingSlots > 1,
+                          selectionLimit: remainingSlots,
+                          orderedSelection: true,
+                      });
 
-            if (result.canceled || !result.assets[0]) return;
+            if (result.canceled || result.assets.length === 0) return;
+            // Older Android pickers ignore selectionLimit, so never send more than there's room for.
+            const assets = result.assets.slice(0, remainingSlots);
+            const skipped = result.assets.length - assets.length;
 
-            try {
-                setIsUploading(true);
-                await uploadLibraryPhotoApi(result.assets[0].uri);
-                await refetch();
-            } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to upload photo.");
-            } finally {
-                setIsUploading(false);
+            // One at a time, so a bad photo doesn't stop the rest and the backend's limit check stays accurate.
+            const failures: string[] = [];
+            setUploadProgress({ done: 0, total: assets.length });
+            for (const [index, asset] of assets.entries()) {
+                try {
+                    await uploadLibraryPhotoApi(await toUploadableJpeg(asset));
+                } catch (err: any) {
+                    failures.push(err.message || "Failed to upload photo.");
+                }
+                setUploadProgress({ done: index + 1, total: assets.length });
+            }
+            await refetch();
+            setUploadProgress(null);
+
+            if (failures.length > 0) {
+                const uploaded = assets.length - failures.length;
+                Alert.alert(
+                    uploaded > 0 ? `${uploaded} of ${assets.length} photos added` : assets.length > 1 ? "Photos not added" : "Photo not added",
+                    [...new Set(failures)].join("\n")
+                );
+            } else if (skipped > 0) {
+                Alert.alert("Limit reached", `Added ${assets.length}. You can have up to ${MAX_PHOTOS} photos, so ${skipped} weren't added.`);
             }
         },
-        [refetch]
+        [refetch, remainingSlots]
     );
 
     const handleAddPhoto = useCallback(() => {
@@ -67,12 +128,12 @@ export function LibraryPhotosScreen() {
             Alert.alert("Limit reached", `You can add up to ${MAX_PHOTOS} photos.`);
             return;
         }
-        Alert.alert("Add Photo", undefined, [
+        Alert.alert("Add Photos", remainingSlots > 1 ? `You can add ${remainingSlots} more.` : "You can add 1 more.", [
             { text: "Take Photo", onPress: () => pickAndUpload("camera") },
             { text: "Choose from Gallery", onPress: () => pickAndUpload("gallery") },
             { text: "Cancel", style: "cancel" },
         ]);
-    }, [photos.length, pickAndUpload]);
+    }, [photos.length, pickAndUpload, remainingSlots]);
 
     const handleDeletePhoto = useCallback(
         (id: number) => {
@@ -113,9 +174,11 @@ export function LibraryPhotosScreen() {
                 ) : (
                     <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                         <View style={styles.grid}>
-                            {photos.map((photo) => (
-                                <View key={photo.id} style={styles.photoTile}>
-                                    <Image source={{ uri: photo.url }} style={styles.photoImage} />
+                            {photos.map((photo, index) => (
+                                <View key={photo.id} style={[styles.photoTile, tileStyle]}>
+                                    <Pressable accessibilityRole="button" accessibilityLabel={`View photo ${index + 1}`} style={styles.photoImage} onPress={() => setPreviewIndex(index)}>
+                                        <Image source={{ uri: photo.url }} style={styles.photoImage} />
+                                    </Pressable>
                                     <Pressable
                                         accessibilityRole="button"
                                         style={styles.removeBtn}
@@ -127,13 +190,20 @@ export function LibraryPhotosScreen() {
                             ))}
 
                             {photos.length < MAX_PHOTOS && (
-                                <Pressable style={styles.addTile} onPress={handleAddPhoto} disabled={isUploading}>
-                                    {isUploading ? (
-                                        <ActivityIndicator color={theme.primary} size="small" />
+                                <Pressable accessibilityRole="button" accessibilityLabel="Add photo" style={[styles.addTile, tileStyle]} onPress={handleAddPhoto} disabled={isUploading}>
+                                    {uploadProgress ? (
+                                        <>
+                                            <ActivityIndicator color={theme.primary} size="small" />
+                                            {uploadProgress.total > 1 && (
+                                                <Text style={styles.addTileText}>
+                                                    Uploading {Math.min(uploadProgress.done + 1, uploadProgress.total)} / {uploadProgress.total}
+                                                </Text>
+                                            )}
+                                        </>
                                     ) : (
                                         <>
                                             <Ionicons name="camera-outline" size={28} color={theme.mutedForeground} />
-                                            <Text style={styles.addTileText}>Add Photo</Text>
+                                            <Text style={styles.addTileText}>Add Photos</Text>
                                         </>
                                     )}
                                 </Pressable>
@@ -143,6 +213,13 @@ export function LibraryPhotosScreen() {
                         {photos.length === 0 && <Text style={styles.emptyText}>Add a few photos of your library - these help members know what to expect.</Text>}
                     </ScrollView>
                 )}
+
+                <PhotoViewer
+                    visible={previewIndex !== null}
+                    photos={photos.map((photo) => ({ key: String(photo.id), uri: photo.url }))}
+                    initialIndex={previewIndex ?? 0}
+                    onClose={() => setPreviewIndex(null)}
+                />
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -154,17 +231,15 @@ const createStyles = (theme: any) =>
             flex: 1,
         },
         scroll: {
-            paddingHorizontal: 20,
+            paddingHorizontal: SIDE_PADDING,
             paddingTop: 24,
         },
         grid: {
             flexDirection: "row",
             flexWrap: "wrap",
-            gap: 12,
+            gap: GRID_GAP,
         },
         photoTile: {
-            width: "31%",
-            aspectRatio: 1,
             borderRadius: 16,
             overflow: "hidden",
             position: "relative",
@@ -186,8 +261,6 @@ const createStyles = (theme: any) =>
             justifyContent: "center",
         },
         addTile: {
-            width: "31%",
-            aspectRatio: 1,
             borderRadius: 16,
             borderWidth: 1.5,
             borderColor: theme.border,

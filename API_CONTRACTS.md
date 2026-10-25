@@ -9,7 +9,9 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
 
 ## Implemented
 
-- `GET /api/members`, `GET /api/members/{id}`, `POST /api/members/{id}/deactivate`
+- `GET /api/members`, `GET /api/members/{id}`, `POST /api/members/{id}/deactivate`. Each list row
+  carries `seats[]` `{ batch_id, batch_name, start_time, end_time, seat_number }` — where the member
+  sits now, one per active batch in the day's order (empty for members who left).
 - `GET /api/batches`, `POST /api/batches`
 - `GET /api/seat-matrix`
 - `POST /api/admission`
@@ -34,6 +36,23 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
   `POST /api/me/push-tokens/remove` `{ token }` on logout. `POST /api/me/notification-settings`
   `{ enabled }` — the owner's single on/off switch, returned as `push_notifications_enabled` on `/me`.
   Notifications carry `data.url` (an app route such as `/payments`) that the app opens on tap.
+- `GET /api/notifications` (optional `?before=<id>` for the next page) — the Alerts inbox, newest
+  first, 30 per page: `{ items: [{ id, type, title, body, url, read, created_at }], has_more,
+  unread_count }`. `type` is `renewals_due` / `dues_summary` / `subscription`. The morning alerts
+  and plan reminders are saved here even when push is off or no device is registered; the
+  "batch starts in 5 minutes" nudge is push-only. `GET /api/notifications/unread-count` →
+  `{ unread_count }` for the tab badge. `POST /api/notifications/read` `{ ids? }` marks those read
+  (all when `ids` is left out) and returns the new `unread_count`. Not subject to the library or
+  subscription checks.
+- `GET /api/reports?months=3|6|12` (default 6) — `{ months, from, to, revenue, dues, members,
+  attendance }`. `revenue.by_month[]` `{ month: "YYYY-MM", label, collected (net of refunds),
+  refunded, payments_count }`, plus `total`, `this_month`, `last_month`, `change_pct` (null when last
+  month is 0) and `by_mode[]`. `dues` `{ total_outstanding, overdue_members, by_age[] { key, label,
+  members, amount }, collection_rate }` (collected this month ÷ (collected + still owed), %, null
+  when both are 0). `members` `{ active, by_month[] { joined, left, active }, occupancy[] per batch
+  { occupied, total, rate } }`. `attendance` `{ window_days: 30, tracked, by_batch[] { enrolled,
+  marked_days, average_present, rate }, not_seen { after_days: 7, count, members[] { member_id, name,
+  last_seen | null, days } } }`.
 
 `POST /api/members/{id}/remind` is channel-smart: it sends the overdue message if the member owes
 money, the renewal message if they don't but are renewing soon, otherwise a generic nudge — same

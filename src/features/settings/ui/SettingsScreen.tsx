@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
@@ -12,11 +12,13 @@ import { handleLogout } from "@/features/settings/logic/settings-logic";
 import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
 import { updateNotificationSettingsApi } from "@/services/api/push.api";
 import { registerForPushNotifications } from "@/services/push/push-notifications";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { getInitials } from "@/shared/utils/text";
+import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
@@ -38,7 +40,7 @@ interface SettingsGroup {
 export function SettingsScreen() {
 	const router = useRouter();
 	const { theme, mode, setMode } = useTheme();
-	const insets = useSafeAreaInsets();
+	const bottomInset = useScreenBottomInset();
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const { data: dashboard } = useApiData(getDashboardApi, []);
@@ -75,6 +77,7 @@ export function SettingsScreen() {
 	const [editProfilePhone, setEditProfilePhone] = useState("");
 	const [isSavingProfile, setIsSavingProfile] = useState(false);
 	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+	const [isPhotoPreviewVisible, setIsPhotoPreviewVisible] = useState(false);
 
 	const handleChangePhoto = useCallback(async () => {
 		const uri = await pickProfilePhoto();
@@ -231,9 +234,15 @@ export function SettingsScreen() {
 			<SafeAreaView style={styles.safe} edges={["top"]}>
 				<ScreenHeader title="Settings" subtitle="Library & account preferences" />
 
-				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + bottomInset }]} showsVerticalScrollIndicator={false}>
 					<View style={styles.profileCenterBlock}>
-						<Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={handleChangePhoto} disabled={isUploadingPhoto} style={styles.avatarHugeWrap}>
+						{/* With a photo, tapping it opens the preview; the camera badge (or an empty avatar) changes it. */}
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={user?.profile_photo_url ? "View profile photo" : "Add profile photo"}
+							onPress={user?.profile_photo_url ? () => setIsPhotoPreviewVisible(true) : handleChangePhoto}
+							disabled={isUploadingPhoto}
+							style={styles.avatarHugeWrap}>
 							<View style={styles.avatarHugeBackground}>
 								{user?.profile_photo_url ? (
 									<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
@@ -246,10 +255,33 @@ export function SettingsScreen() {
 									</View>
 								)}
 							</View>
-							<View style={styles.avatarCameraBadge}>
+							<Pressable
+								accessibilityRole="button"
+								accessibilityLabel="Change profile photo"
+								style={styles.avatarCameraBadge}
+								onPress={handleChangePhoto}
+								disabled={isUploadingPhoto}
+								hitSlop={6}>
 								<Ionicons name="camera" size={16} color={theme.background} />
-							</View>
+							</Pressable>
 						</Pressable>
+						<PhotoViewer
+							visible={isPhotoPreviewVisible}
+							photos={user?.profile_photo_url ? [{ key: "profile", uri: user.profile_photo_url }] : []}
+							onClose={() => setIsPhotoPreviewVisible(false)}
+							renderFooter={() => (
+								<Pressable
+									accessibilityRole="button"
+									style={styles.previewChangeBtn}
+									onPress={() => {
+										setIsPhotoPreviewVisible(false);
+										void handleChangePhoto();
+									}}>
+									<Ionicons name="camera-outline" size={18} color="#fff" />
+									<Text style={styles.previewChangeText}>Change photo</Text>
+								</Pressable>
+							)}
+						/>
 						<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
 						{user && (
 							<View style={styles.ownerInfoRow}>
@@ -426,6 +458,19 @@ const createStyles = (theme: any) => StyleSheet.create({
 		borderColor: theme.background,
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	previewChangeBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		paddingHorizontal: 22,
+		paddingVertical: 12,
+		borderRadius: RADIUS.lg,
+		backgroundColor: theme.accent,
+	},
+	previewChangeText: {
+		...BUTTON_TEXT,
+		color: "#fff",
 	},
 	avatarHugeText: {
 		fontFamily: "sans-extrabold",

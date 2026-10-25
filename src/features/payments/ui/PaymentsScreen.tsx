@@ -18,7 +18,7 @@ import {
     TouchableWithoutFeedback,
     View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
@@ -26,6 +26,7 @@ import { createPaymentApi, getPaymentsApi } from "@/features/payments/logic/paym
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode } from "@/features/payments/types/payments.types";
 import { describePaymentPeriod, formatPaymentWhen, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
 import { remindAllOverdueApi, remindMemberApi } from "@/features/reminders/logic/reminders-api";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
@@ -71,7 +72,7 @@ function formatMonth(month: string, short = false): string {
 export function PaymentsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
-    const insets = useSafeAreaInsets();
+    const bottomInset = useScreenBottomInset();
     const [showPaymentForm, setShowPaymentForm] = useState(false);
     const params = useLocalSearchParams<{ tab?: string }>();
     // Two views: money that came in (by month), and who owes money now.
@@ -271,7 +272,7 @@ export function PaymentsScreen() {
                         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
                             <ScreenHeader title="Mark Payment" subtitle="Record a student payment" onBack={() => setShowPaymentForm(false)} />
 
-                            <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+                            <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + bottomInset }]} keyboardShouldPersistTaps="handled">
                                 <View style={styles.formGroup}>
                                     <Text style={styles.label}>Member</Text>
                                     <Pressable style={styles.input} onPress={() => setMemberPickerVisible(true)}>
@@ -427,7 +428,7 @@ export function PaymentsScreen() {
                                 data={visibleReceived}
                                 renderItem={renderPaymentItem}
                                 keyExtractor={(item) => item.id}
-                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + insets.bottom }]}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + bottomInset }]}
                                 showsVerticalScrollIndicator={false}
                             />
                         )}
@@ -463,7 +464,7 @@ export function PaymentsScreen() {
                                 data={visibleDues}
                                 renderItem={renderDueItem}
                                 keyExtractor={(item) => item.id}
-                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + insets.bottom }]}
+                                contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + bottomInset }]}
                                 showsVerticalScrollIndicator={false}
                             />
                         )}
