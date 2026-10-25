@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getReportApi } from "@/features/reports/logic/reports-api";
@@ -17,13 +17,11 @@ import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { FilterChip } from "@/shared/ui/FilterChip";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text } from "@/shared/ui/Text";
+import { formatRupee } from "@/shared/utils/currency";
 import { formatShortDate } from "@/shared/utils/dates";
 
 const RANGES: ReportMonths[] = [3, 6, 12];
-
-function formatRupee(amount: number): string {
-    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
-}
 
 /** Short amounts for chart captions: ₹950, ₹12.5k, ₹1.2L. */
 function compactRupee(amount: number): string {

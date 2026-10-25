@@ -1,8 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ID_PROOF_TYPE_LABELS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
@@ -18,17 +19,15 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ChoiceChips } from "@/shared/ui/ChoiceChips";
+import { formatRupee } from "@/shared/utils/currency";
 import { getInitials } from "@/shared/utils/text";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { CalendarPicker } from "@/shared/ui/CalendarPicker";
 import { addDays, addMonths, durationSince, toIsoDate } from "@/shared/utils/dates";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: PAYMENT_MODE_LABELS[value] }));
-
-function formatRupee(amount: number): string {
-    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
-}
 
 /** "22 Oct", or "22 Oct 2026" with the year. Accepts "YYYY-MM-DD" or a full timestamp. */
 function formatShortDate(date: string, withYear = false): string {
@@ -696,7 +695,7 @@ export function MemberDetailScreen() {
                         </Pressable>
                         {viewingSide && <Text style={styles.idProofModalLabel}>{viewingSide === "front" ? "Front" : "Back"}</Text>}
                         {idProofSource ? (
-                            <Image source={idProofSource} style={styles.idProofModalImage} resizeMode="contain" />
+                            <Image source={idProofSource} style={styles.idProofModalImage} contentFit="contain" transition={150} />
                         ) : (
                             <ActivityIndicator color="#fff" size="large" />
                         )}

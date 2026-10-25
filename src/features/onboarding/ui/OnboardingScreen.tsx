@@ -1,19 +1,8 @@
+import { Image, type ImageSource } from "expo-image";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useRef, useState } from "react";
-import {
-	FlatList,
-	Image,
-	ImageSourcePropType,
-	ListRenderItemInfo,
-	NativeScrollEvent,
-	NativeSyntheticEvent,
-	Pressable,
-	StyleSheet,
-	Text,
-	useWindowDimensions,
-	View,
-} from "react-native";
+import { FlatList, ListRenderItemInfo, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
@@ -21,10 +10,11 @@ import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { Text } from "@/shared/ui/Text";
 
 type Slide = {
 	key: string;
-	image: ImageSourcePropType;
+	image: ImageSource | number;
 	title: string;
 	body: string;
 };
@@ -85,7 +75,7 @@ export function OnboardingScreen() {
 		({ item }: ListRenderItemInfo<Slide>) => (
 			<View style={[styles.page, { width }]}>
 				<View style={styles.illustrationWrap}>
-					<Image source={item.image} style={styles.illustration} resizeMode="contain" />
+					<Image source={item.image} style={styles.illustration} contentFit="contain" />
 				</View>
 				<Text style={styles.title}>{item.title}</Text>
 				<Text style={styles.body}>{item.body}</Text>

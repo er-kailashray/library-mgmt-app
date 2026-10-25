@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import { Href, useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getNotificationsApi, markNotificationsReadApi } from "@/features/notifications/logic/notifications-api";
@@ -15,6 +16,7 @@ import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text } from "@/shared/ui/Text";
 import { formatShortDate, todayIso, toIsoDate, addDays } from "@/shared/utils/dates";
 
 type Look = { icon: keyof typeof Ionicons.glyphMap; color: (theme: Theme) => string };
@@ -171,9 +173,11 @@ export function NotificationsScreen() {
                 ) : error && alerts.length === 0 ? (
                     <ErrorState message={error} onRetry={() => void loadFirstPage()} />
                 ) : (
-                    <FlatList
+                    <FlashList
                         data={rows}
                         keyExtractor={(row) => row.key}
+                        // Day headings and alert cards recycle separately (different layouts).
+                        getItemType={(row) => row.kind}
                         renderItem={renderRow}
                         contentContainerStyle={[styles.listContent, { paddingBottom: 24 + bottomInset }]}
                         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void loadFirstPage(true)} tintColor={theme.accent} colors={[theme.accent]} />}

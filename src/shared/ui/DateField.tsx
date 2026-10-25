@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { CalendarPicker } from "@/shared/ui/CalendarPicker";
+import { Text } from "@/shared/ui/Text";
 import { formatShortDate, todayIso } from "@/shared/utils/dates";
 
 type DateFieldProps = {

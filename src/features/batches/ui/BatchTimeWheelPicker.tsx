@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from "react-native";
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, View } from "react-native";
 
 import { formatTime, MINUTE_STEPS } from "@/features/batches/logic/batch-time";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const PERIODS = ["AM", "PM"];

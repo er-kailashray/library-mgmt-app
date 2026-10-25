@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { formatSubscriptionDate, getSubscriptionApi } from "@/features/subscription/logic/subscription-api";
 import { SUBSCRIPTION_NUDGE_DAYS, SubscriptionInfo } from "@/features/subscription/types/subscription.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 /** What to tell the owner, or null when there's nothing worth interrupting Home for. */
 function bannerFor(info: SubscriptionInfo, theme: any): { icon: keyof typeof Ionicons.glyphMap; color: string; title: string; detail: string } | null {

@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { fromIsoDate, toIsoDate } from "@/shared/utils/dates";
+import { Text } from "@/shared/ui/Text";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 

@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
@@ -22,6 +23,7 @@ import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 interface SettingsItem {
 	icon: keyof typeof Ionicons.glyphMap;
@@ -41,6 +43,7 @@ export function SettingsScreen() {
 	const router = useRouter();
 	const { theme, mode, setMode } = useTheme();
 	const bottomInset = useScreenBottomInset();
+	const window = useWindowDimensions();
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const { data: dashboard } = useApiData(getDashboardApi, []);
@@ -245,7 +248,7 @@ export function SettingsScreen() {
 							style={styles.avatarHugeWrap}>
 							<View style={styles.avatarHugeBackground}>
 								{user?.profile_photo_url ? (
-									<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
+									<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} transition={150} />
 								) : (
 									<Text style={styles.avatarHugeText}>{getInitials(user?.name || "")}</Text>
 								)}
@@ -304,11 +307,18 @@ export function SettingsScreen() {
 								<View style={styles.iconCircle}>
 									<Ionicons name="color-palette-outline" size={20} color={theme.primary} />
 								</View>
+								{/* Title on its own line and the switch full width below: side by side, the title
+								    got squeezed to nothing on narrower (often Android) screens. */}
 								<View style={styles.themeToggleContainer}>
-									<Text style={styles.optionText}>Theme Mode</Text>
+									<Text style={styles.themeTitle}>Theme Mode</Text>
 									<View style={styles.segmentControl}>
 										{(["system", "light", "dark"] as const).map((m) => (
-											<Pressable key={m} onPress={() => setMode(m)} style={[styles.segment, mode === m && styles.segmentActive]}>
+											<Pressable
+												key={m}
+												accessibilityRole="button"
+												accessibilityState={{ selected: mode === m }}
+												onPress={() => setMode(m)}
+												style={[styles.segment, mode === m && styles.segmentActive]}>
 												<Text style={[styles.segmentText, mode === m && styles.segmentTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
 											</Pressable>
 										))}
@@ -362,6 +372,12 @@ export function SettingsScreen() {
 					<PoweredBy style={styles.footerBlock}>
 						<Text style={styles.versionText}>v1.0.0</Text>
 					</PoweredBy>
+					{/* Development builds only: the numbers that decide how big text looks on this phone. */}
+					{__DEV__ && (
+						<Text style={styles.devInfo} selectable>
+							{`${Platform.OS} · screen ${Math.round(window.width)} × ${Math.round(window.height)} · system text ${Math.round(PixelRatio.getFontScale() * 100)}% · pixel ratio ${PixelRatio.get()}`}
+						</Text>
+					)}
 				</ScrollView>
 
 				<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
@@ -537,11 +553,12 @@ const createStyles = (theme: any) => StyleSheet.create({
 	},
 	themeToggleContainer: {
 		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		flexWrap: "wrap", // Allow wrapping if content is too wide
-		gap: 8,
+		gap: 10,
+	},
+	themeTitle: {
+		fontFamily: "sans-bold",
+		fontSize: 15,
+		color: theme.primary,
 	},
 	segmentControl: {
 		flexDirection: "row",
@@ -553,16 +570,17 @@ const createStyles = (theme: any) => StyleSheet.create({
 		borderColor: theme.border,
 	},
 	segment: {
-		paddingHorizontal: 10, // Reduced padding
-		paddingVertical: 6, // Reduced padding
+		flex: 1,
+		alignItems: "center",
+		paddingVertical: 7,
 		borderRadius: RADIUS.sm,
 	},
 	segmentActive: {
 		backgroundColor: theme.accent,
 	},
 	segmentText: {
-		fontFamily: "sans-bold",
-		fontSize: 11, // Slightly smaller text for consistency
+		fontFamily: "sans-semibold",
+		fontSize: 12,
 		color: theme.mutedForeground,
 	},
 	segmentTextActive: {
@@ -626,6 +644,13 @@ const createStyles = (theme: any) => StyleSheet.create({
 	footerBlock: {
 		paddingTop: 20,
 		marginBottom: 20,
+	},
+	devInfo: {
+		fontFamily: "sans-regular",
+		fontSize: 11,
+		color: theme.mutedForeground,
+		textAlign: "center",
+		marginTop: 8,
 	},
 	versionText: {
 		fontFamily: "sans-bold",

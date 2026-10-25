@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SEAT_BLOCK_SIZE, seatBlocks } from "@/features/admission/logic/seat-picking";
@@ -8,6 +8,7 @@ import { SeatMatrixSeat } from "@/features/seats/types/seats.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { useKeyboardLift } from "@/shared/hooks/useKeyboardLift";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 type Props = {
 	visible: boolean;

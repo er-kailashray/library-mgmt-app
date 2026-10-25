@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
@@ -12,17 +13,11 @@ import { useApiData } from "@/shared/hooks/useApiData";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { formatRupee } from "@/shared/utils/currency";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
-
-function formatRupee(amount: number): string {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(amount);
-}
+import { Text } from "@/shared/ui/Text";
 
 function buildRenewalMessage(renewal: UpcomingRenewal): string {
     const date = new Date(`${renewal.renewal_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -93,22 +88,28 @@ export function RenewalsScreen() {
                 ) : renewals.length === 0 ? (
                     <EmptyState icon="refresh-outline" title="No renewals coming up" subtitle="You'll see members here as their membership gets close to renewing." />
                 ) : (
-                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-                        <Pressable style={[styles.remindAllBtn, isSendingBulk && { opacity: 0.7 }]} onPress={handleRemindAll} disabled={isSendingBulk}>
-                            {isSendingBulk ? (
-                                <ActivityIndicator color={theme.accent} size="small" />
-                            ) : (
-                                <>
-                                    <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
-                                    <Text style={styles.remindAllBtnText}>Remind everyone renewing soon (SMS)</Text>
-                                </>
-                            )}
-                        </Pressable>
-
-                        {renewals.map((renewal) => (
+                    <FlashList
+                        data={renewals}
+                        keyExtractor={(renewal) => String(renewal.member_id)}
+                        // Rows show a spinner while their SMS sends, so they redraw when that changes.
+                        extraData={sendingMemberId}
+                        contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]}
+                        showsVerticalScrollIndicator={false}
+                        ListHeaderComponent={
+                            <Pressable style={[styles.remindAllBtn, isSendingBulk && { opacity: 0.7 }]} onPress={handleRemindAll} disabled={isSendingBulk}>
+                                {isSendingBulk ? (
+                                    <ActivityIndicator color={theme.accent} size="small" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
+                                        <Text style={styles.remindAllBtnText}>Remind everyone renewing soon (SMS)</Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        }
+                        renderItem={({ item: renewal }) => (
                             // The card opens the member's profile; the WhatsApp/SMS buttons inside keep their own taps.
                             <Pressable
-                                key={renewal.member_id}
                                 accessibilityRole="button"
                                 accessibilityLabel={`Open ${renewal.name}'s profile`}
                                 style={({ pressed }) => [styles.renewalCard, pressed && styles.renewalCardPressed]}
@@ -142,8 +143,8 @@ export function RenewalsScreen() {
                                     <Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} style={styles.chevron} />
                                 </View>
                             </Pressable>
-                        ))}
-                    </ScrollView>
+                        )}
+                    />
                 )}
             </SafeAreaView>
         </ScreenBackground>

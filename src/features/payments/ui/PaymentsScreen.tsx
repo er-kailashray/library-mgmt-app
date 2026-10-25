@@ -2,22 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableWithoutFeedback,
-    View,
-} from "react-native";
+import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
@@ -36,9 +21,11 @@ import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionB
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { FilterChip } from "@/shared/ui/FilterChip";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
 import { formatShortDate } from "@/shared/utils/dates";
 
 import { MonthPickerSheet } from "./MonthPickerSheet";
+import { FlashList } from "@shopify/flash-list";
 
 
 type Tab = "received" | "due";
@@ -423,7 +410,7 @@ export function PaymentsScreen() {
                                 subtitle={monthReceived.length === 0 ? "Use the arrows or tap the month to see other months." : "Try a different name or filter."}
                             />
                         ) : (
-                            <FlatList
+                            <FlashList
                                 style={styles.list}
                                 data={visibleReceived}
                                 renderItem={renderPaymentItem}
@@ -459,7 +446,7 @@ export function PaymentsScreen() {
                                 subtitle={dues.length === 0 ? "Everyone is paid up." : "Try a different name."}
                             />
                         ) : (
-                            <FlatList
+                            <FlashList
                                 style={styles.list}
                                 data={visibleDues}
                                 renderItem={renderDueItem}

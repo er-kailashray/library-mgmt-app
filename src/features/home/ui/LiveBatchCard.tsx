@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import { formatTime, toMinutes } from "@/features/batches/logic/batch-time";
 import { Batch } from "@/features/batches/types/batches.types";
 import { DashboardData } from "@/features/home/types/home.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 const DAY = 24 * 60;
 

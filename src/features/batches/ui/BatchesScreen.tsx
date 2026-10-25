@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { durationLabel, findClash, formatTime, fromMinutes, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
@@ -16,16 +16,14 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
+import { Text, TextInput } from "@/shared/ui/Text";
+import { formatRupee as formatAmount } from "@/shared/utils/currency";
 
 import { BatchTimeWheelPicker } from "./BatchTimeWheelPicker";
 
 function formatRupee(amountStr: string): string {
 	const amount = parseFloat(amountStr) || 0;
-	return new Intl.NumberFormat("en-IN", {
-		style: "currency",
-		currency: "INR",
-		maximumFractionDigits: 0,
-	}).format(amount);
+	return formatAmount(amount);
 }
 
 export function BatchesScreen() {

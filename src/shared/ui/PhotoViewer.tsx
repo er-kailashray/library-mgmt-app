@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useEffect, useState, type ReactNode } from "react";
-import { FlatList, Image, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { Text } from "@/shared/ui/Text";
 
 export interface ViewerPhoto {
 	key: string;
@@ -50,7 +53,7 @@ export function PhotoViewer({ visible, photos, initialIndex = 0, onClose, render
 					onMomentumScrollEnd={onScrollEnd}
 					renderItem={({ item }) => (
 						<View style={[styles.page, { width, height }]}>
-							<Image source={{ uri: item.uri }} style={{ width, height: height * 0.75 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+							<Image source={{ uri: item.uri }} style={{ width, height: height * 0.75 }} contentFit="contain" transition={150} />
 						</View>
 					)}
 				/>

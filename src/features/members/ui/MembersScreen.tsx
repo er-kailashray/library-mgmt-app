@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useMemo, useState } from "react";
-import { Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import { memo, useCallback, useMemo, useState } from "react";
+import { FlashList } from "@shopify/flash-list";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
@@ -16,6 +17,8 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
+import { formatRupee } from "@/shared/utils/currency";
 import { formatShortDate, fromIsoDate, todayIso } from "@/shared/utils/dates";
 import { getInitials } from "@/shared/utils/text";
 
@@ -40,6 +43,24 @@ const ROW_PADDING = 16;
 const AVATAR_GAP = 14;
 
 type Section = { key: string; title: string; data: Member[] };
+
+/** One flat list for FlashList: a heading per section, then its rows (first/last round the card). */
+type ListItem =
+    | { type: "header"; key: string; title: string }
+    | { type: "member"; key: string; member: Member; isFirst: boolean; isLast: boolean };
+
+function flatten(sections: Section[]): ListItem[] {
+    return sections.flatMap((section) => [
+        { type: "header" as const, key: `header-${section.key}`, title: section.title },
+        ...section.data.map((member, index) => ({
+            type: "member" as const,
+            key: String(member.id),
+            member,
+            isFirst: index === 0,
+            isLast: index === section.data.length - 1,
+        })),
+    ]);
+}
 
 const isDue = (member: Member) => member.status === "active" && (member.due_amount ?? 0) > 0;
 
@@ -72,10 +93,6 @@ function avatarColor(member: Member): string {
     const n = Number(member.id);
     const index = Number.isFinite(n) ? n : member.name.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
     return AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
-}
-
-function formatRupee(amount: number): string {
-    return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 }
 
 function daysUntil(iso: string): number {
@@ -147,8 +164,8 @@ export function MembersScreen() {
         [members]
     );
 
-    const sections = useMemo(
-        () => toSections(members.filter((m) => matchesFilter(m, filter) && matchesSearch(m, searchQuery)), filter),
+    const items = useMemo(
+        () => flatten(toSections(members.filter((m) => matchesFilter(m, filter) && matchesSearch(m, searchQuery)), filter)),
         [members, filter, searchQuery]
     );
 
@@ -163,9 +180,12 @@ export function MembersScreen() {
     const openMember = useCallback((member: Member) => router.push({ pathname: "/members/[id]", params: { id: String(member.id) } }), [router]);
 
     const renderItem = useCallback(
-        ({ item, index, section }: { item: Member; index: number; section: Section }) => (
-            <MemberRow member={item} isFirst={index === 0} isLast={index === section.data.length - 1} onPress={openMember} styles={styles} theme={theme} />
-        ),
+        ({ item }: { item: ListItem }) =>
+            item.type === "header" ? (
+                <Text style={styles.sectionTitle}>{item.title}</Text>
+            ) : (
+                <MemberRow member={item.member} isFirst={item.isFirst} isLast={item.isLast} onPress={openMember} styles={styles} theme={theme} />
+            ),
         [openMember, styles, theme]
     );
 
@@ -223,12 +243,12 @@ export function MembersScreen() {
                 ) : error && !data ? (
                     <ErrorState message={error} onRetry={refetch} />
                 ) : (
-                    <SectionList
-                        sections={sections}
-                        keyExtractor={(item) => String(item.id)}
+                    <FlashList
+                        data={items}
+                        keyExtractor={(item) => item.key}
+                        // Headings and member rows recycle separately (different layouts).
+                        getItemType={(item) => item.type}
                         renderItem={renderItem}
-                        renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
-                        stickySectionHeadersEnabled={false}
                         contentContainerStyle={[styles.listContent, { paddingBottom: FAB_CLEARANCE + bottomInset }]}
                         keyboardShouldPersistTaps="handled"
                         keyboardDismissMode="on-drag"
@@ -264,7 +284,9 @@ export function MembersScreen() {
 
 type Styles = ReturnType<typeof createStyles>;
 
-function MemberRow({
+/** Memoized: its props are stable (member objects come straight from the loaded list), so typing
+ * in search or switching filters only redraws the rows that actually change. */
+const MemberRow = memo(function MemberRow({
     member,
     isFirst,
     isLast,
@@ -315,7 +337,7 @@ function MemberRow({
             </View>
         </Pressable>
     );
-}
+});
 
 /** The right-hand column: owed amount, renewal date, or when they left. */
 function Trailing({ member, styles, theme }: { member: Member; styles: Styles; theme: Theme }) {

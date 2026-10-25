@@ -1,7 +1,9 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { StyleSheet, View } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 /** Logo with the wordmark and tagline beside it, shared by the login and register screens. */
 export function AuthBrand() {

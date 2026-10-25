@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, TextInputProps, View } from "react-native";
+import { Pressable, StyleSheet, TextInputProps, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { TextInput } from "@/shared/ui/Text";
 
 type PasswordInputProps = Omit<TextInputProps, "secureTextEntry"> & {
 	hasError?: boolean;

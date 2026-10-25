@@ -1,9 +1,10 @@
 import { useRef } from "react";
-import { Pressable, StyleSheet, Text, TextInput, TextInputInstance, View } from "react-native";
+import { Pressable, StyleSheet, TextInputInstance, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 type OtpInputProps = {
 	value: string;

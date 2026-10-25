@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
@@ -15,6 +16,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { FilterChip } from "@/shared/ui/FilterChip";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 const COLUMNS = 6;
 const SECTION_SIZE = 20;
@@ -40,6 +42,8 @@ interface SeatSection {
     data: SeatMatrixSeat[][];
 }
 
+type SeatListItem = { type: "header"; key: string; section: SeatSection } | { type: "row"; key: string; row: SeatMatrixSeat[] };
+
 export function SeatsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
@@ -59,7 +63,7 @@ export function SeatsScreen() {
 
     const [selectedSeat, setSelectedSeat] = useState<SeatMatrixSeat | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const sectionListRef = useRef<SectionList<SeatMatrixSeat[], SeatSection>>(null);
+    const listRef = useRef<FlashListRef<SeatListItem>>(null);
 
     const toggleBatch = (batchId: number) => {
         setSelectedBatchIds((prev) =>
@@ -86,22 +90,29 @@ export function SeatsScreen() {
             });
     }, [seats]);
 
+    // FlashList takes one flat list: each section's heading (kept sticky) followed by its rows.
+    const items = useMemo(
+        (): SeatListItem[] =>
+            sections.flatMap((section) => [
+                { type: "header" as const, key: `header-${section.title}`, section },
+                ...section.data.map((row) => ({ type: "row" as const, key: `row-${row[0]?.seat_id}`, row })),
+            ]),
+        [sections]
+    );
+    const stickyHeaderIndices = useMemo(() => items.flatMap((item, index) => (item.type === "header" ? [index] : [])), [items]);
+
     const handleJumpToSeat = useCallback(() => {
         const target = formatSeatNumber(searchQuery);
         if (target === "0") return;
 
-        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-            const rows = sections[sectionIndex].data;
-            for (let itemIndex = 0; itemIndex < rows.length; itemIndex++) {
-                if (rows[itemIndex].some((seat) => formatSeatNumber(seat.seat_number) === target)) {
-                    sectionListRef.current?.scrollToLocation({ sectionIndex, itemIndex, animated: true, viewPosition: 0.2 });
-                    return;
-                }
-            }
+        const index = items.findIndex((item) => item.type === "row" && item.row.some((seat) => formatSeatNumber(seat.seat_number) === target));
+        if (index >= 0) {
+            void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.2 });
+            return;
         }
 
         Alert.alert("Not found", `Seat ${target} doesn't exist.`);
-    }, [searchQuery, sections]);
+    }, [searchQuery, items]);
 
     const styles = createStyles(theme, seatChipSize);
 
@@ -134,9 +145,9 @@ export function SeatsScreen() {
         );
     };
 
-    const renderRow = ({ item: row }: { item: SeatMatrixSeat[] }) => <View style={styles.seatRow}>{row.map(renderSeatChip)}</View>;
+    const renderRow = (row: SeatMatrixSeat[]) => <View style={styles.seatRow}>{row.map(renderSeatChip)}</View>;
 
-    const renderSectionHeader = ({ section }: { section: SeatSection }) => (
+    const renderSectionHeader = (section: SeatSection) => (
         <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionHeaderTitle}>{section.title}</Text>
             <Text style={styles.sectionHeaderMeta}>
@@ -257,19 +268,17 @@ export function SeatsScreen() {
                         onAction={() => router.push("/batches")}
                     />
                 ) : (
-                    <SectionList<SeatMatrixSeat[], SeatSection>
-                        ref={sectionListRef}
-                        sections={sections}
-                        keyExtractor={(row) => `row-${row[0]?.seat_id}`}
-                        renderItem={renderRow}
-                        renderSectionHeader={renderSectionHeader}
+                    <FlashList
+                        ref={listRef}
+                        data={items}
+                        keyExtractor={(item) => item.key}
+                        // Headings and seat rows recycle separately (different layouts).
+                        getItemType={(item) => item.type}
+                        renderItem={({ item }) => (item.type === "header" ? renderSectionHeader(item.section) : renderRow(item.row))}
+                        stickyHeaderIndices={stickyHeaderIndices}
                         ListHeaderComponent={renderListHeader}
-                        stickySectionHeadersEnabled
                         contentContainerStyle={[styles.listContent, { paddingBottom: 40 + bottomInset }]}
                         showsVerticalScrollIndicator={false}
-                        initialNumToRender={10}
-                        windowSize={10}
-                        removeClippedSubviews
                     />
                 )}
 

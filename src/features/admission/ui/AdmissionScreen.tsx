@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
@@ -27,15 +27,9 @@ import { PhotoPickerTile } from "@/shared/ui/PhotoPickerTile";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { DateField } from "@/shared/ui/DateField";
+import { Text, TextInput } from "@/shared/ui/Text";
+import { formatRupee } from "@/shared/utils/currency";
 import { addDays, addMonths, formatShortDate, todayIso } from "@/shared/utils/dates";
-
-function formatRupee(amount: number): string {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(amount);
-}
 
 export function AdmissionScreen() {
     const router = useRouter();

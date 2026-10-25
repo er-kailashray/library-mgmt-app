@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 interface PhotoPickerTileProps {
     label: string;
@@ -25,7 +27,7 @@ export function PhotoPickerTile({ label, hint, uri, onAdd, onRemove }: PhotoPick
         <View style={styles.wrap}>
             {uri ? (
                 <Pressable accessibilityRole="button" accessibilityLabel={`Change ${label} photo`} style={styles.tile} onPress={onAdd}>
-                    <Image source={{ uri }} style={styles.preview} />
+                    <Image source={{ uri }} style={styles.preview} transition={150} />
                     <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${label} photo`} style={styles.removeBtn} onPress={onRemove} hitSlop={8}>
                         <Ionicons name="close" size={14} color="#fff" />
                     </Pressable>

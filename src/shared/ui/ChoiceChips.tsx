@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { SelectOption } from "@/shared/ui/SelectField";
+import { Text } from "@/shared/ui/Text";
 
 interface ChoiceChipsProps<T extends string> {
     label: string;

@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getBatchesApi } from "@/features/batches/logic/batches-api";
@@ -20,11 +20,14 @@ import type { Theme } from "@/shared/constants/theme";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { formatRupee } from "@/shared/utils/currency";
 import { getInitials } from "@/shared/utils/text";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { Text } from "@/shared/ui/Text";
 
 import { CelebrationBurst } from "./CelebrationBurst";
 import { LiveBatchCard } from "./LiveBatchCard";
+import { Image } from "expo-image";
 
 type MenuItem = {
 	key: string;
@@ -257,14 +260,6 @@ const MAX_RECENT_PAYMENTS_ON_HOME = 3;
 /** How far back the collections card lets you browse. */
 const MAX_MONTHS_BACK = 12;
 
-function formatRupee(amount: number): string {
-	return new Intl.NumberFormat("en-IN", {
-		style: "currency",
-		currency: "INR",
-		maximumFractionDigits: 0,
-	}).format(amount);
-}
-
 export function HomeScreen() {
 	const router = useRouter();
 	const { theme, isDark } = useTheme();
@@ -455,7 +450,7 @@ export function HomeScreen() {
 						</View>
 						<Pressable accessibilityRole="button" accessibilityLabel="Profile and settings" onPress={() => router.push("/settings")}>
 							{dashboard?.owner_photo ? (
-								<Image source={{ uri: dashboard.owner_photo }} style={styles.avatar} />
+								<Image source={{ uri: dashboard.owner_photo }} style={styles.avatar} transition={150} />
 							) : (
 								<View style={styles.avatar}>
 									<Text style={styles.avatarText}>{getInitials(dashboard?.owner_name || "")}</Text>

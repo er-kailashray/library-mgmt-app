@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clearAttendanceApi, getAttendanceRosterApi, markAttendanceApi } from "@/features/attendance/logic/attendance-api";
@@ -16,6 +17,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { DateField } from "@/shared/ui/DateField";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
 import { addDays, formatShortDate, todayIso } from "@/shared/utils/dates";
 
 /** The batch to open on: the one running now, else the next one still to finish, else the first. */
@@ -296,7 +298,7 @@ export function AttendanceScreen() {
                         onAction={() => router.push("/batches")}
                     />
                 ) : (
-                    <FlatList
+                    <FlashList
                         style={styles.list}
                         data={members}
                         keyExtractor={(m) => String(m.member_id)}

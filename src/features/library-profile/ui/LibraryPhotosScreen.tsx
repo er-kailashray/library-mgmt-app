@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { deleteLibraryPhotoApi, getLibraryProfileApi, uploadLibraryPhotoApi } from "@/features/library-profile/logic/library-profile-api";
@@ -14,6 +15,7 @@ import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text } from "@/shared/ui/Text";
 
 const MAX_PHOTOS = 10;
 /** Longest side of an uploaded photo, in pixels. */
@@ -177,7 +179,7 @@ export function LibraryPhotosScreen() {
                             {photos.map((photo, index) => (
                                 <View key={photo.id} style={[styles.photoTile, tileStyle]}>
                                     <Pressable accessibilityRole="button" accessibilityLabel={`View photo ${index + 1}`} style={styles.photoImage} onPress={() => setPreviewIndex(index)}>
-                                        <Image source={{ uri: photo.url }} style={styles.photoImage} />
+                                        <Image source={{ uri: photo.url }} style={styles.photoImage} transition={150} />
                                     </Pressable>
                                     <Pressable
                                         accessibilityRole="button"
