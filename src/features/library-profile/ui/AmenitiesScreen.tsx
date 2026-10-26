@@ -1,20 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLibraryProfileApi, updateLibraryAmenitiesApi } from "@/features/library-profile/logic/library-profile-api";
 import { AMENITY_GROUPS, AMENITY_ICONS, AMENITY_LABELS, Amenity } from "@/features/library-profile/types/library-profile.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 /** How long "Saved" stays on screen. */
 const SAVED_NOTE_MS = 1800;
@@ -60,7 +61,7 @@ export function AmenitiesScreen() {
             setShowSavedNote(true);
             setTimeout(() => setShowSavedNote(false), SAVED_NOTE_MS);
         } catch (err: any) {
-            Alert.alert("Couldn't save", err.message || "Please try again.");
+            showToast({ message: "Couldn't save", detail: err.message || "Please try again.", tone: "error" });
         } finally {
             setIsSaving(false);
         }
@@ -76,7 +77,6 @@ export function AmenitiesScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Facilities" subtitle="What your library offers" />
 
                 {isLoading && !profile ? (
@@ -156,7 +156,7 @@ export function AmenitiesScreen() {
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

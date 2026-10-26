@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, ScrollView, ScrollViewInstance, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, ScrollViewInstance, useWindowDimensions, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet, space } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -51,8 +52,9 @@ export function BatchSwitcher<K extends string | number>({
     const scrollToSelected = useCallback(
         (animated: boolean) => {
             if (index < 0) return;
-            const contentWidth = SIDE_PADDING * 2 + items.length * CARD_WIDTH + (items.length - 1) * GAP;
-            const left = SIDE_PADDING + index * (CARD_WIDTH + GAP);
+            // Padding and gaps are scaled by ScaledSheet; the card width isn't.
+            const contentWidth = space(SIDE_PADDING) * 2 + items.length * CARD_WIDTH + (items.length - 1) * space(GAP);
+            const left = space(SIDE_PADDING) + index * (CARD_WIDTH + space(GAP));
             const x = left - (screenWidth - CARD_WIDTH) / 2;
             scrollRef.current?.scrollTo({ x: Math.max(0, Math.min(x, contentWidth - screenWidth)), animated });
         },
@@ -110,7 +112,7 @@ export function BatchSwitcher<K extends string | number>({
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         row: {
             gap: GAP,
             paddingHorizontal: SIDE_PADDING,

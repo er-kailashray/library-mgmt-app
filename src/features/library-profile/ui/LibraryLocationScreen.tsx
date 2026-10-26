@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
 import MapView, { PROVIDER_GOOGLE, type Region } from "react-native-maps";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,10 +11,13 @@ import { getLibraryProfileApi, updateLibraryLocationApi } from "@/features/libra
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from "@/features/library-profile/logic/map-style";
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 // Whole-of-India view, used when there's no saved pin and location permission is denied.
 const INDIA_REGION: Region = { latitude: 22.9734, longitude: 78.6569, latitudeDelta: 20, longitudeDelta: 20 };
@@ -169,6 +172,9 @@ export function LibraryLocationScreen() {
 		[placePin]
 	);
 
+	const locationSheet = useActionSheet();
+	const openLocationSheet = locationSheet.open;
+
 	const handleUseCurrentLocation = useCallback(async () => {
 		if (locatingRef.current) return;
 		locatingRef.current = true;
@@ -179,16 +185,19 @@ export function LibraryLocationScreen() {
 			const dot = userLocationRef.current;
 			const region = dot ? toStreetRegion(dot.latitude, dot.longitude) : await getCurrentRegion();
 			if (!region) {
-				Alert.alert(
-					"Location access is off",
-					"Allow location access to jump to where you are, or zoom and drag the map to your library.",
-					canAskAgainRef.current
-						? [{ text: "OK" }]
-						: [
-								{ text: "Not now", style: "cancel" },
-								{ text: "Open Settings", onPress: () => void Linking.openSettings() },
-							]
-				);
+				const message = "Allow location access to jump to where you are, or zoom and drag the map to your library.";
+				if (canAskAgainRef.current) {
+					showToast({ message: "Location access is off", detail: message, tone: "info", durationMs: 4500 });
+				} else {
+					// Refused for good: only the phone's settings can turn it back on.
+					openLocationSheet({
+						title: "Location access is off",
+						message,
+						confirm: true,
+						cancelLabel: "Not now",
+						actions: [{ label: "Open phone settings", icon: "settings-outline", tone: "primary", onPress: () => void Linking.openSettings() }],
+					});
+				}
 				return;
 			}
 			setAddressEdited(false);
@@ -196,19 +205,19 @@ export function LibraryLocationScreen() {
 			// Always refresh the address here, even if the owner had typed one: the pin is moving.
 			await placePin(region.latitude, region.longitude, true);
 		} catch (err: any) {
-			Alert.alert("Couldn't find your location", err.message || "Please try again.");
+			showToast({ message: "Couldn't find your location", detail: err.message || "Please try again.", tone: "error" });
 		} finally {
 			finishLocating();
 		}
-	}, [getCurrentRegion, placePin, finishLocating]);
+	}, [getCurrentRegion, placePin, finishLocating, openLocationSheet]);
 
 	const handleSave = useCallback(async () => {
 		if (!pin) {
-			Alert.alert("Pick a location", "Drag the map so the pin sits on your library.");
+			showToast({ message: "Pick a location", detail: "Drag the map so the pin sits on your library.", tone: "error" });
 			return;
 		}
 		if (!address.trim()) {
-			Alert.alert("Error", "Please enter your library's address.");
+			showToast({ message: "Please enter your library's address.", tone: "error" });
 			return;
 		}
 		try {
@@ -216,7 +225,7 @@ export function LibraryLocationScreen() {
 			await updateLibraryLocationApi({ address: address.trim(), latitude: pin.latitude, longitude: pin.longitude });
 			router.back();
 		} catch (err: any) {
-			Alert.alert("Error", err.message || "Failed to save location.");
+			showToast({ message: err.message || "Failed to save location.", tone: "error" });
 		} finally {
 			setIsSaving(false);
 		}
@@ -322,12 +331,13 @@ export function LibraryLocationScreen() {
 					</Pressable>
 				</View>
 			</KeyboardAvoidingView>
+			{locationSheet.sheet}
 		</View>
 	);
 }
 
 const createStyles = (theme: any) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		safe: {
 			flex: 1,
 			backgroundColor: theme.background,

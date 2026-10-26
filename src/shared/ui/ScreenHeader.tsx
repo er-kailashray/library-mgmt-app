@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useIsInTabs } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
@@ -72,7 +73,7 @@ export function HeaderIconButton({ icon, label, onPress, filled = false, busy = 
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		wrapper: {
 			paddingTop: 8,
 			borderBottomWidth: 1,

@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, RefreshControl, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BatchSwitcher } from "@/features/batches/ui/BatchSwitcher";
@@ -12,6 +11,7 @@ import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet, space } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -75,7 +75,8 @@ export function SeatsScreen() {
     const { theme } = useTheme();
     const bottomInset = useScreenBottomInset();
     const { width: screenWidth } = useWindowDimensions();
-    const tileSize = Math.floor((screenWidth - GRID_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
+    // The grid's padding and gaps are scaled by ScaledSheet, so the sum uses the same space() values.
+    const tileSize = Math.floor((screenWidth - space(GRID_PADDING) * 2 - space(GRID_GAP) * (COLUMNS - 1)) / COLUMNS);
     const styles = useMemo(() => createStyles(theme, tileSize), [theme, tileSize]);
 
     const { data, isLoading, error, refetch } = useApiData(getSeatMatrixApi, []);
@@ -316,7 +317,6 @@ export function SeatsScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Seats" subtitle={subtitle} />
 
                 {isLoading && !data ? (
@@ -393,7 +393,7 @@ function tileLook(theme: Theme, state: SeatState): { background: string; border:
 }
 
 const createStyles = (theme: Theme, tileSize: number) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

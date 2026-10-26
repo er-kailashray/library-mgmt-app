@@ -16,7 +16,8 @@ export function useIsInTabs(): boolean {
  * - iOS: each tab screen gets its own safe-area provider whose bottom inset already includes the
  *   (translucent) tab bar, so the inset is right as-is. Automatic scroll insets are turned off in
  *   the tabs layout so this isn't doubled.
- * - Android: native tabs already pad each tab screen above the bar, so inside them it's 0.
+ * - Android: the tab bar (AndroidTabBar) sits below the screens rather than over them, so inside
+ *   the tabs it's 0.
  */
 export function useScreenBottomInset(): number {
 	const insets = useSafeAreaInsets();

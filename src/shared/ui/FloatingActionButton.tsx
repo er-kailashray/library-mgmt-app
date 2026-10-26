@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
 import { FLOATING_SHADOW } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
@@ -37,7 +38,7 @@ export function FloatingActionButton({ label, onPress, icon = "add" }: FloatingA
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		fab: {
 			position: "absolute",
 			right: 20,

@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { FlashList } from "@shopify/flash-list";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { getUpcomingRenewalsApi, remindAllUpcomingRenewalsApi } from "@/features/renewals/logic/renewals-api";
 import { UpcomingRenewal } from "@/features/renewals/types/renewals.types";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { RADIUS } from "@/shared/constants/layout";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -18,6 +18,7 @@ import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 function buildRenewalMessage(renewal: UpcomingRenewal): string {
     const date = new Date(`${renewal.renewal_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -45,7 +46,7 @@ export function RenewalsScreen() {
         try {
             await openWhatsAppMessage(renewal.phone, buildRenewalMessage(renewal));
         } catch {
-            Alert.alert("Couldn't open WhatsApp", "Make sure WhatsApp is installed on this device.");
+            showToast({ message: "Couldn't open WhatsApp", detail: "Make sure WhatsApp is installed on this device.", tone: "error" });
         }
     }, []);
 
@@ -53,9 +54,9 @@ export function RenewalsScreen() {
         try {
             setSendingMemberId(renewal.member_id);
             await remindMemberApi(renewal.member_id);
-            Alert.alert("Sent", `An SMS reminder was sent to ${renewal.name}.`);
+            showToast({ message: "Reminder sent", detail: `${renewal.name} got an SMS.` });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to send SMS reminder.");
+            showToast({ message: "Couldn't send the reminder", detail: err.message, tone: "error" });
         } finally {
             setSendingMemberId(null);
         }
@@ -65,9 +66,9 @@ export function RenewalsScreen() {
         try {
             setIsSendingBulk(true);
             const response = await remindAllUpcomingRenewalsApi();
-            Alert.alert("Reminders sent", response.message || `Sent ${response.data.sent} reminder(s).`);
+            showToast({ message: "Reminders sent", detail: response.message || `Sent ${response.data.sent} reminder(s).` });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to send reminders.");
+            showToast({ message: "Couldn't send reminders", detail: err.message, tone: "error" });
         } finally {
             setIsSendingBulk(false);
         }
@@ -78,7 +79,6 @@ export function RenewalsScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Renewals" subtitle={data ? `Renewing within ${data.window_days} days` : "Upcoming renewals"} />
 
                 {isLoading ? (
@@ -152,7 +152,7 @@ export function RenewalsScreen() {
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

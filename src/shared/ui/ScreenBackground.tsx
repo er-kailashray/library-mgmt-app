@@ -1,7 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 
 /**
@@ -25,7 +26,7 @@ export function ScreenBackground({ children }: { children: ReactNode }) {
 	);
 }
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
 	root: {
 		flex: 1,
 	},

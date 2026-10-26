@@ -1,17 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { changePasswordApi } from "@/services/api/auth.api";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 const PASSWORD_MIN = 6;
 
@@ -48,7 +50,7 @@ export function ChangePasswordScreen() {
 		try {
 			setIsSaving(true);
 			await changePasswordApi(currentPassword, newPassword);
-			Alert.alert("Password changed", "Your password has been updated. Other devices have been signed out.");
+			showToast({ message: "Password changed", detail: "Other devices have been signed out." });
 			router.back();
 		} catch (err: any) {
 			setError(err.message || "Failed to change password.");
@@ -104,7 +106,7 @@ export function ChangePasswordScreen() {
 	);
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
 	safe: {
 		flex: 1,
 	},

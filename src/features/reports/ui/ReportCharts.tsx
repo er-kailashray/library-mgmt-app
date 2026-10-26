@@ -1,7 +1,8 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -65,7 +66,7 @@ export function MeterRow({ label, value, percent, color }: { label: string; valu
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         chart: {
             flexDirection: "row",
             alignItems: "flex-end",

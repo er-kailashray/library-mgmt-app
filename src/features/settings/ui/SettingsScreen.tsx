@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Linking, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
@@ -16,15 +16,18 @@ import { registerForPushNotifications } from "@/services/push/push-notifications
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet, TEXT_SCALE } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
 import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
-import { SegmentedControl } from "@/shared/ui/SegmentedControl";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 import { getInitials } from "@/shared/utils/text";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -32,6 +35,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 /** Icon tile colours per row, like iOS Settings: each kind of setting keeps its own colour. */
 const TINTS = {
     library: "#0EA5E9",
+    batches: "#8B5CF6",
     location: "#10B981",
     photos: "#EC4899",
     facilities: "#F59E0B",
@@ -41,9 +45,9 @@ const TINTS = {
 };
 
 const THEME_MODES = [
-    { key: "system" as const, label: "System" },
-    { key: "light" as const, label: "Light" },
-    { key: "dark" as const, label: "Dark" },
+    { key: "system" as const, label: "System", hint: "Match your phone's setting", icon: "phone-portrait-outline" as IconName },
+    { key: "light" as const, label: "Light", hint: "Always light", icon: "sunny-outline" as IconName },
+    { key: "dark" as const, label: "Dark", hint: "Always dark", icon: "moon-outline" as IconName },
 ];
 
 /**
@@ -98,7 +102,7 @@ export function SettingsScreen() {
             setIsUploadingPhoto(true);
             setUser(await uploadProfilePhoto(uri));
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to upload photo.");
+            showToast({ message: err.message || "Failed to upload photo.", tone: "error" });
         } finally {
             setIsUploadingPhoto(false);
         }
@@ -119,11 +123,11 @@ export function SettingsScreen() {
 
     const handleSaveProfile = useCallback(async () => {
         if (!editProfileName.trim()) {
-            Alert.alert("Error", "Please enter your name.");
+            showToast({ message: "Please enter your name.", tone: "error" });
             return;
         }
         if (editProfilePhone.trim().length < 10) {
-            Alert.alert("Error", "Please enter a valid 10-digit phone number.");
+            showToast({ message: "Please enter a valid 10-digit phone number.", tone: "error" });
             return;
         }
         try {
@@ -133,11 +137,15 @@ export function SettingsScreen() {
             setUser(response.user);
             setIsEditProfileVisible(false);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to update profile.");
+            showToast({ message: err.message || "Failed to update profile.", tone: "error" });
         } finally {
             setIsSavingProfile(false);
         }
     }, [editProfileName, editProfilePhone]);
+
+    // Confirmations and the blocked-notifications prompt, as sheets rather than system alerts.
+    const actionSheet = useActionSheet();
+    const openSheet = actionSheet.open;
 
     // --- Notifications -----------------------------------------------------------------------
     const [isSavingNotifications, setIsSavingNotifications] = useState(false);
@@ -149,10 +157,13 @@ export function SettingsScreen() {
             setIsSavingNotifications(true);
             try {
                 if (enabled && (await registerForPushNotifications()) === "denied") {
-                    Alert.alert("Notifications are blocked", "Allow notifications for Librum in your phone's settings, then turn this on again.", [
-                        { text: "Not now", style: "cancel" },
-                        { text: "Open Settings", onPress: () => void Linking.openSettings() },
-                    ]);
+                    openSheet({
+                        title: "Notifications are blocked",
+                        message: "Allow notifications for Librum in your phone's settings, then turn this on again.",
+                        confirm: true,
+                        cancelLabel: "Not now",
+                        actions: [{ label: "Open phone settings", icon: "settings-outline", tone: "primary", onPress: () => void Linking.openSettings() }],
+                    });
                     return;
                 }
                 const response = await updateNotificationSettingsApi(enabled);
@@ -160,33 +171,41 @@ export function SettingsScreen() {
                 await updateStoredAuthUser(updated);
                 setUser(updated);
             } catch (err: any) {
-                Alert.alert("Error", err.message || "Couldn't update notifications.");
+                showToast({ message: err.message || "Couldn't update notifications.", tone: "error" });
             } finally {
                 setIsSavingNotifications(false);
             }
         },
-        [user]
+        [user, openSheet]
     );
+
+    // --- Appearance ------------------------------------------------------------------------
+    const [isAppearanceVisible, setIsAppearanceVisible] = useState(false);
 
     // --- Log out -----------------------------------------------------------------------------
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const onLogout = useCallback(() => {
-        Alert.alert("Log out?", "You'll need your phone number and password to sign in again.", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Log out",
-                style: "destructive",
-                onPress: async () => {
-                    setIsLoggingOut(true);
-                    try {
-                        await handleLogout();
-                    } finally {
-                        setIsLoggingOut(false);
-                    }
+        openSheet({
+            title: "Log out?",
+            message: "You'll need your phone number and password to sign in again.",
+            confirm: true,
+            actions: [
+                {
+                    label: "Log out",
+                    icon: "log-out-outline",
+                    tone: "destructive",
+                    onPress: async () => {
+                        setIsLoggingOut(true);
+                        try {
+                            await handleLogout();
+                        } finally {
+                            setIsLoggingOut(false);
+                        }
+                    },
                 },
-            },
-        ]);
-    }, []);
+            ],
+        });
+    }, [openSheet]);
 
     const hasPhoto = !!user?.profile_photo_url;
 
@@ -269,6 +288,15 @@ export function SettingsScreen() {
                             theme={theme}
                         />
                         <Row
+                            icon="layers"
+                            tint={TINTS.batches}
+                            label="Batches & timings"
+                            value={dashboard ? `${dashboard.batch_occupancy.length} batch${dashboard.batch_occupancy.length === 1 ? "" : "es"}` : undefined}
+                            onPress={() => router.push("/batches")}
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <Row
                             icon="location"
                             tint={TINTS.location}
                             label="Location"
@@ -292,17 +320,15 @@ export function SettingsScreen() {
                     </Group>
 
                     <Group title="Preferences" styles={styles}>
-                        <View style={styles.stackedRow}>
-                            <View style={styles.rowHead}>
-                                <View style={[styles.tile, { backgroundColor: TINTS.appearance }]}>
-                                    <Ionicons name="contrast" size={16} color="#fff" />
-                                </View>
-                                <Text style={styles.rowLabel}>Appearance</Text>
-                            </View>
-                            <View style={styles.stackedBody}>
-                                <SegmentedControl segments={THEME_MODES} value={mode} onChange={setMode} />
-                            </View>
-                        </View>
+                        <Row
+                            icon="contrast"
+                            tint={TINTS.appearance}
+                            label="Appearance"
+                            value={THEME_MODES.find((m) => m.key === mode)?.label}
+                            onPress={() => setIsAppearanceVisible(true)}
+                            styles={styles}
+                            theme={theme}
+                        />
                         <Row
                             icon="notifications"
                             tint={TINTS.notifications}
@@ -347,7 +373,7 @@ export function SettingsScreen() {
                     {/* Development builds only: the numbers that decide how big text looks on this phone. */}
                     {__DEV__ && (
                         <Text style={styles.devInfo} selectable>
-                            {`${Platform.OS} · screen ${Math.round(window.width)} × ${Math.round(window.height)} · system text ${Math.round(PixelRatio.getFontScale() * 100)}% · pixel ratio ${PixelRatio.get()}`}
+                            {`${Platform.OS} · screen ${Math.round(window.width)} × ${Math.round(window.height)} · system text ${Math.round(PixelRatio.getFontScale() * 100)}% · pixel ratio ${PixelRatio.get()} · ui scale ${Math.round(TEXT_SCALE * 100)}%`}
                         </Text>
                     )}
                 </ScrollView>
@@ -371,41 +397,65 @@ export function SettingsScreen() {
                     )}
                 />
 
-                <Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)} statusBarTranslucent>
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.sheetRoot}>
-                        <Pressable style={styles.sheetBackdrop} onPress={() => setIsEditProfileVisible(false)} accessibilityLabel="Close" />
-                        <View style={[styles.sheet, { paddingBottom: 20 + bottomInset }]}>
-                            <View style={styles.sheetHandle} />
-                            <Text style={styles.sheetTitle}>Edit profile</Text>
+                {/* Appearance: pick System / Light / Dark; the app switches as soon as one is tapped. */}
+                {actionSheet.sheet}
 
-                            <Text style={styles.inputLabel}>Your name</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editProfileName}
-                                onChangeText={setEditProfileName}
-                                autoCapitalize="words"
-                                placeholder="e.g. Suresh Kumar"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                            />
+                <BottomSheet visible={isAppearanceVisible} onClose={() => setIsAppearanceVisible(false)} title="Appearance">
+                    <View style={[styles.groupCard, styles.optionList]}>
+                        {THEME_MODES.map((option, index) => {
+                            const selected = option.key === mode;
+                            return (
+                                <Pressable
+                                    key={option.key}
+                                    accessibilityRole="radio"
+                                    accessibilityState={{ selected }}
+                                    onPress={() => {
+                                        setMode(option.key);
+                                        setIsAppearanceVisible(false);
+                                    }}
+                                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                                >
+                                    <Ionicons name={option.icon} size={20} color={selected ? theme.accent : theme.mutedForeground} style={styles.optionIcon} />
+                                    <View style={[styles.rowMain, index < THEME_MODES.length - 1 && styles.rowDivider]}>
+                                        <View style={styles.rowText}>
+                                            <Text style={styles.rowLabel}>{option.label}</Text>
+                                            <Text style={styles.rowHint}>{option.hint}</Text>
+                                        </View>
+                                        {selected && <Ionicons name="checkmark" size={20} color={theme.accent} />}
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </BottomSheet>
 
-                            <Text style={styles.inputLabel}>Phone number</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editProfilePhone}
-                                onChangeText={setEditProfilePhone}
-                                keyboardType="phone-pad"
-                                maxLength={15}
-                                placeholder="10-digit mobile number"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                            />
-                            <Text style={styles.inputHint}>This is the number you sign in with.</Text>
+                <BottomSheet visible={isEditProfileVisible} onClose={() => setIsEditProfileVisible(false)} title="Edit profile">
+                    <Text style={styles.inputLabel}>Your name</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={editProfileName}
+                        onChangeText={setEditProfileName}
+                        autoCapitalize="words"
+                        placeholder="e.g. Suresh Kumar"
+                        placeholderTextColor={theme.mutedForeground + "80"}
+                    />
 
-                            <Pressable style={({ pressed }) => [styles.saveBtn, (pressed || isSavingProfile) && styles.pressed]} onPress={handleSaveProfile} disabled={isSavingProfile}>
-                                {isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save changes</Text>}
-                            </Pressable>
-                        </View>
-                    </KeyboardAvoidingView>
-                </Modal>
+                    <Text style={styles.inputLabel}>Phone number</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={editProfilePhone}
+                        onChangeText={setEditProfilePhone}
+                        keyboardType="phone-pad"
+                        maxLength={15}
+                        placeholder="10-digit mobile number"
+                        placeholderTextColor={theme.mutedForeground + "80"}
+                    />
+                    <Text style={styles.inputHint}>This is the number you sign in with.</Text>
+
+                    <Pressable style={({ pressed }) => [styles.saveBtn, (pressed || isSavingProfile) && styles.pressed]} onPress={handleSaveProfile} disabled={isSavingProfile}>
+                        {isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save changes</Text>}
+                    </Pressable>
+                </BottomSheet>
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -478,7 +528,7 @@ const TILE = 30;
 const ROW_PADDING = 14;
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },
@@ -650,22 +700,13 @@ const createStyles = (theme: Theme) =>
             fontSize: 14,
             color: theme.mutedForeground,
         },
-        // Appearance: label row, then the full-width System / Light / Dark control under it.
-        stackedRow: {
-            paddingHorizontal: ROW_PADDING,
-            paddingTop: 13,
-            paddingBottom: 14,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.mutedForeground + "33",
+        // The Appearance sheet's options: a plain icon where Settings rows have a coloured tile.
+        optionList: {
+            marginTop: 8,
         },
-        rowHead: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-        },
-        stackedBody: {
-            marginTop: 12,
-            marginLeft: TILE + 12,
+        optionIcon: {
+            width: TILE,
+            textAlign: "center",
         },
         logout: {
             marginTop: 24,
@@ -708,36 +749,6 @@ const createStyles = (theme: Theme) =>
         previewChangeText: {
             ...BUTTON_TEXT,
             color: "#fff",
-        },
-        sheetRoot: {
-            flex: 1,
-            justifyContent: "flex-end",
-        },
-        sheetBackdrop: {
-            ...StyleSheet.absoluteFill,
-            backgroundColor: "rgba(0,0,0,0.45)",
-        },
-        sheet: {
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg + 4,
-            borderTopRightRadius: RADIUS.lg + 4,
-            paddingHorizontal: 20,
-            paddingTop: 10,
-            ...FLOATING_SHADOW,
-        },
-        sheetHandle: {
-            alignSelf: "center",
-            width: 36,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: theme.mutedForeground + "55",
-            marginBottom: 16,
-        },
-        sheetTitle: {
-            fontFamily: "sans-bold",
-            fontSize: 20,
-            color: theme.primary,
-            marginBottom: 8,
         },
         inputLabel: {
             fontFamily: "sans-medium",

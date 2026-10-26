@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { forgotPasswordApi, resetPasswordApi } from "@/features/auth/logic/auth-password.api";
 import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { OtpInput } from "@/shared/ui/OtpInput";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
@@ -16,6 +16,9 @@ import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
+import { formatCountdown } from "@/shared/utils/dates";
+import { PHONE_INPUT_MAX_LENGTH, phoneDigits } from "@/shared/utils/text";
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const PASSWORD_MIN = 6;
@@ -31,7 +34,7 @@ export function ForgotPasswordScreen() {
 	const params = useLocalSearchParams<{ phone?: string }>();
 
 	const [step, setStep] = useState<"phone" | "reset">("phone");
-	const [phone, setPhone] = useState(params.phone ?? "");
+	const [phone, setPhone] = useState(phoneDigits(params.phone ?? ""));
 	const [otp, setOtp] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
@@ -116,7 +119,7 @@ export function ForgotPasswordScreen() {
 		try {
 			setIsSubmitting(true);
 			await resetPasswordApi(phone, otp, password);
-			Alert.alert("Password reset", "Your password has been changed. Please sign in with the new password.");
+			showToast({ message: "Password reset", detail: "Sign in with your new password." });
 			// Return to the existing login screen rather than stacking a second one on top of it.
 			router.dismissTo("/login");
 		} catch (err: any) {
@@ -127,12 +130,11 @@ export function ForgotPasswordScreen() {
 	};
 
 	const styles = createStyles(theme);
-	const buttonTextColor = theme.background === "#0C0A09" ? theme.primary : "#fff";
+	const buttonTextColor = "#fff";
 
 	return (
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
-				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 				<ScreenHeader
 					title="Forgot Password"
 					subtitle={step === "phone" ? "We'll send a code to your phone" : `Enter the code sent to ${phone}`}
@@ -159,9 +161,9 @@ export function ForgotPasswordScreen() {
 											placeholder="10-digit mobile number"
 											placeholderTextColor={theme.mutedForeground + "80"}
 											keyboardType="phone-pad"
-											maxLength={10}
+											maxLength={PHONE_INPUT_MAX_LENGTH}
 											value={phone}
-											onChangeText={setPhone}
+											onChangeText={(text) => setPhone(phoneDigits(text))}
 										/>
 									</View>
 								</>
@@ -211,7 +213,7 @@ export function ForgotPasswordScreen() {
 									{isResending ? (
 										<ActivityIndicator color={theme.accent} size="small" />
 									) : cooldown > 0 ? (
-										<Text style={styles.resendText}>Resend code in 0:{String(cooldown).padStart(2, "0")}</Text>
+										<Text style={styles.resendText}>Resend code in {formatCountdown(cooldown)}</Text>
 									) : (
 										<Text style={styles.resendText}>
 											Didn't receive code? <Text style={{ color: theme.accent }}>Resend</Text>
@@ -229,7 +231,7 @@ export function ForgotPasswordScreen() {
 	);
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
 	safe: {
 		flex: 1,
 	},

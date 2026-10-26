@@ -1,8 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createAdmissionApi } from "@/features/admission/logic/admission-api";
@@ -19,6 +18,7 @@ const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[])
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -28,8 +28,10 @@ import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { DateField } from "@/shared/ui/DateField";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 import { formatRupee } from "@/shared/utils/currency";
 import { addDays, addMonths, formatShortDate, todayIso } from "@/shared/utils/dates";
+import { PHONE_INPUT_MAX_LENGTH, phoneDigits } from "@/shared/utils/text";
 
 export function AdmissionScreen() {
     const router = useRouter();
@@ -75,7 +77,7 @@ export function AdmissionScreen() {
     }, [preset.batch_id, preset.seat_id, batches, seatsData]);
 
     const [name, setName] = useState(readmit.name ?? "");
-    const [phone, setPhone] = useState(readmit.phone ?? "");
+    const [phone, setPhone] = useState(phoneDigits(readmit.phone ?? ""));
     const [gender, setGender] = useState<Gender | null>(readmit.gender ?? null);
     // Optional, for the owner's records; deliberately not labelled "Optional" to keep the form calm.
     const [address, setAddress] = useState(readmit.address ?? "");
@@ -299,7 +301,7 @@ export function AdmissionScreen() {
                         await uploadMemberIdProofApi(memberId, idProof.type, "back", idProof.backUri);
                     }
                 } catch {
-                    Alert.alert("Admission confirmed", "Admission was created, but the ID proof photo failed to upload. You can add it from the member's profile.");
+                    showToast({ message: isReadmission ? "Readmission confirmed" : "Admission confirmed", detail: "The ID proof photo didn't upload. Add it from the member's profile.", tone: "info", durationMs: 5000 });
                     router.back();
                     return;
                 }
@@ -311,12 +313,14 @@ export function AdmissionScreen() {
                         ? ` Previous dues: ${formatRupee(previousDuesValue)} collected${previousDuesValue < previousDues ? `, ${formatRupee(previousDues - previousDuesValue)} waived` : ""}.`
                         : ` Previous dues of ${formatRupee(previousDues)} waived.`
                     : "";
-            Alert.alert(
-                isReadmission ? "Readmission confirmed" : "Admission confirmed",
-                (payNow
-                    ? `${formatRupee(paidAmountValue)} received via ${PAYMENT_MODE_LABELS[paymentMode]}.${isPartialPayment ? ` ${formatRupee(totalMonthlyFee - paidAmountValue)} is still due.` : ""}`
-                    : "No payment recorded - the member will show as due.") + settlementNote
-            );
+            showToast({
+                message: isReadmission ? "Readmission confirmed" : "Admission confirmed",
+                detail:
+                    (payNow
+                        ? `${formatRupee(paidAmountValue)} received via ${PAYMENT_MODE_LABELS[paymentMode]}.${isPartialPayment ? ` ${formatRupee(totalMonthlyFee - paidAmountValue)} is still due.` : ""}`
+                        : "No payment recorded - the member will show as due.") + settlementNote,
+                durationMs: 4500,
+            });
             router.back();
         } catch (err: any) {
             setSubmitError(err.message || "Failed to create admission.");
@@ -330,7 +334,6 @@ export function AdmissionScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader
                     title={isReadmission ? "Readmission" : "New Admission"}
                     subtitle={isReadmission ? `Welcome back ${readmit.name ?? ""} - pick a new seat` : "Onboard member and allocate seat"}
@@ -654,9 +657,9 @@ export function AdmissionScreen() {
                                             placeholder="10-digit mobile number"
                                             placeholderTextColor={theme.mutedForeground + "80"}
                                             value={phone}
-                                            onChangeText={setPhone}
+                                            onChangeText={(text) => setPhone(phoneDigits(text))}
                                             keyboardType="phone-pad"
-                                            maxLength={15}
+                                            maxLength={PHONE_INPUT_MAX_LENGTH}
                                             // The phone number is how a returning member is recognised.
                                             editable={!isReadmission}
                                         />
@@ -767,7 +770,7 @@ export function AdmissionScreen() {
     );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
     safe: {
         flex: 1,
     },

@@ -1,16 +1,19 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { PhotoPickerTile } from "@/shared/ui/PhotoPickerTile";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 export interface IdProofDraft {
     type: IdProofType;
@@ -34,7 +37,7 @@ export function AddIdProofCard({ onAdd }: AddIdProofCardProps) {
             </View>
             <View style={styles.cardHeaderText}>
                 <Text style={styles.cardTitle}>Add ID proof</Text>
-                <Text style={styles.cardSubtitle}>Take a photo or pick one from your gallery</Text>
+                <Text style={styles.cardSubtitle}>Optional · take a photo or pick one from your gallery</Text>
             </View>
             <View style={styles.addCardPlus}>
                 <Ionicons name="add" size={20} color="#fff" />
@@ -66,7 +69,6 @@ interface IdProofSheetProps {
 /** Bottom sheet to pick an ID type and photograph the front (required) and back (optional). */
 export function IdProofSheet({ visible, onClose, initial, onSave, isSaving = false, title = "Add ID Proof", saveLabel = "Save ID Proof" }: IdProofSheetProps) {
     const { theme } = useTheme();
-    const insets = useSafeAreaInsets();
     const styles = createStyles(theme);
 
     const [type, setType] = useState<IdProofType | null>(null);
@@ -88,7 +90,7 @@ export function IdProofSheet({ visible, onClose, initial, onSave, isSaving = fal
         if (source === "camera") {
             const permission = await ImagePicker.requestCameraPermissionsAsync();
             if (!permission.granted) {
-                Alert.alert("Permission needed", "Please allow camera access to photograph the ID proof.");
+                showToast({ message: "Permission needed", detail: "Please allow camera access to photograph the ID proof.", tone: "error" });
                 return;
             }
         }
@@ -100,66 +102,65 @@ export function IdProofSheet({ visible, onClose, initial, onSave, isSaving = fal
         }
     };
 
+    // Opens on top of this sheet (rendered inside its content below).
+    const sourceSheet = useActionSheet();
     const askImageSource = (side: IdProofSide) => {
-        Alert.alert(`Add ${side === "front" ? "Front" : "Back"} Photo`, undefined, [
-            { text: "Take Photo", onPress: () => pickImage(side, "camera") },
-            { text: "Choose from Gallery", onPress: () => pickImage(side, "gallery") },
-            { text: "Cancel", style: "cancel" },
-        ]);
+        sourceSheet.open({
+            title: `Add ${side} photo`,
+            message: side === "front" ? "The side with the name and photo" : "Optional",
+            actions: [
+                { label: "Take photo", icon: "camera-outline", tone: "primary", onPress: () => void pickImage(side, "camera") },
+                { label: "Choose from gallery", icon: "images-outline", onPress: () => void pickImage(side, "gallery") },
+            ],
+        });
     };
 
     const canSave = !!type && !!frontUri && !isSaving;
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-            <Pressable style={styles.overlay} onPress={onClose} />
-            <View style={styles.sheetWrap}>
-                <View style={[styles.sheet, { paddingBottom: 32 + insets.bottom }]}>
-                    <Text style={styles.sheetTitle}>{title}</Text>
-
-                    <Text style={styles.label}>ID Type</Text>
-                    {/* Equal-size tiles, two per row, so long and short names line up. */}
-                    <View style={styles.typeGrid} accessibilityRole="radiogroup">
-                        {ID_PROOF_TYPE_OPTIONS.map((option) => {
-                            const selected = type === option.value;
-                            return (
-                                <Pressable
-                                    key={option.value}
-                                    accessibilityRole="radio"
-                                    accessibilityState={{ selected }}
-                                    style={[styles.typeTile, selected && styles.typeTileSelected]}
-                                    onPress={() => setType(option.value)}>
-                                    <MaterialCommunityIcons name={ID_TYPE_ICONS[option.value]} size={22} color={selected ? theme.accent : theme.mutedForeground} />
-                                    <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]} numberOfLines={2}>
-                                        {option.label}
-                                    </Text>
-                                    {selected && <Ionicons name="checkmark-circle" size={18} color={theme.accent} style={styles.typeCheck} />}
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-
-                    <Text style={styles.label}>Photos</Text>
-                    <View style={styles.tileRow}>
-                        <PhotoPickerTile label="Front" uri={frontUri} onAdd={() => askImageSource("front")} onRemove={() => setFrontUri(null)} />
-                        <PhotoPickerTile label="Back" hint="(optional)" uri={backUri} onAdd={() => askImageSource("back")} onRemove={() => setBackUri(null)} />
-                    </View>
-
-                    <Pressable
-                        style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-                        onPress={() => type && frontUri && onSave({ type, frontUri, backUri })}
-                        disabled={!canSave}>
-                        {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>{saveLabel}</Text>}
-                    </Pressable>
-                    {(!type || !frontUri) && <Text style={styles.sheetHint}>{!type ? "Pick the ID type, then add a front photo." : "Add a photo of the front side to save."}</Text>}
-                </View>
+        <BottomSheet visible={visible} onClose={onClose} title={title} bottomPadding={32}>
+            {sourceSheet.sheet}
+            <Text style={styles.label}>ID Type</Text>
+            {/* Equal-size tiles, two per row, so long and short names line up. */}
+            <View style={styles.typeGrid} accessibilityRole="radiogroup">
+                {ID_PROOF_TYPE_OPTIONS.map((option) => {
+                    const selected = type === option.value;
+                    return (
+                        <Pressable
+                            key={option.value}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected }}
+                            style={[styles.typeTile, selected && styles.typeTileSelected]}
+                            onPress={() => setType(option.value)}>
+                            <MaterialCommunityIcons name={ID_TYPE_ICONS[option.value]} size={22} color={selected ? theme.accent : theme.mutedForeground} />
+                            <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]} numberOfLines={2}>
+                                {option.label}
+                            </Text>
+                            {selected && <Ionicons name="checkmark-circle" size={18} color={theme.accent} style={styles.typeCheck} />}
+                        </Pressable>
+                    );
+                })}
             </View>
-        </Modal>
+
+            <Text style={styles.label}>Photos</Text>
+            <View style={styles.tileRow}>
+                <PhotoPickerTile label="Front" uri={frontUri} onAdd={() => askImageSource("front")} onRemove={() => setFrontUri(null)} />
+                <PhotoPickerTile label="Back" hint="(optional)" uri={backUri} onAdd={() => askImageSource("back")} onRemove={() => setBackUri(null)} />
+            </View>
+
+            <Pressable
+                style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+                onPress={() => type && frontUri && onSave({ type, frontUri, backUri })}
+                disabled={!canSave}>
+                {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>{saveLabel}</Text>}
+            </Pressable>
+            {(!type || !frontUri) && <Text style={styles.sheetHint}>{!type ? "Pick the ID type, then add a front photo." : "Add a photo of the front side to save."}</Text>}
+        </BottomSheet>
     );
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         addCard: {
             flexDirection: "row",
             alignItems: "center",
@@ -190,37 +191,15 @@ const createStyles = (theme: Theme) =>
             flex: 1,
         },
         cardTitle: {
-            fontFamily: "sans-bold",
+            fontFamily: "sans-semibold",
             fontSize: 15,
             color: theme.primary,
         },
         cardSubtitle: {
-            fontFamily: "sans-medium",
+            fontFamily: "sans-regular",
             fontSize: 12,
             color: theme.mutedForeground,
             marginTop: 2,
-        },
-        overlay: {
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-        },
-        sheetWrap: {
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-        },
-        sheet: {
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg,
-            borderTopRightRadius: RADIUS.lg,
-            padding: 24,
-        },
-        sheetTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 18,
-            color: theme.primary,
-            marginBottom: 20,
         },
         label: {
             fontFamily: "sans-bold",

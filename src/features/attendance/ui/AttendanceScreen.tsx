@@ -1,10 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, ScrollViewInstance, StyleSheet, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, ScrollViewInstance, StyleSheet, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clearAttendanceApi, getAttendanceRosterApi, markAttendanceApi } from "@/features/attendance/logic/attendance-api";
 import { AttendanceBatch, AttendanceMember, AttendanceRoster, AttendanceStatus, AttendanceVisitor } from "@/features/attendance/types/attendance.types";
@@ -13,15 +12,20 @@ import { BatchSwitcher } from "@/features/batches/ui/BatchSwitcher";
 import { BatchTimeWheelPicker } from "@/features/batches/ui/BatchTimeWheelPicker";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { MemberAvatar } from "@/shared/ui/MemberAvatar";
+import { ActionSheetAction, useActionSheet } from "@/shared/ui/ActionSheet";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { SegmentedControl } from "@/shared/ui/SegmentedControl";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 import { addDays, fromIsoDate, todayIso } from "@/shared/utils/dates";
+import { haptics } from "@/shared/utils/haptics";
 
 type Filter = "pending" | "in" | "absent" | "all";
 type TimeRequest = { memberId: number; initial: string; title: string };
@@ -162,6 +166,10 @@ export function AttendanceScreen() {
     // ---------------------------------------------------------------- actions
     const [busyMemberId, setBusyMemberId] = useState<number | null>(null);
     const [timeRequest, setTimeRequest] = useState<TimeRequest | null>(null);
+    // Keeps the picker on screen while the sheet slides away after the request is cleared.
+    const lastTimeRequest = useRef(timeRequest);
+    if (timeRequest) lastTimeRequest.current = timeRequest;
+    const shownTimeRequest = timeRequest ?? lastTimeRequest.current;
 
     /** Show a change on this batch's row at once; the server's answer replaces it after saving. */
     const patchMember = (memberId: number, changes: Partial<AttendanceMember>) => {
@@ -187,12 +195,14 @@ export function AttendanceScreen() {
         if (!batch) return;
         // Today's check-in needs no wait: show it now, save behind it.
         const instant = status === "present" && !checkInAt;
-        if (instant) patchMember(memberId, { status: "present", check_in_at: nowTime(), auto_absent: false });
-        else setBusyMemberId(memberId);
+        if (instant) {
+            haptics.light();
+            patchMember(memberId, { status: "present", check_in_at: nowTime(), auto_absent: false });
+        } else setBusyMemberId(memberId);
         try {
             await markAttendanceApi({ member_id: memberId, batch_id: batch.batch_id, date, status, ...(checkInAt ? { check_in_at: checkInAt } : {}) });
         } catch (err: any) {
-            Alert.alert("Couldn't save", err.message || "Please try again.");
+            showToast({ message: "Couldn't save attendance", detail: err.message || "Please try again.", tone: "error" });
         } finally {
             setBusyMemberId(null);
             void refetch();
@@ -205,7 +215,7 @@ export function AttendanceScreen() {
             setBusyMemberId(memberId);
             await clearAttendanceApi({ member_id: memberId, batch_id: batch.batch_id, date });
         } catch (err: any) {
-            Alert.alert("Couldn't undo", err.message || "Please try again.");
+            showToast({ message: "Couldn't undo", detail: err.message || "Please try again.", tone: "error" });
         } finally {
             setBusyMemberId(null);
             void refetch();
@@ -222,24 +232,47 @@ export function AttendanceScreen() {
     const askTime = (memberId: number, name: string, current: string | null) =>
         setTimeRequest({ memberId, initial: current ?? batch?.start_time ?? "09:00", title: `${name} came at` });
 
+    // Everything that can be done to one row, in a sheet (Android's alert would drop all but three).
+    const actionSheet = useActionSheet();
+
     const openOptions = (member: AttendanceMember) => {
         const marked = !!member.status && !member.auto_absent;
-        Alert.alert(member.name, member.check_in_at ? `Came at ${formatTime(member.check_in_at)}` : member.seat_number ? `Seat ${member.seat_number}` : undefined, [
-            ...(member.status !== "present" ? [{ text: isLive ? "Check in now" : "Check in…", onPress: () => checkIn(member.member_id, member.name) }] : []),
-            ...(member.status === "present" ? [{ text: "Change time", onPress: () => askTime(member.member_id, member.name, member.check_in_at) }] : []),
-            ...(member.status !== "absent" || member.auto_absent ? [{ text: "Mark absent", onPress: () => void mark(member.member_id, "absent") }] : []),
-            ...(marked ? [{ text: "Undo", style: "destructive" as const, onPress: () => void undo(member.member_id) }] : []),
-            { text: "View profile", onPress: () => router.push({ pathname: "/members/[id]", params: { id: String(member.member_id) } }) },
-            { text: "Cancel", style: "cancel" as const },
-        ]);
+        const actions: ActionSheetAction[] = [];
+        if (member.status !== "present") {
+            actions.push({
+                label: isLive ? "Check in now" : "Check in…",
+                hint: isLive ? "Marks them present at the current time" : "Pick the time they came",
+                icon: "checkmark-circle-outline",
+                tone: "primary",
+                onPress: () => checkIn(member.member_id, member.name),
+            });
+        } else {
+            actions.push({ label: "Change time", hint: "Correct when they came", icon: "time-outline", onPress: () => askTime(member.member_id, member.name, member.check_in_at) });
+        }
+        if (member.status !== "absent" || member.auto_absent) {
+            actions.push({ label: "Mark absent", icon: "close-circle-outline", onPress: () => void mark(member.member_id, "absent") });
+        }
+        if (marked) {
+            actions.push({ label: "Undo", hint: "Clear today's mark", icon: "arrow-undo-outline", tone: "destructive", onPress: () => void undo(member.member_id) });
+        }
+        actions.push({ label: "View profile", icon: "person-outline", onPress: () => router.push({ pathname: "/members/[id]", params: { id: String(member.member_id) } }) });
+        actionSheet.open({
+            title: member.name,
+            message: member.check_in_at ? `Came at ${formatTime(member.check_in_at)}` : member.seat_number ? `Seat ${member.seat_number}` : undefined,
+            actions,
+        });
     };
 
     const openVisitorOptions = (visitor: AttendanceVisitor) => {
-        Alert.alert(visitor.name, visitor.check_in_at ? `Came at ${formatTime(visitor.check_in_at)}` : undefined, [
-            { text: "Change time", onPress: () => askTime(visitor.member_id, visitor.name, visitor.check_in_at) },
-            { text: "Undo", style: "destructive", onPress: () => void undo(visitor.member_id) },
-            { text: "Cancel", style: "cancel" },
-        ]);
+        actionSheet.open({
+            title: visitor.name,
+            message: visitor.check_in_at ? `Came at ${formatTime(visitor.check_in_at)}` : undefined,
+            actions: [
+                { label: "Change time", hint: "Correct when they came", icon: "time-outline", onPress: () => askTime(visitor.member_id, visitor.name, visitor.check_in_at) },
+                { label: "Undo", hint: "Clear today's check-in", icon: "arrow-undo-outline", tone: "destructive", onPress: () => void undo(visitor.member_id) },
+                { label: "View profile", icon: "person-outline", onPress: () => router.push({ pathname: "/members/[id]", params: { id: String(visitor.member_id) } }) },
+            ],
+        });
     };
 
     // ---------------------------------------------------------------- rows
@@ -423,7 +456,6 @@ export function AttendanceScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Attendance" subtitle={subtitle} />
 
                 {isLoading && !roster ? (
@@ -476,25 +508,23 @@ export function AttendanceScreen() {
                 )}
 
                 {/* Arrival time for an earlier day, or a correction */}
-                <Modal visible={!!timeRequest} transparent animationType="slide" onRequestClose={() => setTimeRequest(null)} statusBarTranslucent navigationBarTranslucent>
-                    <SafeAreaProvider>
-                        <SheetFrame onClose={() => setTimeRequest(null)}>
-                            {timeRequest && (
-                                <BatchTimeWheelPicker
-                                    title={timeRequest.title}
-                                    initialValue={timeRequest.initial}
-                                    minuteStep={5}
-                                    onCancel={() => setTimeRequest(null)}
-                                    onDone={(time) => {
-                                        const memberId = timeRequest.memberId;
-                                        setTimeRequest(null);
-                                        void mark(memberId, "present", time);
-                                    }}
-                                />
-                            )}
-                        </SheetFrame>
-                    </SafeAreaProvider>
-                </Modal>
+                {actionSheet.sheet}
+
+                <BottomSheet visible={!!timeRequest} onClose={() => setTimeRequest(null)} bottomPadding={16}>
+                    {shownTimeRequest && (
+                        <BatchTimeWheelPicker
+                            title={shownTimeRequest.title}
+                            initialValue={shownTimeRequest.initial}
+                            minuteStep={5}
+                            onCancel={() => setTimeRequest(null)}
+                            onDone={(time) => {
+                                const memberId = shownTimeRequest.memberId;
+                                setTimeRequest(null);
+                                void mark(memberId, "present", time);
+                            }}
+                        />
+                    )}
+                </BottomSheet>
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -570,20 +600,8 @@ function DayStrip({
 }
 
 /** Bottom sheet frame for the time picker. */
-function SheetFrame({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-    const { theme } = useTheme();
-    const styles = createStyles(theme);
-    const insets = useSafeAreaInsets();
-    return (
-        <View style={styles.sheetRoot}>
-            <Pressable style={styles.sheetOverlay} onPress={onClose} />
-            <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>{children}</View>
-        </View>
-    );
-}
-
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },
@@ -800,19 +818,5 @@ const createStyles = (theme: Theme) =>
         },
         checkInTextLate: {
             color: theme.accent,
-        },
-        sheetRoot: {
-            flex: 1,
-        },
-        sheetOverlay: {
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-        },
-        sheet: {
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg,
-            borderTopRightRadius: RADIUS.lg,
-            paddingHorizontal: 20,
-            paddingTop: 20,
         },
     });

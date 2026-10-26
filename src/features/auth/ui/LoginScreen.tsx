@@ -1,8 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthBrand } from "@/features/auth/ui/AuthBrand";
@@ -10,10 +8,13 @@ import { loginApi, saveAuthData } from "@/services/api/auth.api";
 import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { PasswordInput } from "@/shared/ui/PasswordInput";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { PHONE_INPUT_MAX_LENGTH, phoneDigits } from "@/shared/utils/text";
 
 const PHONE_MIN = 10;
 const PASSWORD_MIN = 6;
@@ -23,13 +24,10 @@ export function LoginScreen() {
 	const { theme } = useTheme();
 	const [phone, setPhone] = useState("");
 	const [password, setPassword] = useState("");
-	const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 	const [showErrors, setShowErrors] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [apiError, setApiError] = useState<string | null>(null);
 
-	const phoneError = phone.length > 0 && phone.length < PHONE_MIN;
-	const passwordError = password.length > 0 && password.length < PASSWORD_MIN;
 	const phoneErrorSubmit = phone.length < PHONE_MIN;
 	const passwordErrorSubmit = password.length < PASSWORD_MIN;
 
@@ -52,7 +50,9 @@ export function LoginScreen() {
 				router.push({ pathname: "/otp", params: { phone } });
 				return;
 			}
-			setApiError("Unable to sign in. Please check your phone number and password.");
+			// Offline or a server fault isn't a wrong password; say what actually happened.
+			const noAnswer = error instanceof ApiError && (error.status === 0 || error.status >= 500);
+			setApiError(noAnswer ? error.message : "Unable to sign in. Please check your phone number and password.");
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -63,7 +63,6 @@ export function LoginScreen() {
 	return (
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
-				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 				<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
 					<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 						<View style={styles.brandBlock}>
@@ -79,38 +78,36 @@ export function LoginScreen() {
 								<View style={styles.field}>
 									<Text style={styles.label}>Phone number</Text>
 									<TextInput
-										style={[styles.input, ((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError]}
+										style={[styles.input, showErrors && phoneErrorSubmit && styles.inputError]}
 										placeholder="10-digit mobile number"
 										placeholderTextColor={theme.mutedForeground + "80"}
 										keyboardType="phone-pad"
-										maxLength={15}
+										// Digits only, like Register; a pasted "+91 98..." loses its country code.
+										maxLength={PHONE_INPUT_MAX_LENGTH}
 										autoCapitalize="none"
 										autoCorrect={false}
+										textContentType="telephoneNumber"
+										autoComplete="tel"
 										value={phone}
-										onChangeText={setPhone}
+										onChangeText={(text) => setPhone(phoneDigits(text))}
 									/>
 									{showErrors && phoneErrorSubmit ? (
 										<Text style={styles.fieldError}>
-											Enter at least {PHONE_MIN} digits.
+											Enter your {PHONE_MIN}-digit mobile number.
 										</Text>
 									) : null}
 								</View>
 
 								<View style={styles.field}>
 									<Text style={styles.label}>Password</Text>
-									<View style={styles.passwordContainer}>
-										<TextInput
-											style={[styles.input, ((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError]}
-											placeholder="••••••••"
-											placeholderTextColor={theme.mutedForeground + "80"}
-											secureTextEntry={!isPasswordVisible}
-											value={password}
-											onChangeText={setPassword}
-										/>
-										<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button">
-											<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={theme.mutedForeground} />
-										</Pressable>
-									</View>
+									<PasswordInput
+										hasError={showErrors && passwordErrorSubmit}
+										placeholder="••••••••"
+										textContentType="password"
+										autoComplete="password"
+										value={password}
+										onChangeText={setPassword}
+									/>
 									{showErrors && passwordErrorSubmit ? (
 										<Text style={styles.fieldError}>
 											Password must be at least {PASSWORD_MIN} characters.
@@ -146,7 +143,7 @@ export function LoginScreen() {
 	);
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
 	safe: {
 		flex: 1,
 	},
@@ -210,18 +207,6 @@ const createStyles = (theme: any) => StyleSheet.create({
 		paddingVertical: 14,
 		fontSize: 15,
 		color: theme.primary,
-	},
-	passwordContainer: {
-		position: "relative",
-	},
-	eyeButton: {
-		position: "absolute",
-		right: 4,
-		top: 0,
-		bottom: 0,
-		justifyContent: "center",
-		alignItems: "center",
-		width: 44,
 	},
 	inputError: {
 		borderColor: theme.destructive,

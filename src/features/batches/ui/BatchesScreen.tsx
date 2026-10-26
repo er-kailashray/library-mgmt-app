@@ -1,18 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { durationLabel, findClash, formatTime, fromMinutes, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
 import { createBatchApi, deleteBatchApi, getBatchesApi, updateBatchApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
@@ -68,40 +70,50 @@ export function BatchesScreen() {
 		setIsAddModalVisible(true);
 	};
 
+	// Opens on top of the batch sheet (rendered inside its content).
+	const confirmSheet = useActionSheet();
+
 	const handleDeleteBatch = () => {
 		if (!editingBatch) return;
 		const batch = editingBatch;
 
 		// The backend refuses this too; say so up front instead of after a round trip.
 		if (batch.allocations_count > 0) {
-			Alert.alert(
-				"Can't delete this batch",
-				`${batch.allocations_count} member${batch.allocations_count === 1 ? " is" : "s are"} in ${batch.name}. Move them to another batch or end their membership first.`
-			);
+			confirmSheet.open({
+				title: "Can't delete this batch",
+				message: `${batch.allocations_count} member${batch.allocations_count === 1 ? " is" : "s are"} in ${batch.name}. Move them to another batch or end their membership first.`,
+				actions: [],
+				cancelLabel: "Got it",
+			});
 			return;
 		}
 
-		Alert.alert(`Delete ${batch.name}?`, "Past seat and attendance records for this batch will also be removed. This can't be undone.", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Delete",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						setIsDeleting(true);
-						setSubmitError(null);
-						await deleteBatchApi(batch.id);
-						setIsAddModalVisible(false);
-						setEditingBatch(null);
-						await fetchBatches();
-					} catch (err: any) {
-						setSubmitError(err.message || "Could not delete the batch. Please try again.");
-					} finally {
-						setIsDeleting(false);
-					}
+		confirmSheet.open({
+			title: `Delete ${batch.name}?`,
+			message: "Past seat and attendance records for this batch will also be removed. This can't be undone.",
+			confirm: true,
+			actions: [
+				{
+					label: "Delete batch",
+					icon: "trash-outline",
+					tone: "destructive",
+					onPress: async () => {
+						try {
+							setIsDeleting(true);
+							setSubmitError(null);
+							await deleteBatchApi(batch.id);
+							setIsAddModalVisible(false);
+							setEditingBatch(null);
+							await fetchBatches();
+						} catch (err: any) {
+							setSubmitError(err.message || "Could not delete the batch. Please try again.");
+						} finally {
+							setIsDeleting(false);
+						}
+					},
 				},
-			},
-		]);
+			],
+		});
 	};
 
 	const handleCreateBatch = async () => {
@@ -165,7 +177,6 @@ export function BatchesScreen() {
 	return (
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe} edges={["top"]}>
-				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 				<ScreenHeader
 					title="Batches"
 					subtitle="Manage timeslots & pricing"
@@ -181,7 +192,7 @@ export function BatchesScreen() {
 					) : error ? (
 						<ErrorState message={error} onRetry={fetchBatches} />
 					) : batchList.length === 0 ? (
-						<EmptyState icon="calendar-outline" title="No batches available yet" subtitle="Tap the + icon in the header to create your first timeslot." />
+						<EmptyState icon="calendar-outline" title="No batches available yet" subtitle="Tap Add batch below to create your first time slot." />
 					) : (
 						batchList.map((batch) => (
 							<Pressable
@@ -212,111 +223,107 @@ export function BatchesScreen() {
 
 				<FloatingActionButton label="Add batch" onPress={openCreate} />
 
-				<Modal visible={isAddModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsAddModalVisible(false)}>
-					<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
-						<View style={styles.modalContent}>
-							{selectingTimeFor ? (
-								<BatchTimeWheelPicker
-									title={selectingTimeFor === "start" ? "Batch starts at" : "Batch ends at"}
-									initialValue={pickerInitialValue}
-									onCancel={() => setSelectingTimeFor(null)}
-									onDone={(value) => {
-										if (selectingTimeFor === "start") setNewStartTime(value);
-										else setNewEndTime(value);
-										setSubmitError(null);
-										setSelectingTimeFor(null);
-									}}
-								/>
-							) : (
-								<>
-									<View style={styles.modalHeader}>
-										<Text style={styles.modalTitle}>{editingBatch ? "Edit Batch" : "Create New Batch"}</Text>
-										<Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setIsAddModalVisible(false)}>
-											<Ionicons name="close" size={24} color={theme.primary} />
-										</Pressable>
-									</View>
+				{/* The time wheel replaces the form in the same sheet while a time is being picked. */}
+				<BottomSheet
+					visible={isAddModalVisible}
+					onClose={() => setIsAddModalVisible(false)}
+					title={selectingTimeFor ? undefined : editingBatch ? "Edit batch" : "New batch"}
+					showClose={!selectingTimeFor}
+					bottomPadding={28}>
+					{confirmSheet.sheet}
+					{selectingTimeFor ? (
+						<BatchTimeWheelPicker
+							title={selectingTimeFor === "start" ? "Batch starts at" : "Batch ends at"}
+							initialValue={pickerInitialValue}
+							onCancel={() => setSelectingTimeFor(null)}
+							onDone={(value) => {
+								if (selectingTimeFor === "start") setNewStartTime(value);
+								else setNewEndTime(value);
+								setSubmitError(null);
+								setSelectingTimeFor(null);
+							}}
+						/>
+					) : (
+						<>
+							<Text style={styles.inputLabel}>Batch Name</Text>
+							<TextInput style={styles.modalInput} placeholder="e.g. Morning Batch" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
 
-									<Text style={styles.inputLabel}>Batch Name</Text>
-									<TextInput style={styles.modalInput} placeholder="e.g. Morning Batch" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
+							<View style={styles.modalRowGroup}>
+								<View style={{ flex: 1 }}>
+									<Text style={styles.inputLabel}>Start Time</Text>
+									<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("start")}>
+										<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
+										<Text style={[styles.modalTimeSelectorText, !newStartTime && { color: theme.mutedForeground + "80" }]}>{newStartTime ? formatTime(newStartTime) : "Select time"}</Text>
+									</Pressable>
+								</View>
+								<View style={{ flex: 1 }}>
+									<Text style={styles.inputLabel}>End Time</Text>
+									<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("end")}>
+										<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
+										<Text style={[styles.modalTimeSelectorText, !newEndTime && { color: theme.mutedForeground + "80" }]}>{newEndTime ? formatTime(newEndTime) : "Select time"}</Text>
+									</Pressable>
+								</View>
+							</View>
 
-									<View style={styles.modalRowGroup}>
-										<View style={{ flex: 1 }}>
-											<Text style={styles.inputLabel}>Start Time</Text>
-											<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("start")}>
-												<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
-												<Text style={[styles.modalTimeSelectorText, !newStartTime && { color: theme.mutedForeground + "80" }]}>{newStartTime ? formatTime(newStartTime) : "Select time"}</Text>
-											</Pressable>
-										</View>
-										<View style={{ flex: 1 }}>
-											<Text style={styles.inputLabel}>End Time</Text>
-											<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("end")}>
-												<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
-												<Text style={[styles.modalTimeSelectorText, !newEndTime && { color: theme.mutedForeground + "80" }]}>{newEndTime ? formatTime(newEndTime) : "Select time"}</Text>
-											</Pressable>
-										</View>
-									</View>
-
-									{hasBothTimes && (
-										<View style={styles.timeSummary}>
-											{sameTimes ? (
-												<Text style={styles.timeSummaryError}>Start and end can't be the same time.</Text>
-											) : clash ? (
-												<Text style={styles.timeSummaryError}>{clashMessage}</Text>
-											) : (
-												<Text style={styles.timeSummaryText}>
-													{durationLabel(newStartTime, newEndTime)}
-													{runsPastMidnight(newStartTime, newEndTime) ? " · runs past midnight" : ""}
-												</Text>
-											)}
-										</View>
-									)}
-
-									<Text style={styles.inputLabel}>Monthly Fee (Rs)</Text>
-									<TextInput style={styles.modalInput} placeholder="e.g. 800" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
-
-									{feeChangedWithMembers && (
-										<Text style={styles.feeWarning}>
-											{editingBatch.allocations_count} member{editingBatch.allocations_count === 1 ? " is" : "s are"} in this batch. The new fee will also be used for their dues.
+							{hasBothTimes && (
+								<View style={styles.timeSummary}>
+									{sameTimes ? (
+										<Text style={styles.timeSummaryError}>Start and end can't be the same time.</Text>
+									) : clash ? (
+										<Text style={styles.timeSummaryError}>{clashMessage}</Text>
+									) : (
+										<Text style={styles.timeSummaryText}>
+											{durationLabel(newStartTime, newEndTime)}
+											{runsPastMidnight(newStartTime, newEndTime) ? " · runs past midnight" : ""}
 										</Text>
 									)}
-
-									{submitError && (
-										<View style={styles.errorBox}>
-											<Ionicons name="alert-circle" size={18} color={theme.destructive} />
-											<Text style={styles.errorText}>{submitError}</Text>
-										</View>
-									)}
-
-									<Pressable
-										style={[styles.modalSubmitBtn, (isSubmitting || sameTimes || !!clash) && { opacity: 0.5 }]}
-										onPress={handleCreateBatch}
-										disabled={isSubmitting || sameTimes || !!clash}>
-										{isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSubmitText}>{editingBatch ? "Save Changes" : "Create Batch"}</Text>}
-									</Pressable>
-
-									{editingBatch && (
-										<Pressable accessibilityRole="button" style={styles.deleteBtn} onPress={handleDeleteBatch} disabled={isDeleting || isSubmitting}>
-											{isDeleting ? (
-												<ActivityIndicator color={theme.destructive} size="small" />
-											) : (
-												<>
-													<Ionicons name="trash-outline" size={18} color={theme.destructive} />
-													<Text style={styles.deleteText}>Delete Batch</Text>
-												</>
-											)}
-										</Pressable>
-									)}
-								</>
+								</View>
 							)}
-						</View>
-					</KeyboardAvoidingView>
-				</Modal>
+
+							<Text style={styles.inputLabel}>Monthly Fee (Rs)</Text>
+							<TextInput style={styles.modalInput} placeholder="e.g. 800" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
+
+							{feeChangedWithMembers && (
+								<Text style={styles.feeWarning}>
+									{editingBatch.allocations_count} member{editingBatch.allocations_count === 1 ? " is" : "s are"} in this batch. The new fee will also be used for their dues.
+								</Text>
+							)}
+
+							{submitError && (
+								<View style={styles.errorBox}>
+									<Ionicons name="alert-circle" size={18} color={theme.destructive} />
+									<Text style={styles.errorText}>{submitError}</Text>
+								</View>
+							)}
+
+							<Pressable
+								style={[styles.modalSubmitBtn, (isSubmitting || sameTimes || !!clash) && { opacity: 0.5 }]}
+								onPress={handleCreateBatch}
+								disabled={isSubmitting || sameTimes || !!clash}>
+								{isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSubmitText}>{editingBatch ? "Save Changes" : "Create Batch"}</Text>}
+							</Pressable>
+
+							{editingBatch && (
+								<Pressable accessibilityRole="button" style={styles.deleteBtn} onPress={handleDeleteBatch} disabled={isDeleting || isSubmitting}>
+									{isDeleting ? (
+										<ActivityIndicator color={theme.destructive} size="small" />
+									) : (
+										<>
+											<Ionicons name="trash-outline" size={18} color={theme.destructive} />
+											<Text style={styles.deleteText}>Delete Batch</Text>
+										</>
+									)}
+								</Pressable>
+							)}
+						</>
+					)}
+				</BottomSheet>
 			</SafeAreaView>
 		</ScreenBackground>
 	);
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
 	safe: {
 		flex: 1,
 	},
@@ -376,44 +383,6 @@ const createStyles = (theme: any) => StyleSheet.create({
 		fontFamily: "sans-extrabold",
 		fontSize: 14,
 		color: theme.accent,
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.6)",
-		justifyContent: "flex-end",
-	},
-	modalContent: {
-		backgroundColor: theme.background,
-		borderTopLeftRadius: 32,
-		borderTopRightRadius: 32,
-		padding: 24,
-		paddingBottom: 48,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: -10 },
-		shadowOpacity: 0.12,
-		shadowRadius: 24,
-		elevation: 10,
-	},
-	modalHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		marginBottom: 24,
-	},
-	modalTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 20,
-		color: theme.primary,
-	},
-	modalCloseButton: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: theme.card,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
 	},
 	inputLabel: {
 		fontFamily: "sans-bold",

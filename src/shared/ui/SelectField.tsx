@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { Text } from "@/shared/ui/Text";
 
 export interface SelectOption<T extends string> {
@@ -40,37 +42,33 @@ export function SelectField<T extends string>({ label, placeholder, value, optio
                 <Ionicons name="chevron-down" size={18} color={theme.mutedForeground} />
             </Pressable>
 
-            <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}>
-                <Pressable style={styles.overlay} onPress={() => setIsOpen(false)} />
-                <View style={styles.sheet}>
-                    <Text style={styles.sheetTitle}>{label}</Text>
-                    <FlatList
-                        data={options}
-                        keyExtractor={(item) => item.value}
-                        style={{ maxHeight: 360 }}
-                        renderItem={({ item }) => {
-                            const isSelected = item.value === value;
-                            return (
-                                <Pressable
-                                    style={styles.optionRow}
-                                    onPress={() => {
-                                        onChange(item.value);
-                                        setIsOpen(false);
-                                    }}>
-                                    <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{item.label}</Text>
-                                    {isSelected && <Ionicons name="checkmark" size={20} color={theme.accent} />}
-                                </Pressable>
-                            );
-                        }}
-                    />
-                </View>
-            </Modal>
+            <BottomSheet visible={isOpen} onClose={() => setIsOpen(false)} title={label}>
+                <FlatList
+                    data={options}
+                    keyExtractor={(item) => item.value}
+                    style={{ maxHeight: 360 }}
+                    renderItem={({ item }) => {
+                        const isSelected = item.value === value;
+                        return (
+                            <Pressable
+                                style={styles.optionRow}
+                                onPress={() => {
+                                    onChange(item.value);
+                                    setIsOpen(false);
+                                }}>
+                                <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{item.label}</Text>
+                                {isSelected && <Ionicons name="checkmark" size={20} color={theme.accent} />}
+                            </Pressable>
+                        );
+                    }}
+                />
+            </BottomSheet>
         </View>
     );
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         wrap: {
             marginBottom: 16,
         },
@@ -100,27 +98,6 @@ const createStyles = (theme: Theme) =>
         },
         placeholderText: {
             color: theme.mutedForeground,
-        },
-        overlay: {
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-        },
-        sheet: {
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg,
-            borderTopRightRadius: RADIUS.lg,
-            padding: 24,
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: "70%",
-        },
-        sheetTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 18,
-            color: theme.primary,
-            marginBottom: 16,
         },
         optionRow: {
             flexDirection: "row",

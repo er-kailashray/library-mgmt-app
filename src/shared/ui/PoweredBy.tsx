@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { StyleProp, View, ViewStyle } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -30,7 +31,7 @@ export function PoweredBy({ style, children }: PoweredByProps) {
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		block: {
 			alignItems: "center",
 			marginTop: "auto",

@@ -1,13 +1,13 @@
 import { Image, type ImageSource } from "expo-image";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useRef, useState } from "react";
-import { FlatList, ListRenderItemInfo, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { FlatList, ListRenderItemInfo, NativeScrollEvent, NativeSyntheticEvent, Pressable, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { Text } from "@/shared/ui/Text";
@@ -87,7 +87,6 @@ export function OnboardingScreen() {
 	return (
 		<ScreenBackground>
 			<SafeAreaView style={styles.safe}>
-				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 				<View style={styles.topBar}>
 					<View style={styles.brandRow}>
 						<Image source={require("@/assets/images/logo.png")} style={styles.brandMark} />
@@ -129,7 +128,7 @@ export function OnboardingScreen() {
 	);
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
 	// Transparent so the gradient behind shows through.
 	safe: {
 		flex: 1,

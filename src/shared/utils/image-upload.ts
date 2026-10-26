@@ -1,5 +1,6 @@
 import { File, UploadTask, UploadType } from "expo-file-system";
 
+import { notifyIfSessionExpired } from "@/services/api/session-guard";
 import { notifyIfSubscriptionExpired } from "@/services/api/subscription-guard";
 
 function guessImageMimeType(uri: string): string {
@@ -32,6 +33,7 @@ export async function uploadImage(
     });
 
     const result = await task.uploadAsync();
+    notifyIfSessionExpired(result.status, Object.keys(options.headers ?? {}).some((key) => key.toLowerCase() === "authorization"));
     try {
         notifyIfSubscriptionExpired(result.status, result.body ? JSON.parse(result.body) : null);
     } catch {

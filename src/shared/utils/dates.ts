@@ -61,3 +61,9 @@ export function durationSince(iso: string): string {
 		.filter(Boolean)
 		.join(" ");
 }
+
+/** "0:30", "1:05", "12:00" for a countdown in seconds (e.g. "Resend code in 1:05"). */
+export function formatCountdown(seconds: number): string {
+	const s = Math.max(0, Math.ceil(seconds));
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}

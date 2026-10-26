@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
+import { haptics } from "@/shared/utils/haptics";
 
 type FilterChipProps = {
 	label: string;
@@ -17,7 +19,10 @@ export function FilterChip({ label, selected, onPress }: FilterChipProps) {
 	const styles = createStyles(theme);
 
 	return (
-		<Pressable accessibilityRole="button" accessibilityState={{ selected }} style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
+		<Pressable accessibilityRole="button" accessibilityState={{ selected }} style={[styles.chip, selected && styles.chipSelected]} onPress={() => {
+				if (!selected) haptics.selection();
+				onPress();
+			}}>
 			<Text style={[styles.text, selected && styles.textSelected]} numberOfLines={1}>
 				{label}
 			</Text>
@@ -26,7 +31,7 @@ export function FilterChip({ label, selected, onPress }: FilterChipProps) {
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		chip: {
 			paddingHorizontal: 18,
 			paddingVertical: 10,

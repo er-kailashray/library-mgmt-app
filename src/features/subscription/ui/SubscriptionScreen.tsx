@@ -4,19 +4,21 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatSubscriptionDate, getSubscriptionApi, getSubscriptionInvoicesApi, startCheckoutApi } from "@/features/subscription/logic/subscription-api";
 import { SubscriptionInfo, SubscriptionPlan, SubscriptionStateKey } from "@/features/subscription/types/subscription.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 import { formatRupee } from "@/shared/utils/currency";
 
 const INCLUDED = [
@@ -94,12 +96,12 @@ export function SubscriptionScreen() {
 
             await Promise.all([refetch(), refetchInvoices()]);
             if (result === "success") {
-                Alert.alert("Payment successful", `Your ${selectedPlan.name} plan is active. Thank you!`);
+                showToast({ message: "Payment successful", detail: `Your ${selectedPlan.name} plan is active. Thank you!`, durationMs: 4500 });
             } else if (result === "failed") {
-                Alert.alert("Payment failed", "No money was taken for this attempt. Please try again or use another payment method.");
+                showToast({ message: "Payment failed", detail: "No money was taken for this attempt. Please try again or use another payment method.", tone: "error" });
             }
         } catch (err: any) {
-            Alert.alert("Couldn't start payment", err.message || "Please try again.");
+            showToast({ message: "Couldn't start payment", detail: err.message || "Please try again.", tone: "error" });
         } finally {
             setIsPaying(false);
         }
@@ -230,7 +232,7 @@ export function SubscriptionScreen() {
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

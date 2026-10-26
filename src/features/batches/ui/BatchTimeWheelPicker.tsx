@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, View } from "react-native";
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, ScrollViewInstance, View } from "react-native";
 
 import { formatTime, MINUTE_STEPS } from "@/features/batches/logic/batch-time";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -102,7 +103,7 @@ export function BatchTimeWheelPicker({ title, initialValue, minuteStep = 15, onD
 }
 
 const createStyles = (theme: any) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		title: {
 			fontFamily: "sans-bold",
 			fontSize: 16,

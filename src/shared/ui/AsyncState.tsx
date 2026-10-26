@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleProp, View, ViewStyle } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -56,14 +57,14 @@ export function EmptyState({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
     spacing: {
         marginTop: 40,
     },
 });
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         container: {
             alignItems: "center",
             justifyContent: "center",

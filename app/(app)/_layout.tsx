@@ -2,9 +2,13 @@ import type { NotificationResponse } from "expo-notifications";
 import { Href, Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 
+import { clearAuthData } from "@/services/api/auth.api";
+import { SESSION_EXPIRED_MESSAGE } from "@/services/api/client";
+import { setSessionExpiredHandler } from "@/services/api/session-guard";
 import { setSubscriptionExpiredHandler } from "@/services/api/subscription-guard";
 import { Notifications } from "@/services/push/notifications-module";
 import { notificationUrl, registerForPushNotifications } from "@/services/push/push-notifications";
+import { showToast } from "@/shared/ui/Toast";
 
 export default function AppGroupLayout() {
 	const router = useRouter();
@@ -13,6 +17,18 @@ export default function AppGroupLayout() {
 	useEffect(() => {
 		setSubscriptionExpiredHandler(() => router.push("/subscription"));
 		return () => setSubscriptionExpiredHandler(null);
+	}, [router]);
+
+	// The token stopped working (expired, or signed out elsewhere after a password change): forget
+	// it and go back to sign-in, rather than leaving every screen stuck on an error.
+	useEffect(() => {
+		setSessionExpiredHandler(() => {
+			void clearAuthData().then(() => {
+				router.replace("/login");
+				showToast({ message: SESSION_EXPIRED_MESSAGE, tone: "info" });
+			});
+		});
+		return () => setSessionExpiredHandler(null);
 	}, [router]);
 
 	// Signed in: make sure this device is registered for push (no-op if permission was refused).

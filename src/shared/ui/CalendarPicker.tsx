@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { fromIsoDate, toIsoDate } from "@/shared/utils/dates";
 import { Text } from "@/shared/ui/Text";
@@ -85,7 +86,7 @@ export function CalendarPicker({ value, onChange, minDate, maxDate }: CalendarPi
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		wrap: {
 			backgroundColor: theme.card,
 			borderRadius: RADIUS.md,

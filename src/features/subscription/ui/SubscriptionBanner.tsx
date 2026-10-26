@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { formatSubscriptionDate, getSubscriptionApi } from "@/features/subscription/logic/subscription-api";
 import { SUBSCRIPTION_NUDGE_DAYS, SubscriptionInfo } from "@/features/subscription/types/subscription.types";
 import { RADIUS } from "@/shared/constants/layout";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
@@ -71,7 +72,7 @@ export function SubscriptionBanner({ refreshSignal = 0 }: { refreshSignal?: numb
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         banner: {
             flexDirection: "row",
             alignItems: "center",

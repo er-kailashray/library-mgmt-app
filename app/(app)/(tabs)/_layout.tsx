@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Tabs } from "expo-router/js-tabs";
 import { NativeTabs } from "expo-router/native-tabs";
 import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
@@ -8,6 +9,7 @@ import { refreshUnreadCount, setUnreadCount, useUnreadCount } from "@/features/n
 import { Notifications } from "@/services/push/notifications-module";
 import { InTabsContext } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { AndroidTabBar } from "@/shared/ui/AndroidTabBar";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -24,8 +26,8 @@ const TABS: { name: string; title: string; sf: SFSymbol; sfSelected: SFSymbol; i
 ];
 
 /**
- * The native bottom tab bar (UITabBarController on iOS, Material bottom navigation on Android) for
- * the everyday screens. Everything else (member detail, admission, batches, seats, settings, …)
+ * The bottom tab bar for the everyday screens: the native UITabBarController on iOS, and our own
+ * Material-style bar on Android (the native Android bar looked flat and out of place there). Everything else (member detail, admission, batches, seats, settings, …)
  * lives in the parent stack, so it opens full-screen over the tabs; Settings is reached from the
  * profile button on Home.
  */
@@ -47,6 +49,27 @@ export default function TabsLayout() {
 			setUnreadCount(0);
 		};
 	}, []);
+
+	if (Platform.OS === "android") {
+		return (
+			// Lets ScreenHeader and useScreenBottomInset know they're on a tab screen.
+			<InTabsContext.Provider value={true}>
+				<Tabs
+					// The bar sits below the screens (not over them), so screens need no extra bottom padding.
+					tabBar={(props) => <AndroidTabBar {...props} tabs={TABS} badges={{ notifications: unread }} />}
+					screenOptions={{
+						headerShown: false,
+						tabBarHideOnKeyboard: true,
+						animation: "fade",
+						sceneStyle: { backgroundColor: theme.background },
+					}}>
+					{TABS.map((tab) => (
+						<Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.title }} />
+					))}
+				</Tabs>
+			</InTabsContext.Provider>
+		);
+	}
 
 	return (
 		// Lets ScreenHeader and useScreenBottomInset know they're on a tab screen.

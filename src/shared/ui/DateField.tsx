@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
-import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CalendarPicker } from "@/shared/ui/CalendarPicker";
 import { Text } from "@/shared/ui/Text";
 import { formatShortDate, todayIso } from "@/shared/utils/dates";
@@ -54,54 +55,40 @@ export function DateField({ value, onChange, minDate, maxDate, sheetTitle, note,
 				</View>
 			</Pressable>
 
-			<Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent navigationBarTranslucent>
-				<SafeAreaProvider>
-					<CalendarSheet
-						title={sheetTitle}
-						value={value}
-						minDate={minDate}
-						maxDate={maxDate}
-						onDone={(iso) => {
-							onChange(iso);
-							setOpen(false);
-						}}
-						onClose={() => setOpen(false)}
-					/>
-				</SafeAreaProvider>
-			</Modal>
+			<BottomSheet visible={open} onClose={() => setOpen(false)} title={sheetTitle} showClose bottomPadding={24}>
+				<CalendarBody
+					value={value}
+					minDate={minDate}
+					maxDate={maxDate}
+					onDone={(iso) => {
+						onChange(iso);
+						setOpen(false);
+					}}
+				/>
+			</BottomSheet>
 		</>
 	);
 }
 
-function CalendarSheet({ title, value, minDate, maxDate, onDone, onClose }: { title: string; value: string | null; minDate: string; maxDate: string; onDone: (iso: string) => void; onClose: () => void }) {
+function CalendarBody({ value, minDate, maxDate, onDone }: { value: string | null; minDate: string; maxDate: string; onDone: (iso: string) => void }) {
 	const { theme } = useTheme();
 	const styles = createStyles(theme);
-	const insets = useSafeAreaInsets();
 	// Picking only previews; "Done" confirms, so a stray tap doesn't change the form.
 	const [draft, setDraft] = useState(value);
 	useEffect(() => setDraft(value), [value]);
 
 	return (
-		<View style={styles.root}>
-			<Pressable style={styles.overlay} onPress={onClose} />
-			<View style={[styles.sheet, { paddingBottom: 24 + insets.bottom }]}>
-				<View style={styles.sheetHeader}>
-					<Text style={styles.sheetTitle}>{title}</Text>
-					<Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={10}>
-						<Ionicons name="close" size={22} color={theme.mutedForeground} />
-					</Pressable>
-				</View>
-				<CalendarPicker value={draft} onChange={setDraft} minDate={minDate} maxDate={maxDate} />
-				<Pressable accessibilityRole="button" style={[styles.doneButton, !draft && styles.doneButtonDisabled]} disabled={!draft} onPress={() => draft && onDone(draft)}>
-					<Text style={styles.doneText}>{draft ? `Set ${formatShortDate(draft, true)}` : "Pick a date"}</Text>
-				</Pressable>
-			</View>
-		</View>
+		<>
+			<CalendarPicker value={draft} onChange={setDraft} minDate={minDate} maxDate={maxDate} />
+			<Pressable accessibilityRole="button" style={[styles.doneButton, !draft && styles.doneButtonDisabled]} disabled={!draft} onPress={() => draft && onDone(draft)}>
+				<Text style={styles.doneText}>{draft ? `Set ${formatShortDate(draft, true)}` : "Pick a date"}</Text>
+			</Pressable>
+		</>
 	);
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		field: {
 			flexDirection: "row",
 			alignItems: "center",
@@ -129,7 +116,7 @@ const createStyles = (theme: Theme) =>
 			flex: 1,
 		},
 		date: {
-			fontFamily: "sans-extrabold",
+			fontFamily: "sans-semibold",
 			fontSize: 16,
 			color: theme.primary,
 		},
@@ -137,7 +124,7 @@ const createStyles = (theme: Theme) =>
 			color: theme.mutedForeground,
 		},
 		note: {
-			fontFamily: "sans-medium",
+			fontFamily: "sans-regular",
 			fontSize: 12,
 			color: theme.mutedForeground,
 			marginTop: 2,
@@ -154,34 +141,9 @@ const createStyles = (theme: Theme) =>
 			paddingHorizontal: 4,
 		},
 		changeText: {
-			fontFamily: "sans-bold",
+			fontFamily: "sans-semibold",
 			fontSize: 13,
 			color: theme.accent,
-		},
-		root: {
-			flex: 1,
-		},
-		overlay: {
-			flex: 1,
-			backgroundColor: "rgba(0,0,0,0.5)",
-		},
-		sheet: {
-			backgroundColor: theme.background,
-			borderTopLeftRadius: RADIUS.lg,
-			borderTopRightRadius: RADIUS.lg,
-			paddingHorizontal: 20,
-			paddingTop: 20,
-		},
-		sheetHeader: {
-			flexDirection: "row",
-			alignItems: "center",
-			justifyContent: "space-between",
-			marginBottom: 14,
-		},
-		sheetTitle: {
-			fontFamily: "sans-extrabold",
-			fontSize: 18,
-			color: theme.primary,
 		},
 		doneButton: {
 			backgroundColor: theme.accent,
@@ -194,7 +156,7 @@ const createStyles = (theme: Theme) =>
 			opacity: 0.5,
 		},
 		doneText: {
-			fontFamily: "sans-extrabold",
+			fontFamily: "sans-bold",
 			fontSize: 15,
 			color: "#fff",
 		},

@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useMemo, useState } from "react";
 import { FlashList } from "@shopify/flash-list";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -10,6 +9,7 @@ import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -186,7 +186,6 @@ export function MembersScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Members" subtitle={summary} />
 
                 <View style={styles.controls}>
@@ -357,7 +356,7 @@ function Trailing({ member, styles, theme }: { member: Member; styles: Styles; t
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

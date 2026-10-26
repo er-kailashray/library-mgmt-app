@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList } from "@shopify/flash-list";
 import { Href, useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getNotificationsApi, markNotificationsReadApi } from "@/features/notifications/logic/notifications-api";
@@ -11,6 +10,7 @@ import { setUnreadCount } from "@/features/notifications/logic/unread-count";
 import { OwnerNotification } from "@/features/notifications/types/notifications.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
@@ -165,7 +165,6 @@ export function NotificationsScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Alerts" subtitle="Dues, renewals and plan updates" />
 
                 {isLoading ? (
@@ -200,7 +199,7 @@ export function NotificationsScreen() {
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

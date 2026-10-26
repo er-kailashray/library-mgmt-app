@@ -1,19 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { registerApi } from "@/features/auth/logic/auth-register.api";
 import { AuthBrand } from "@/features/auth/ui/AuthBrand";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { PHONE_INPUT_MAX_LENGTH, phoneDigits } from "@/shared/utils/text";
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const PASSWORD_MIN = 6;
@@ -92,7 +93,6 @@ export function RegisterScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
 
                 <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -159,9 +159,9 @@ export function RegisterScreen() {
                                     placeholder="10-digit mobile number"
                                     placeholderTextColor={theme.mutedForeground + "80"}
                                     keyboardType="phone-pad"
-                                    maxLength={10}
+                                    maxLength={PHONE_INPUT_MAX_LENGTH}
                                     value={phone}
-                                    onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
+                                    onChangeText={(text) => setPhone(phoneDigits(text))}
                                 />
                                 {fieldError("phone") ?? <Text style={styles.hint}>We'll send a code to verify it. You'll sign in with this number.</Text>}
                             </View>
@@ -198,7 +198,7 @@ export function RegisterScreen() {
 
                         <Pressable accessibilityRole="button" style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]} onPress={handleRegister} disabled={isSubmitting}>
                             {isSubmitting ? (
-                                <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
+                                <ActivityIndicator color={"#fff"} size="small" />
                             ) : (
                                 <Text style={styles.submitButtonText}>Create Account</Text>
                             )}
@@ -219,7 +219,7 @@ export function RegisterScreen() {
     );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
     safe: {
         flex: 1,
     },

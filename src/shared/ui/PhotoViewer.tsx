@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useEffect, useState, type ReactNode } from "react";
-import { FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { Text } from "@/shared/ui/Text";
 
 export interface ViewerPhoto {
@@ -71,7 +72,7 @@ export function PhotoViewer({ visible, photos, initialIndex = 0, onClose, render
 	);
 }
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
 	backdrop: {
 		flex: 1,
 		backgroundColor: "rgba(0,0,0,0.94)",

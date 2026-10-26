@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { resendRegisterOtpApi, verifyRegisterOtpApi } from "@/features/auth/logic/auth-register.api";
@@ -11,12 +10,14 @@ import { saveAuthData } from "@/services/api/auth.api";
 import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { OtpInput } from "@/shared/ui/OtpInput";
 import { PoweredBy } from "@/shared/ui/PoweredBy";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text } from "@/shared/ui/Text";
+import { formatCountdown } from "@/shared/utils/dates";
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -85,7 +86,6 @@ export function OtpScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader
                     title="Verify Account"
                     subtitle={`Enter the code sent to ${phone}`}
@@ -113,7 +113,7 @@ export function OtpScreen() {
 
                             <Pressable style={styles.submitButton} onPress={handleVerify} disabled={isVerifying}>
                                 {isVerifying ? (
-                                    <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
+                                    <ActivityIndicator color={"#fff"} size="small" />
                                 ) : (
                                     <Text style={styles.submitButtonText}>Verify & Complete</Text>
                                 )}
@@ -128,7 +128,7 @@ export function OtpScreen() {
                                 {isResending ? (
                                     <ActivityIndicator color={theme.accent} size="small" />
                                 ) : cooldown > 0 ? (
-                                    <Text style={styles.resendText}>Resend code in 0:{String(cooldown).padStart(2, "0")}</Text>
+                                    <Text style={styles.resendText}>Resend code in {formatCountdown(cooldown)}</Text>
                                 ) : (
                                     <Text style={styles.resendText}>Didn't receive code? <Text style={{ color: theme.accent }}>Resend</Text></Text>
                                 )}
@@ -143,7 +143,7 @@ export function OtpScreen() {
     );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => ScaledSheet.create({
     safe: {
         flex: 1,
     },

@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { getMembersApi } from "@/features/members/logic/members.api";
 import { Member } from "@/features/members/types/members.types";
-import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { MemberAvatar } from "@/shared/ui/MemberAvatar";
 import { Text, TextInput } from "@/shared/ui/Text";
 import { formatRupee } from "@/shared/utils/currency";
@@ -19,7 +20,6 @@ import { formatShortDate } from "@/shared/utils/dates";
  */
 export function RecordPaymentSheet({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (member: Member) => void }) {
     const { theme } = useTheme();
-    const insets = useSafeAreaInsets();
     const styles = createStyles(theme);
 
     const [members, setMembers] = useState<Member[] | null>(null);
@@ -48,133 +48,65 @@ export function RecordPaymentSheet({ visible, onClose, onPick }: { visible: bool
     }, [members, query]);
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-            <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
-                <View style={[styles.sheet, { paddingBottom: 12 + insets.bottom }]}>
-                    <View style={styles.handle} />
-                    <View style={styles.header}>
-                        <View style={styles.headerText}>
-                            <Text style={styles.title}>Record payment</Text>
-                            <Text style={styles.subtitle}>Who paid? Members who owe are at the top.</Text>
-                        </View>
-                        <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.closeBtn} onPress={onClose} hitSlop={8}>
-                            <Ionicons name="close" size={20} color={theme.primary} />
-                        </Pressable>
-                    </View>
+        <BottomSheet visible={visible} onClose={onClose} title="Record payment" subtitle="Who paid? Members who owe are at the top." showClose bottomPadding={12}>
+            <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color={theme.mutedForeground} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Name or phone"
+                    placeholderTextColor={theme.mutedForeground + "99"}
+                    value={query}
+                    onChangeText={setQuery}
+                    autoCorrect={false}
+                />
+            </View>
 
-                    <View style={styles.searchBar}>
-                        <Ionicons name="search" size={18} color={theme.mutedForeground} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Name or phone"
-                            placeholderTextColor={theme.mutedForeground + "99"}
-                            value={query}
-                            onChangeText={setQuery}
-                            autoCorrect={false}
-                        />
-                    </View>
-
-                    {members === null && !error ? (
-                        <ActivityIndicator color={theme.accent} style={styles.spinner} />
-                    ) : error ? (
-                        <Text style={styles.note}>{error}</Text>
-                    ) : (
-                        <FlatList
-                            data={shown}
-                            keyExtractor={(m) => String(m.id)}
-                            style={styles.list}
-                            keyboardShouldPersistTaps="handled"
-                            ItemSeparatorComponent={() => <View style={styles.divider} />}
-                            ListEmptyComponent={<Text style={styles.note}>{members?.length ? "Nobody matches that." : "No active members yet."}</Text>}
-                            renderItem={({ item }) => {
-                                const owes = (item.due_amount ?? 0) > 0;
-                                return (
-                                    <Pressable
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`${item.name}${owes ? `, owes ${formatRupee(item.due_amount ?? 0)}` : ""}`}
-                                        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                                        onPress={() => onPick(item)}
-                                    >
-                                        <MemberAvatar id={item.id} name={item.name} size={38} />
-                                        <View style={styles.rowText}>
-                                            <Text style={styles.name} numberOfLines={1}>
-                                                {item.name}
-                                            </Text>
-                                            <Text style={styles.meta} numberOfLines={1}>
-                                                {item.next_renewal_date && !owes ? `Renews ${formatShortDate(item.next_renewal_date)}` : item.phone}
-                                            </Text>
-                                        </View>
-                                        {owes ? (
-                                            <Text style={styles.owes}>{formatRupee(item.due_amount ?? 0)}</Text>
-                                        ) : (
-                                            <Text style={styles.paidUp}>Paid up</Text>
-                                        )}
-                                    </Pressable>
-                                );
-                            }}
-                        />
-                    )}
-                </View>
-            </KeyboardAvoidingView>
-        </Modal>
+            {members === null && !error ? (
+                <ActivityIndicator color={theme.accent} style={styles.spinner} />
+            ) : error ? (
+                <Text style={styles.note}>{error}</Text>
+            ) : (
+                <FlatList
+                    data={shown}
+                    keyExtractor={(m) => String(m.id)}
+                    style={styles.list}
+                    keyboardShouldPersistTaps="handled"
+                    ItemSeparatorComponent={() => <View style={styles.divider} />}
+                    ListEmptyComponent={<Text style={styles.note}>{members?.length ? "Nobody matches that." : "No active members yet."}</Text>}
+                    renderItem={({ item }) => {
+                        const owes = (item.due_amount ?? 0) > 0;
+                        return (
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`${item.name}${owes ? `, owes ${formatRupee(item.due_amount ?? 0)}` : ""}`}
+                                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                                onPress={() => onPick(item)}
+                            >
+                                <MemberAvatar id={item.id} name={item.name} size={38} />
+                                <View style={styles.rowText}>
+                                    <Text style={styles.name} numberOfLines={1}>
+                                        {item.name}
+                                    </Text>
+                                    <Text style={styles.meta} numberOfLines={1}>
+                                        {item.next_renewal_date && !owes ? `Renews ${formatShortDate(item.next_renewal_date)}` : item.phone}
+                                    </Text>
+                                </View>
+                                {owes ? (
+                                    <Text style={styles.owes}>{formatRupee(item.due_amount ?? 0)}</Text>
+                                ) : (
+                                    <Text style={styles.paidUp}>Paid up</Text>
+                                )}
+                            </Pressable>
+                        );
+                    }}
+                />
+            )}
+        </BottomSheet>
     );
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
-        root: {
-            flex: 1,
-            justifyContent: "flex-end",
-        },
-        backdrop: {
-            ...StyleSheet.absoluteFill,
-            backgroundColor: "rgba(0,0,0,0.45)",
-        },
-        sheet: {
-            maxHeight: "80%",
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg + 4,
-            borderTopRightRadius: RADIUS.lg + 4,
-            paddingHorizontal: 20,
-            paddingTop: 10,
-            ...FLOATING_SHADOW,
-        },
-        handle: {
-            alignSelf: "center",
-            width: 36,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: theme.mutedForeground + "55",
-            marginBottom: 14,
-        },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 14,
-        },
-        headerText: {
-            flex: 1,
-        },
-        title: {
-            fontFamily: "sans-bold",
-            fontSize: 20,
-            color: theme.primary,
-        },
-        subtitle: {
-            fontFamily: "sans-regular",
-            fontSize: 13,
-            color: theme.mutedForeground,
-            marginTop: 2,
-        },
-        closeBtn: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: theme.muted,
-            alignItems: "center",
-            justifyContent: "center",
-        },
+    ScaledSheet.create({
         searchBar: {
             flexDirection: "row",
             alignItems: "center",

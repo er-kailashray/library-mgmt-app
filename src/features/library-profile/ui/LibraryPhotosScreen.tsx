@@ -3,19 +3,21 @@ import { Image } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { deleteLibraryPhotoApi, getLibraryProfileApi, uploadLibraryPhotoApi } from "@/features/library-profile/logic/library-profile-api";
+import { ScaledSheet, space } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { PhotoViewer } from "@/shared/ui/PhotoViewer";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
 import { Text } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 const MAX_PHOTOS = 10;
 /** Longest side of an uploaded photo, in pixels. */
@@ -45,7 +47,8 @@ export function LibraryPhotosScreen() {
     const { width } = useWindowDimensions();
     // Exact pixel squares: percentage widths with aspectRatio left the add tile's icon off-centre
     // and the last column short of the edge.
-    const tileSize = Math.floor((width - SIDE_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
+    // Padding and gaps are scaled by ScaledSheet, so the sum uses the same space() values.
+    const tileSize = Math.floor((width - space(SIDE_PADDING) * 2 - space(GRID_GAP) * (COLUMNS - 1)) / COLUMNS);
     const tileStyle = { width: tileSize, height: tileSize };
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -71,7 +74,7 @@ export function LibraryPhotosScreen() {
             if (source === "camera") {
                 const permission = await ImagePicker.requestCameraPermissionsAsync();
                 if (!permission.granted) {
-                    Alert.alert("Permission needed", "Please allow camera access to take a photo.");
+                    showToast({ message: "Camera access is off", detail: "Allow camera access in your phone's settings to take a photo.", tone: "error" });
                     return;
                 }
             }
@@ -114,51 +117,65 @@ export function LibraryPhotosScreen() {
 
             if (failures.length > 0) {
                 const uploaded = assets.length - failures.length;
-                Alert.alert(
-                    uploaded > 0 ? `${uploaded} of ${assets.length} photos added` : assets.length > 1 ? "Photos not added" : "Photo not added",
-                    [...new Set(failures)].join("\n")
-                );
+                showToast({
+                    message: uploaded > 0 ? `${uploaded} of ${assets.length} photos added` : assets.length > 1 ? "Photos not added" : "Photo not added",
+                    detail: [...new Set(failures)].join("\n"),
+                    tone: "error",
+                    durationMs: 5000,
+                });
             } else if (skipped > 0) {
-                Alert.alert("Limit reached", `Added ${assets.length}. You can have up to ${MAX_PHOTOS} photos, so ${skipped} weren't added.`);
+                showToast({ message: `${assets.length} added`, detail: `You can have up to ${MAX_PHOTOS} photos, so ${skipped} weren't added.`, tone: "info", durationMs: 4500 });
             }
         },
         [refetch, remainingSlots]
     );
 
+    // Photo source and remove confirmation, as sheets rather than system alerts.
+    const actionSheet = useActionSheet();
+    const openActionSheet = actionSheet.open;
+
     const handleAddPhoto = useCallback(() => {
         if (photos.length >= MAX_PHOTOS) {
-            Alert.alert("Limit reached", `You can add up to ${MAX_PHOTOS} photos.`);
+            showToast({ message: "Photo limit reached", detail: `You can have up to ${MAX_PHOTOS} photos. Remove one to add another.`, tone: "info" });
             return;
         }
-        Alert.alert("Add Photos", remainingSlots > 1 ? `You can add ${remainingSlots} more.` : "You can add 1 more.", [
-            { text: "Take Photo", onPress: () => pickAndUpload("camera") },
-            { text: "Choose from Gallery", onPress: () => pickAndUpload("gallery") },
-            { text: "Cancel", style: "cancel" },
-        ]);
-    }, [photos.length, pickAndUpload, remainingSlots]);
+        openActionSheet({
+            title: "Add photos",
+            message: remainingSlots > 1 ? `You can add ${remainingSlots} more.` : "You can add 1 more.",
+            actions: [
+                { label: "Take photo", icon: "camera-outline", tone: "primary", onPress: () => void pickAndUpload("camera") },
+                { label: "Choose from gallery", icon: "images-outline", onPress: () => void pickAndUpload("gallery") },
+            ],
+        });
+    }, [photos.length, pickAndUpload, remainingSlots, openActionSheet]);
 
     const handleDeletePhoto = useCallback(
         (id: number) => {
-            Alert.alert("Remove photo?", "This photo will be removed from your library's gallery.", [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Remove",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            setDeletingId(id);
-                            await deleteLibraryPhotoApi(id);
-                            await refetch();
-                        } catch (err: any) {
-                            Alert.alert("Error", err.message || "Failed to remove photo.");
-                        } finally {
-                            setDeletingId(null);
-                        }
+            openActionSheet({
+                title: "Remove photo?",
+                message: "It will be removed from your library's gallery.",
+                confirm: true,
+                actions: [
+                    {
+                        label: "Remove photo",
+                        icon: "trash-outline",
+                        tone: "destructive",
+                        onPress: async () => {
+                            try {
+                                setDeletingId(id);
+                                await deleteLibraryPhotoApi(id);
+                                await refetch();
+                            } catch (err: any) {
+                                showToast({ message: "Couldn't remove the photo", detail: err.message, tone: "error" });
+                            } finally {
+                                setDeletingId(null);
+                            }
+                        },
                     },
-                },
-            ]);
+                ],
+            });
         },
-        [refetch]
+        [refetch, openActionSheet]
     );
 
     const styles = createStyles(theme);
@@ -166,7 +183,6 @@ export function LibraryPhotosScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Manage Photos" subtitle={`${photos.length} / ${MAX_PHOTOS} photos`} />
 
                 {isLoading ? (
@@ -222,13 +238,14 @@ export function LibraryPhotosScreen() {
                     initialIndex={previewIndex ?? 0}
                     onClose={() => setPreviewIndex(null)}
                 />
+                {actionSheet.sheet}
             </SafeAreaView>
         </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

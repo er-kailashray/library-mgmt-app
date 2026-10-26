@@ -1,18 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLibraryProfileApi, updateLibraryProfileApi } from "@/features/library-profile/logic/library-profile-api";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 export function LibraryProfileScreen() {
     const router = useRouter();
@@ -40,21 +41,21 @@ export function LibraryProfileScreen() {
 
     const handleSave = useCallback(async () => {
         if (!name.trim()) {
-            Alert.alert("Error", "Please enter a library name.");
+            showToast({ message: "Please enter a library name.", tone: "error" });
             return;
         }
         const seatCount = parseInt(seats, 10);
         if (!seatCount || seatCount < 1) {
-            Alert.alert("Error", "Please enter a valid number of seats.");
+            showToast({ message: "Please enter a valid number of seats.", tone: "error" });
             return;
         }
         try {
             setIsSaving(true);
             await updateLibraryProfileApi({ library_name: name.trim(), total_seats: seatCount });
-            Alert.alert("Saved", "Library profile updated.");
+            showToast({ message: "Library profile saved" });
             router.back();
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to update library.");
+            showToast({ message: err.message || "Failed to update library.", tone: "error" });
         } finally {
             setIsSaving(false);
         }
@@ -65,7 +66,6 @@ export function LibraryProfileScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Library Profile" subtitle="Name & total seats" />
 
                 {isLoading ? (
@@ -115,7 +115,7 @@ export function LibraryProfileScreen() {
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

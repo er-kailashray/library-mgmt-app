@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, TextInputInstance, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text, TextInput } from "@/shared/ui/Text";
 
@@ -50,7 +51,7 @@ export function OtpInput({ value, onChangeText, length = 6 }: OtpInputProps) {
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		row: {
 			flexDirection: "row",
 			justifyContent: "space-between",

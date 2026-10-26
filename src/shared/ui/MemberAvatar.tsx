@@ -1,5 +1,6 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
+import { scale, ScaledSheet } from "@/shared/constants/ui-scale";
 import { Text } from "@/shared/ui/Text";
 import { getInitials } from "@/shared/utils/text";
 
@@ -14,8 +15,10 @@ export function memberColor(id: number | string | null | undefined, name: string
 }
 
 /** A round avatar with the member's initials on their own soft colour (Members, Payments, …). */
-export function MemberAvatar({ id, name, size = 44, faded = false }: { id?: number | string | null; name: string; size?: number; faded?: boolean }) {
+export function MemberAvatar({ id, name, size: designSize = 44, faded = false }: { id?: number | string | null; name: string; size?: number; faded?: boolean }) {
     const color = memberColor(id, name);
+    // A touch smaller on narrow phones, like the text beside it.
+    const size = scale(designSize);
     return (
         <View style={[styles.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + "22" }, faded && styles.faded]}>
             <Text style={[styles.initials, { color, fontSize: Math.round(size * 0.34) }]}>{getInitials(name)}</Text>
@@ -23,7 +26,7 @@ export function MemberAvatar({ id, name, size = 44, faded = false }: { id?: numb
     );
 }
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
     circle: {
         alignItems: "center",
         justifyContent: "center",

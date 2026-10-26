@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { describePaymentPeriod, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
@@ -12,6 +11,7 @@ import { Payment } from "@/features/payments/types/payments.types";
 import { remindAllOverdueApi, remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -23,6 +23,7 @@ import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { SegmentedControl } from "@/shared/ui/SegmentedControl";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 import { formatRupee } from "@/shared/utils/currency";
 import { addDays, formatShortDate, fromIsoDate, todayIso } from "@/shared/utils/dates";
 
@@ -173,9 +174,9 @@ export function PaymentsScreen() {
         try {
             setRemindingId(payment.id);
             await remindMemberApi(payment.member_id);
-            Alert.alert("Reminder sent", `${payment.member_name} got an SMS about the ${formatRupee(payment.amount)} due.`);
+            showToast({ message: "Reminder sent", detail: `${payment.member_name} got an SMS about the ${formatRupee(payment.amount)} due.` });
         } catch (err: any) {
-            Alert.alert("Couldn't send", err.message || "Failed to send the reminder.");
+            showToast({ message: "Couldn't send the reminder", detail: err.message, tone: "error" });
         } finally {
             setRemindingId(null);
         }
@@ -185,9 +186,9 @@ export function PaymentsScreen() {
         try {
             setIsRemindingAll(true);
             const response = await remindAllOverdueApi();
-            Alert.alert("Reminders sent", response.message || `Sent ${response.data.sent} reminder(s).`);
+            showToast({ message: "Reminders sent", detail: response.message || `Sent ${response.data.sent} reminder(s).` });
         } catch (err: any) {
-            Alert.alert("Couldn't send", err.message || "Failed to send reminders.");
+            showToast({ message: "Couldn't send reminders", detail: err.message, tone: "error" });
         } finally {
             setIsRemindingAll(false);
         }
@@ -371,7 +372,6 @@ export function PaymentsScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Payments" subtitle={subtitle} />
 
                 <View style={styles.controls}>
@@ -462,7 +462,7 @@ export function PaymentsScreen() {
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

@@ -1,9 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ID_PROOF_TYPE_LABELS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
@@ -15,17 +14,21 @@ import { PAYMENT_MODE_LABELS, Payment, PaymentMode, PaymentStatus } from "@/feat
 import { remindMemberApi } from "@/features/reminders/logic/reminders-api";
 import { RADIUS } from "@/shared/constants/layout";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { useActionSheet } from "@/shared/ui/ActionSheet";
+import { MemberAvatar } from "@/shared/ui/MemberAvatar";
 import { ChoiceChips } from "@/shared/ui/ChoiceChips";
 import { formatRupee } from "@/shared/utils/currency";
-import { getInitials } from "@/shared/utils/text";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { CalendarPicker } from "@/shared/ui/CalendarPicker";
 import { addDays, addMonths, durationSince, toIsoDate } from "@/shared/utils/dates";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
 
 const PAYMENT_MODE_OPTIONS = (Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((value) => ({ value, label: PAYMENT_MODE_LABELS[value] }));
 
@@ -83,7 +86,7 @@ export function MemberDetailScreen() {
                 setViewingSide(side);
                 setIdProofModalVisible(true);
             } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to load ID proof.");
+                showToast({ message: err.message || "Failed to load ID proof.", tone: "error" });
             } finally {
                 setLoadingIdProofSide(null);
             }
@@ -116,7 +119,7 @@ export function MemberDetailScreen() {
                 setIsIdProofSheetVisible(false);
                 await refetch();
             } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to save ID proof.");
+                showToast({ message: err.message || "Failed to save ID proof.", tone: "error" });
             } finally {
                 setIsSavingIdProof(false);
             }
@@ -124,27 +127,36 @@ export function MemberDetailScreen() {
         [member, refetch]
     );
 
+    // Confirmations, as a sheet rather than a system alert.
+    const confirmSheet = useActionSheet();
+    const openConfirm = confirmSheet.open;
+
     const handleRemoveIdProof = useCallback(() => {
         if (!member) return;
-        Alert.alert("Remove ID proof?", `The ID proof photos for ${member.name} will be deleted.`, [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Remove",
-                style: "destructive",
-                onPress: async () => {
-                    try {
-                        setIsSavingIdProof(true);
-                        await deleteMemberIdProofApi(member.id);
-                        await refetch();
-                    } catch (err: any) {
-                        Alert.alert("Error", err.message || "Failed to remove ID proof.");
-                    } finally {
-                        setIsSavingIdProof(false);
-                    }
+        openConfirm({
+            title: "Remove ID proof?",
+            message: `The ID proof photos for ${member.name} will be deleted.`,
+            confirm: true,
+            actions: [
+                {
+                    label: "Remove ID proof",
+                    icon: "trash-outline",
+                    tone: "destructive",
+                    onPress: async () => {
+                        try {
+                            setIsSavingIdProof(true);
+                            await deleteMemberIdProofApi(member.id);
+                            await refetch();
+                        } catch (err: any) {
+                            showToast({ message: "Couldn't remove the ID proof", detail: err.message, tone: "error" });
+                        } finally {
+                            setIsSavingIdProof(false);
+                        }
+                    },
                 },
-            },
-        ]);
-    }, [member, refetch]);
+            ],
+        });
+    }, [member, refetch, openConfirm]);
 
     // Editing name/phone/gender/address
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -166,15 +178,15 @@ export function MemberDetailScreen() {
     const handleSaveEdit = useCallback(async () => {
         if (!member) return;
         if (!editName.trim()) {
-            Alert.alert("Error", "Please enter a name.");
+            showToast({ message: "Please enter a name.", tone: "error" });
             return;
         }
         if (editPhone.trim().length < 10) {
-            Alert.alert("Error", "Please enter a valid 10-digit phone number.");
+            showToast({ message: "Please enter a valid 10-digit phone number.", tone: "error" });
             return;
         }
         if (member.status === "inactive" && editPhone.trim() !== member.phone) {
-            Alert.alert("Error", "Phone number can't be changed for a member who has left.");
+            showToast({ message: "Phone number can't be changed for a member who has left.", tone: "error" });
             return;
         }
         try {
@@ -183,7 +195,7 @@ export function MemberDetailScreen() {
             setIsEditModalVisible(false);
             await refetch();
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to update member.");
+            showToast({ message: err.message || "Failed to update member.", tone: "error" });
         } finally {
             setIsSavingEdit(false);
         }
@@ -247,11 +259,11 @@ export function MemberDetailScreen() {
     const handleSavePayment = useCallback(async () => {
         if (!member) return;
         if (restartMode && !restartDate) {
-            Alert.alert("Pick a date", "Choose the date their membership restarts from.");
+            showToast({ message: "Pick a date", detail: "Choose the date their membership restarts from.", tone: "error" });
             return;
         }
         if (paymentAmountValue <= 0) {
-            Alert.alert("Error", "Please enter the amount received.");
+            showToast({ message: "Please enter the amount received.", tone: "error" });
             return;
         }
         try {
@@ -265,14 +277,16 @@ export function MemberDetailScreen() {
             setIsPaymentSheetVisible(false);
             await refetch();
             const covers = payment.period_start && payment.period_end ? `${formatShortDate(payment.period_start, true)} – ${formatShortDate(payment.period_end, true)}` : "";
-            Alert.alert(
-                payment.status === PaymentStatus.PAID ? "Payment recorded" : "Partial payment recorded",
-                payment.status === PaymentStatus.PAID
-                    ? `${formatRupee(paymentAmountValue)} received${covers ? ` for ${covers}` : ""}.`
-                    : `${formatRupee(paymentAmountValue)} received toward ${covers}. ${formatRupee(remainingAfterPayment)} more is needed to renew.`
-            );
+            showToast({
+                message: payment.status === PaymentStatus.PAID ? "Payment recorded" : "Partial payment recorded",
+                detail:
+                    payment.status === PaymentStatus.PAID
+                        ? `${formatRupee(paymentAmountValue)} received${covers ? ` for ${covers}` : ""}.`
+                        : `${formatRupee(paymentAmountValue)} received toward ${covers}. ${formatRupee(remainingAfterPayment)} more is needed to renew.`,
+                durationMs: 4000,
+            });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to record payment.");
+            showToast({ message: err.message || "Failed to record payment.", tone: "error" });
         } finally {
             setIsSavingPayment(false);
         }
@@ -286,9 +300,9 @@ export function MemberDetailScreen() {
             await restartMemberApi(member.id, restartDate);
             setIsPaymentSheetVisible(false);
             await refetch();
-            Alert.alert("Membership restarted", `${member.name} restarts on ${formatShortDate(restartDate, true)}. ${formatRupee(restartAmount)} is due from that date.`);
+            showToast({ message: "Membership restarted", detail: `${member.name} restarts on ${formatShortDate(restartDate, true)}. ${formatRupee(restartAmount)} is due from that date.`, durationMs: 4000 });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to restart membership.");
+            showToast({ message: err.message || "Failed to restart membership.", tone: "error" });
         } finally {
             setIsRestarting(false);
         }
@@ -305,7 +319,7 @@ export function MemberDetailScreen() {
         try {
             await openWhatsAppMessage(member.phone, message);
         } catch {
-            Alert.alert("Couldn't open WhatsApp", "Make sure WhatsApp is installed on this device.");
+            showToast({ message: "Couldn't open WhatsApp", detail: "Make sure WhatsApp is installed on this device.", tone: "error" });
         }
     }, [member]);
 
@@ -314,9 +328,9 @@ export function MemberDetailScreen() {
         try {
             setIsSendingSms(true);
             await remindMemberApi(member.id);
-            Alert.alert("Sent", `An SMS reminder was sent to ${member.name}.`);
+            showToast({ message: "Reminder sent", detail: `${member.name} got an SMS.` });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to send SMS reminder.");
+            showToast({ message: "Couldn't send the reminder", detail: err.message, tone: "error" });
         } finally {
             setIsSendingSms(false);
         }
@@ -338,7 +352,7 @@ export function MemberDetailScreen() {
         if (!member) return;
         const amount = refundChoice === "none" ? 0 : parseFloat(refundAmount) || 0;
         if (refundChoice !== "none" && amount <= 0) {
-            Alert.alert("Error", "Enter the amount you're giving back, or choose No refund.");
+            showToast({ message: "Enter the amount you're giving back, or choose No refund.", tone: "error" });
             return;
         }
         try {
@@ -347,7 +361,7 @@ export function MemberDetailScreen() {
             setIsLeaveSheetVisible(false);
             router.back();
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to update member.");
+            showToast({ message: err.message || "Failed to update member.", tone: "error" });
         } finally {
             setIsDeactivating(false);
         }
@@ -361,32 +375,35 @@ export function MemberDetailScreen() {
             setIsLeaveSheetVisible(true);
             return;
         }
-        Alert.alert(
-            "Mark as left?",
-            `${member.name} will be marked inactive and their seat${member.allocations.length > 1 ? "s" : ""} will be freed up for new admissions.` +
-                (member.due_amount ? ` The ${formatRupee(member.due_amount)} they owe will be kept on record, to collect or waive if they come back.` : ""),
-            [
-                { text: "Cancel", style: "cancel" },
+        openConfirm({
+            title: "Mark as left?",
+            message:
+                `${member.name}'s seat${member.allocations.length > 1 ? "s" : ""} will be freed up for new admissions.` +
+                (member.due_amount ? ` The ${formatRupee(member.due_amount)} they owe stays on record, to collect or waive if they come back.` : ""),
+            confirm: true,
+            actions: [
                 {
-                    text: "Mark as left",
-                    style: "destructive",
+                    label: "Mark as left",
+                    icon: "person-remove-outline",
+                    tone: "destructive",
                     onPress: async () => {
                         try {
                             setIsDeactivating(true);
                             await deactivateMemberApi(member.id);
+                            showToast({ message: `${member.name} marked as left` });
                             router.back();
                         } catch (err: any) {
-                            Alert.alert("Error", err.message || "Failed to update member.");
+                            showToast({ message: "Couldn't update the member", detail: err.message, tone: "error" });
                         } finally {
                             setIsDeactivating(false);
                         }
                     },
                 },
-            ]
-        );
+            ],
+        });
         // chooseRefund only reads member, which is already a dependency.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [member, router]);
+    }, [member, router, openConfirm]);
 
     const [showAllPayments, setShowAllPayments] = useState(false);
 
@@ -423,7 +440,6 @@ export function MemberDetailScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 {/* No header on this page: the member's name below is the title. Just a plain back arrow. */}
                 <View style={styles.topBar}>
                     <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={12} style={styles.backArrow}>
@@ -439,9 +455,8 @@ export function MemberDetailScreen() {
                     <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                         {/* IDENTITY */}
                         <View style={styles.identityRow}>
-                            <View style={[styles.avatar, { backgroundColor: statusColor + "15" }]}>
-                                <Text style={[styles.avatarText, { color: statusColor }]}>{getInitials(member.name)}</Text>
-                            </View>
+                            {/* Same colour as the member has in every list. */}
+                            <MemberAvatar id={member.id} name={member.name} size={56} faded={!isActive} />
                             <View style={styles.identityText}>
                                 <Text style={styles.memberName} numberOfLines={1}>
                                     {member.name}
@@ -450,7 +465,7 @@ export function MemberDetailScreen() {
                                     <Text style={styles.memberPhone}>{member.phone}</Text>
                                     <View style={[styles.statusPill, { backgroundColor: statusColor + "15" }]}>
                                         <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                                        <Text style={[styles.statusPillText, { color: statusColor }]}>{isActive ? "Active" : "Inactive"}</Text>
+                                        <Text style={[styles.statusPillText, { color: statusColor }]}>{isActive ? "Active" : "Left"}</Text>
                                     </View>
                                 </View>
                                 {!!member.join_date && (
@@ -712,212 +727,197 @@ export function MemberDetailScreen() {
                     isSaving={isSavingIdProof}
                 />
 
-                <Modal visible={isPaymentSheetVisible} transparent animationType="slide" onRequestClose={() => setIsPaymentSheetVisible(false)}>
-                    <Pressable style={styles.editModalOverlay} onPress={() => setIsPaymentSheetVisible(false)} />
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-                        <View style={styles.editModalSheet}>
-                            <Text style={styles.editModalTitle}>{isPaidAhead ? "Renew Early" : "Record Payment"}</Text>
-                            {member && (
-                                <Text style={styles.paymentSheetSubtitle}>
-                                    {member.name} · Monthly fee {formatRupee(member.monthly_fee)}
-                                    {member.due_amount ? ` · ${formatRupee(member.due_amount)} due` : ""}
-                                </Text>
-                            )}
-                            {isPaidAhead && paidThrough && (
-                                <View style={styles.sheetNote}>
-                                    <Ionicons name="information-circle-outline" size={16} color={theme.accent} />
-                                    <Text style={styles.sheetNoteText}>Already paid till {formatShortDate(addDays(paidThrough, -1), true)}. This payment adds the time after that.</Text>
+                {confirmSheet.sheet}
+
+                <BottomSheet
+                    visible={isPaymentSheetVisible}
+                    onClose={() => setIsPaymentSheetVisible(false)}
+                    title={isPaidAhead ? "Renew early" : "Record payment"}
+                    subtitle={member ? `${member.name} · Monthly fee ${formatRupee(member.monthly_fee)}${member.due_amount ? ` · ${formatRupee(member.due_amount)} due` : ""}` : undefined}>
+                    {/* Scrolls when the restart calendar makes it taller than the screen. */}
+                    <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                        {isPaidAhead && paidThrough && (
+                            <View style={styles.sheetNote}>
+                                <Ionicons name="information-circle-outline" size={16} color={theme.accent} />
+                                <Text style={styles.sheetNoteText}>Already paid till {formatShortDate(addDays(paidThrough, -1), true)}. This payment adds the time after that.</Text>
+                            </View>
+                        )}
+
+                        {/* Overdue after a break: carry on from where their paid time ended, or restart on a chosen date. */}
+                        {canRestart && paidThrough && (
+                            <>
+                                <Text style={styles.inputLabel}>Start From</Text>
+                                <View style={styles.restartChoiceRow}>
+                                    <Pressable
+                                        accessibilityRole="radio"
+                                        accessibilityState={{ selected: !restartMode }}
+                                        style={[styles.restartChoice, !restartMode && styles.restartChoiceSelected]}
+                                        onPress={() => switchRestartMode(false)}>
+                                        <Text style={[styles.restartChoiceTitle, !restartMode && styles.restartChoiceTitleSelected]}>Continue</Text>
+                                        <Text style={styles.restartChoiceHint}>From {formatShortDate(paidThrough, true)}</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        accessibilityRole="radio"
+                                        accessibilityState={{ selected: restartMode }}
+                                        style={[styles.restartChoice, restartMode && styles.restartChoiceSelected]}
+                                        onPress={() => switchRestartMode(true)}>
+                                        <Text style={[styles.restartChoiceTitle, restartMode && styles.restartChoiceTitleSelected]}>Restart</Text>
+                                        <Text style={styles.restartChoiceHint}>{restartDate ? `From ${formatShortDate(restartDate, true)}` : "Pick a date"}</Text>
+                                    </Pressable>
                                 </View>
-                            )}
-
-                            {/* Overdue after a break: carry on from where their paid time ended, or restart on a chosen date. */}
-                            {canRestart && paidThrough && (
-                                <>
-                                    <Text style={styles.inputLabel}>Start From</Text>
-                                    <View style={styles.restartChoiceRow}>
-                                        <Pressable
-                                            accessibilityRole="radio"
-                                            accessibilityState={{ selected: !restartMode }}
-                                            style={[styles.restartChoice, !restartMode && styles.restartChoiceSelected]}
-                                            onPress={() => switchRestartMode(false)}>
-                                            <Text style={[styles.restartChoiceTitle, !restartMode && styles.restartChoiceTitleSelected]}>Continue</Text>
-                                            <Text style={styles.restartChoiceHint}>From {formatShortDate(paidThrough, true)}</Text>
-                                        </Pressable>
-                                        <Pressable
-                                            accessibilityRole="radio"
-                                            accessibilityState={{ selected: restartMode }}
-                                            style={[styles.restartChoice, restartMode && styles.restartChoiceSelected]}
-                                            onPress={() => switchRestartMode(true)}>
-                                            <Text style={[styles.restartChoiceTitle, restartMode && styles.restartChoiceTitleSelected]}>Restart</Text>
-                                            <Text style={styles.restartChoiceHint}>{restartDate ? `From ${formatShortDate(restartDate, true)}` : "Pick a date"}</Text>
-                                        </Pressable>
+                                {restartMode && (
+                                    <View style={styles.calendarWrap}>
+                                        <CalendarPicker value={restartDate} onChange={setRestartDate} minDate={paidThrough} maxDate={addDays(todayIso, RESTART_MAX_DAYS_AHEAD)} />
+                                        {restartDate && (
+                                            <Text style={styles.paymentHint}>
+                                                {restartDate > paidThrough ? `${formatShortDate(paidThrough)} – ${formatShortDate(addDays(restartDate, -1), true)} won't be charged.` : " "}
+                                            </Text>
+                                        )}
                                     </View>
-                                    {restartMode && (
-                                        <View style={styles.calendarWrap}>
-                                            <CalendarPicker value={restartDate} onChange={setRestartDate} minDate={paidThrough} maxDate={addDays(todayIso, RESTART_MAX_DAYS_AHEAD)} />
-                                            {restartDate && (
-                                                <Text style={styles.paymentHint}>
-                                                    {restartDate > paidThrough ? `${formatShortDate(paidThrough)} – ${formatShortDate(addDays(restartDate, -1), true)} won't be charged.` : " "}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    )}
-                                </>
-                            )}
+                                )}
+                            </>
+                        )}
 
-                            <Text style={styles.inputLabel}>Amount Received</Text>
+                        <Text style={styles.inputLabel}>Amount Received</Text>
+                        <View style={styles.amountField}>
+                            <Text style={styles.amountPrefix}>₹</Text>
+                            <TextInput
+                                style={styles.amountInput}
+                                value={paymentAmount}
+                                onChangeText={(text) => setPaymentAmount(text.replace(/[^0-9.]/g, ""))}
+                                keyboardType="decimal-pad"
+                                placeholder="0"
+                                placeholderTextColor={theme.mutedForeground + "80"}
+                            />
+                        </View>
+                        {/* Which days this pays for, so it's never a guess. */}
+                        <Text style={[styles.paymentHint, monthsCovered >= 1 && styles.paymentCovers]}>
+                            {paymentAmountValue <= 0 || (restartMode && !restartDate)
+                                ? " "
+                                : monthsCovered >= 1
+                                  ? `Covers ${periodText}${monthsCovered > 1 ? ` (${monthsCovered} months)` : ""}${remainingAfterPayment > 0 ? ` · ${formatRupee(remainingAfterPayment)} still due` : ""}`
+                                  : `Partial payment toward ${periodText} · ${formatRupee(remainingAfterPayment)} more to renew`}
+                        </Text>
+
+                        <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
+
+                        <Pressable style={[styles.editSaveBtn, isSavingPayment && { opacity: 0.7 }]} onPress={handleSavePayment} disabled={isSavingPayment || isRestarting}>
+                            {isSavingPayment ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Payment</Text>}
+                        </Pressable>
+                        {restartMode && restartDate && (
+                            <Pressable accessibilityRole="button" style={styles.secondaryBtn} onPress={handleRestartWithoutPayment} disabled={isSavingPayment || isRestarting}>
+                                {isRestarting ? <ActivityIndicator color={theme.primary} size="small" /> : <Text style={styles.secondaryBtnText}>Restart now, collect later</Text>}
+                            </Pressable>
+                        )}
+                    </ScrollView>
+                </BottomSheet>
+
+                <BottomSheet
+                    visible={isLeaveSheetVisible}
+                    onClose={() => setIsLeaveSheetVisible(false)}
+                    title="Mark as left"
+                    subtitle={
+                        member?.refund_options
+                            ? `${member.name} has paid till ${formatShortDate(addDays(member.refund_options.paid_through, -1), true)} · ${member.refund_options.unused_days} day${member.refund_options.unused_days === 1 ? "" : "s"} unused. Their seat will be freed.`
+                            : undefined
+                    }>
+                    <Text style={styles.inputLabel}>Money Back</Text>
+                    <View style={styles.restartChoiceRow}>
+                        {(
+                            [
+                                ["none", "No refund", " "],
+                                ["partial", "Partial", member?.refund_options ? formatRupee(member.refund_options.partial) : ""],
+                                ["full", "Full", member?.refund_options ? formatRupee(member.refund_options.full) : ""],
+                            ] as const
+                        ).map(([key, title, hint]) => (
+                            <Pressable
+                                key={key}
+                                accessibilityRole="radio"
+                                accessibilityState={{ selected: refundChoice === key }}
+                                style={[styles.restartChoice, refundChoice === key && styles.restartChoiceSelected]}
+                                onPress={() => chooseRefund(key)}>
+                                <Text style={[styles.restartChoiceTitle, refundChoice === key && styles.restartChoiceTitleSelected]}>{title}</Text>
+                                <Text style={styles.restartChoiceHint}>{hint}</Text>
+                            </Pressable>
+                        ))}
+                    </View>
+
+                    {refundChoice !== "none" && (
+                        <>
+                            <Text style={styles.inputLabel}>Refund Amount</Text>
                             <View style={styles.amountField}>
                                 <Text style={styles.amountPrefix}>₹</Text>
                                 <TextInput
                                     style={styles.amountInput}
-                                    value={paymentAmount}
-                                    onChangeText={(text) => setPaymentAmount(text.replace(/[^0-9.]/g, ""))}
+                                    value={refundAmount}
+                                    onChangeText={(text) => setRefundAmount(text.replace(/[^0-9.]/g, ""))}
                                     keyboardType="decimal-pad"
                                     placeholder="0"
                                     placeholderTextColor={theme.mutedForeground + "80"}
                                 />
                             </View>
-                            {/* Which days this pays for, so it's never a guess. */}
-                            <Text style={[styles.paymentHint, monthsCovered >= 1 && styles.paymentCovers]}>
-                                {paymentAmountValue <= 0 || (restartMode && !restartDate)
-                                    ? " "
-                                    : monthsCovered >= 1
-                                      ? `Covers ${periodText}${monthsCovered > 1 ? ` (${monthsCovered} months)` : ""}${remainingAfterPayment > 0 ? ` · ${formatRupee(remainingAfterPayment)} still due` : ""}`
-                                      : `Partial payment toward ${periodText} · ${formatRupee(remainingAfterPayment)} more to renew`}
+                            <Text style={styles.paymentHint}>
+                                {refundChoice === "partial" && member?.refund_options ? `For the ${member.refund_options.unused_days} unused days. You can change the amount.` : "You can change the amount."}
                             </Text>
+                            <ChoiceChips label="Paid Back By" value={refundMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setRefundMode(mode)} />
+                        </>
+                    )}
 
-                            <ChoiceChips label="Payment Mode" value={paymentMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setPaymentMode(mode)} />
+                    <Pressable style={[styles.editSaveBtn, styles.leaveConfirmBtn, isDeactivating && { opacity: 0.7 }]} onPress={confirmLeave} disabled={isDeactivating}>
+                        {isDeactivating ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                            <Text style={styles.editSaveBtnText}>
+                                {refundChoice === "none" || !(parseFloat(refundAmount) > 0) ? "Mark as left" : `Mark as left · refund ${formatRupee(parseFloat(refundAmount))}`}
+                            </Text>
+                        )}
+                    </Pressable>
+                </BottomSheet>
 
-                            <Pressable style={[styles.editSaveBtn, isSavingPayment && { opacity: 0.7 }]} onPress={handleSavePayment} disabled={isSavingPayment || isRestarting}>
-                                {isSavingPayment ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Payment</Text>}
-                            </Pressable>
-                            {restartMode && restartDate && (
-                                <Pressable accessibilityRole="button" style={styles.secondaryBtn} onPress={handleRestartWithoutPayment} disabled={isSavingPayment || isRestarting}>
-                                    {isRestarting ? <ActivityIndicator color={theme.primary} size="small" /> : <Text style={styles.secondaryBtnText}>Restart now, collect later</Text>}
-                                </Pressable>
-                            )}
-                        </View>
-                    </KeyboardAvoidingView>
-                </Modal>
+                <BottomSheet visible={isEditModalVisible} onClose={() => setIsEditModalVisible(false)} title="Edit member">
+                    <Text style={styles.inputLabel}>Full Name</Text>
+                    <TextInput style={styles.inputField} value={editName} onChangeText={setEditName} autoCapitalize="words" placeholder="e.g. Rahul Sharma" placeholderTextColor={theme.mutedForeground + "80"} />
 
-                <Modal visible={isLeaveSheetVisible} transparent animationType="slide" onRequestClose={() => setIsLeaveSheetVisible(false)}>
-                    <Pressable style={styles.editModalOverlay} onPress={() => setIsLeaveSheetVisible(false)} />
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-                        <View style={styles.editModalSheet}>
-                            <Text style={styles.editModalTitle}>Mark as left</Text>
-                            {member?.refund_options && (
-                                <Text style={styles.paymentSheetSubtitle}>
-                                    {member.name} has paid till {formatShortDate(addDays(member.refund_options.paid_through, -1), true)} · {member.refund_options.unused_days} day
-                                    {member.refund_options.unused_days === 1 ? "" : "s"} unused. Their seat will be freed.
-                                </Text>
-                            )}
+                    <Text style={styles.inputLabel}>Phone Number</Text>
+                    <TextInput
+                        style={[styles.inputField, member?.status === "inactive" && styles.inputFieldDisabled]}
+                        value={editPhone}
+                        onChangeText={setEditPhone}
+                        keyboardType="phone-pad"
+                        maxLength={15}
+                        placeholder="10-digit mobile number"
+                        placeholderTextColor={theme.mutedForeground + "80"}
+                        editable={member?.status !== "inactive"}
+                    />
+                    {member?.status === "inactive" && (
+                        <Text style={styles.inputHint}>Phone can&apos;t be changed once a member has left - it&apos;s used to recognize them if they rejoin.</Text>
+                    )}
 
-                            <Text style={styles.inputLabel}>Money Back</Text>
-                            <View style={styles.restartChoiceRow}>
-                                {(
-                                    [
-                                        ["none", "No refund", " "],
-                                        ["partial", "Partial", member?.refund_options ? formatRupee(member.refund_options.partial) : ""],
-                                        ["full", "Full", member?.refund_options ? formatRupee(member.refund_options.full) : ""],
-                                    ] as const
-                                ).map(([key, title, hint]) => (
-                                    <Pressable
-                                        key={key}
-                                        accessibilityRole="radio"
-                                        accessibilityState={{ selected: refundChoice === key }}
-                                        style={[styles.restartChoice, refundChoice === key && styles.restartChoiceSelected]}
-                                        onPress={() => chooseRefund(key)}>
-                                        <Text style={[styles.restartChoiceTitle, refundChoice === key && styles.restartChoiceTitleSelected]}>{title}</Text>
-                                        <Text style={styles.restartChoiceHint}>{hint}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
+                    <ChoiceChips label="Gender" value={editGender} options={GENDER_OPTIONS} onChange={setEditGender} allowDeselect />
 
-                            {refundChoice !== "none" && (
-                                <>
-                                    <Text style={styles.inputLabel}>Refund Amount</Text>
-                                    <View style={styles.amountField}>
-                                        <Text style={styles.amountPrefix}>₹</Text>
-                                        <TextInput
-                                            style={styles.amountInput}
-                                            value={refundAmount}
-                                            onChangeText={(text) => setRefundAmount(text.replace(/[^0-9.]/g, ""))}
-                                            keyboardType="decimal-pad"
-                                            placeholder="0"
-                                            placeholderTextColor={theme.mutedForeground + "80"}
-                                        />
-                                    </View>
-                                    <Text style={styles.paymentHint}>
-                                        {refundChoice === "partial" && member?.refund_options ? `For the ${member.refund_options.unused_days} unused days. You can change the amount.` : "You can change the amount."}
-                                    </Text>
-                                    <ChoiceChips label="Paid Back By" value={refundMode} options={PAYMENT_MODE_OPTIONS} onChange={(mode) => mode && setRefundMode(mode)} />
-                                </>
-                            )}
+                    <Text style={styles.inputLabel}>Address</Text>
+                    <TextInput
+                        style={[styles.inputField, styles.addressField]}
+                        value={editAddress}
+                        onChangeText={setEditAddress}
+                        placeholder="House no., street, area, city"
+                        placeholderTextColor={theme.mutedForeground + "80"}
+                        autoCapitalize="words"
+                        multiline
+                        maxLength={500}
+                    />
 
-                            <Pressable style={[styles.editSaveBtn, styles.leaveConfirmBtn, isDeactivating && { opacity: 0.7 }]} onPress={confirmLeave} disabled={isDeactivating}>
-                                {isDeactivating ? (
-                                    <ActivityIndicator color="#fff" size="small" />
-                                ) : (
-                                    <Text style={styles.editSaveBtnText}>
-                                        {refundChoice === "none" || !(parseFloat(refundAmount) > 0) ? "Mark as left" : `Mark as left · refund ${formatRupee(parseFloat(refundAmount))}`}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </KeyboardAvoidingView>
-                </Modal>
-
-                <Modal visible={isEditModalVisible} transparent animationType="slide" onRequestClose={() => setIsEditModalVisible(false)}>
-                    <Pressable style={styles.editModalOverlay} onPress={() => setIsEditModalVisible(false)} />
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-                        <View style={styles.editModalSheet}>
-                            <Text style={styles.editModalTitle}>Edit Member</Text>
-
-                            <Text style={styles.inputLabel}>Full Name</Text>
-                            <TextInput style={styles.inputField} value={editName} onChangeText={setEditName} autoCapitalize="words" placeholder="e.g. Rahul Sharma" placeholderTextColor={theme.mutedForeground + "80"} />
-
-                            <Text style={styles.inputLabel}>Phone Number</Text>
-                            <TextInput
-                                style={[styles.inputField, member?.status === "inactive" && styles.inputFieldDisabled]}
-                                value={editPhone}
-                                onChangeText={setEditPhone}
-                                keyboardType="phone-pad"
-                                maxLength={15}
-                                placeholder="10-digit mobile number"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                                editable={member?.status !== "inactive"}
-                            />
-                            {member?.status === "inactive" && (
-                                <Text style={styles.inputHint}>Phone can&apos;t be changed once a member has left - it&apos;s used to recognize them if they rejoin.</Text>
-                            )}
-
-                            <ChoiceChips label="Gender" value={editGender} options={GENDER_OPTIONS} onChange={setEditGender} allowDeselect />
-
-                            <Text style={styles.inputLabel}>Address</Text>
-                            <TextInput
-                                style={[styles.inputField, styles.addressField]}
-                                value={editAddress}
-                                onChangeText={setEditAddress}
-                                placeholder="House no., street, area, city"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                                autoCapitalize="words"
-                                multiline
-                                maxLength={500}
-                            />
-
-                            <Pressable style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={isSavingEdit}>
-                                {isSavingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
-                            </Pressable>
-                        </View>
-                    </KeyboardAvoidingView>
-                </Modal>
+                    <Pressable style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={isSavingEdit}>
+                        {isSavingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+                    </Pressable>
+                </BottomSheet>
             </SafeAreaView>
         </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },
@@ -948,17 +948,6 @@ const createStyles = (theme: any) =>
             borderColor: theme.border,
             alignItems: "center",
             justifyContent: "center",
-        },
-        avatar: {
-            width: 56,
-            height: 56,
-            borderRadius: 18,
-            alignItems: "center",
-            justifyContent: "center",
-        },
-        avatarText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 20,
         },
         identityText: {
             flex: 1,
@@ -1343,13 +1332,6 @@ const createStyles = (theme: any) =>
             alignItems: "center",
             justifyContent: "center",
         },
-        paymentSheetSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 13,
-            color: theme.mutedForeground,
-            marginTop: -12,
-            marginBottom: 20,
-        },
         amountField: {
             flexDirection: "row",
             alignItems: "center",
@@ -1426,29 +1408,6 @@ const createStyles = (theme: any) =>
             fontSize: 14,
             color: theme.destructive,
         },
-        editModalOverlay: {
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-        },
-        editModalSheetWrap: {
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-        },
-        editModalSheet: {
-            backgroundColor: theme.background,
-            borderTopLeftRadius: RADIUS.lg,
-            borderTopRightRadius: RADIUS.lg,
-            padding: 24,
-            paddingBottom: 32,
-        },
-        editModalTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 18,
-            color: theme.primary,
-            marginBottom: 20,
-        },
         inputLabel: {
             fontFamily: "sans-bold",
             fontSize: 13,
@@ -1483,6 +1442,10 @@ const createStyles = (theme: any) =>
             color: theme.mutedForeground,
             marginTop: -10,
             marginBottom: 16,
+        },
+        // The payment sheet's body; shrinks to scroll when the restart calendar is open.
+        sheetScroll: {
+            flexShrink: 1,
         },
         editSaveBtn: {
             backgroundColor: theme.accent,

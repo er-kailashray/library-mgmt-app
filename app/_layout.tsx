@@ -1,6 +1,7 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { View } from "react-native";
 import "react-native-gesture-handler";
@@ -10,6 +11,7 @@ import "react-native-reanimated";
 import { getOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
 import { BootstrapProvider } from "@/shared/providers/BootstrapProvider";
 import { ThemeProvider, useTheme } from "@/shared/providers/ThemeProvider";
+import { ToastHost } from "@/shared/ui/Toast";
 
 export { ErrorBoundary } from "expo-router";
 
@@ -80,17 +82,21 @@ export default function RootLayout() {
 }
 
 function RootContent({ onboardingComplete }: { onboardingComplete: boolean }) {
-	const { theme } = useTheme();
+	const { theme, isDark } = useTheme();
 
 	return (
 		<BootstrapProvider onboardingComplete={onboardingComplete}>
 			<View style={{ flex: 1, backgroundColor: theme.background }}>
+				{/* One status bar for the whole app, following the theme; screens don't set their own. */}
+				<StatusBar style={isDark ? "light" : "dark"} />
 				<Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
 					<Stack.Screen name="index" />
 					<Stack.Screen name="onboarding" />
 					<Stack.Screen name="(auth)" />
 					<Stack.Screen name="(app)" />
 				</Stack>
+				{/* Above every screen, so a toast shown just before navigating stays visible. */}
+				<ToastHost />
 			</View>
 		</BootstrapProvider>
 	);

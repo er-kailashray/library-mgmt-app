@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getReportApi } from "@/features/reports/logic/reports-api";
@@ -10,6 +9,7 @@ import { ReportData, ReportMonths } from "@/features/reports/types/reports.types
 import { BarChart, MeterRow } from "@/features/reports/ui/ReportCharts";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
@@ -74,7 +74,6 @@ export function ReportsScreen() {
     return (
         <ScreenBackground>
             <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
                 <ScreenHeader title="Reports" subtitle={data ? `${formatShortDate(data.from, true)} – ${formatShortDate(data.to, true)}` : "How your library is doing"} />
 
                 <View style={styles.rangeRow}>
@@ -312,7 +311,7 @@ function AttendanceCard({
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         safe: {
             flex: 1,
         },

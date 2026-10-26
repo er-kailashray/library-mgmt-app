@@ -1,5 +1,6 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -13,7 +14,7 @@ export function LibraryLocationScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
 	container: {
 		flex: 1,
 		alignItems: "center",

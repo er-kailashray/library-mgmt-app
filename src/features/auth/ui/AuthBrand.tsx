@@ -1,7 +1,8 @@
 import { Image } from "expo-image";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -22,7 +23,7 @@ export function AuthBrand() {
 }
 
 const createStyles = (theme: Theme) =>
-	StyleSheet.create({
+	ScaledSheet.create({
 		logoWrap: {
 			flexDirection: "row",
 			alignItems: "center",

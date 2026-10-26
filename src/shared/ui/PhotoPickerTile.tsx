@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { Text } from "@/shared/ui/Text";
 
@@ -47,7 +48,7 @@ export function PhotoPickerTile({ label, hint, uri, onAdd, onRemove }: PhotoPick
 }
 
 const createStyles = (theme: Theme) =>
-    StyleSheet.create({
+    ScaledSheet.create({
         wrap: {
             flex: 1,
         },
@@ -81,19 +82,19 @@ const createStyles = (theme: Theme) =>
             justifyContent: "center",
         },
         addText: {
-            fontFamily: "sans-bold",
+            fontFamily: "sans-semibold",
             fontSize: 12,
             color: theme.primary,
         },
         label: {
-            fontFamily: "sans-bold",
+            fontFamily: "sans-medium",
             fontSize: 13,
             color: theme.primary,
             marginTop: 8,
             textAlign: "center",
         },
         hint: {
-            fontFamily: "sans-medium",
+            fontFamily: "sans-regular",
             fontSize: 12,
             color: theme.mutedForeground,
         },
