@@ -38,6 +38,11 @@ export interface AttendanceRoster {
     date: string;
     /** Earliest "YYYY-MM-DD" that can still be marked or corrected (the last 7 days). */
     editable_from: string;
+    /**
+     * The session on right now and the day it belongs to; after midnight an overnight batch
+     * (10 PM - 2 AM) is still the previous day's. Null when nothing is running.
+     */
+    live_session?: { date: string; batch_id: number } | null;
     batches: AttendanceBatch[];
 }
 

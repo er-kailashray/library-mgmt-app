@@ -3,9 +3,10 @@ import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, ScrollViewInstance, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BatchSwitcher } from "@/features/batches/ui/BatchSwitcher";
 import { batchTimeLabel, freeBatches, isRunningNow, seatLabel, seatNumber } from "@/features/seats/logic/seat-display";
 import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
 import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
@@ -29,9 +30,6 @@ const GRID_PADDING = 20;
 const GRID_GAP = 8;
 /** Beyond this many batches, an "All batches" tile shows "2/7" instead of one dot per batch. */
 const MAX_DOTS = 6;
-/** Batch cards are a fixed width, so the switcher can scroll any of them into view without measuring. */
-const BATCH_CARD_WIDTH = 148;
-const SWITCHER_GAP = 10;
 
 /** Which map is showing: one batch, or every batch at once. */
 type MapView = number | "all";
@@ -90,7 +88,6 @@ export function SeatsScreen() {
     const [openSeat, setOpenSeat] = useState<SeatMatrixSeat | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const listRef = useRef<FlashListRef<ListItem>>(null);
-    const switcherRef = useRef<ScrollViewInstance>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -108,24 +105,7 @@ export function SeatsScreen() {
     const activeView: MapView = view ?? "all";
     const focusBatch = activeView === "all" ? null : batches.find((b) => b.id === activeView) ?? null;
 
-    /** Centre the selected batch card in the switcher (it may open on, or be tapped at, the far end). */
     const hasAllCard = batches.length > 1;
-    const scrollSwitcherToSelected = useCallback(
-        (animated: boolean) => {
-            const batchIndex = activeView === "all" ? -1 : batches.findIndex((b) => b.id === activeView);
-            if (activeView !== "all" && batchIndex < 0) return;
-            const index = activeView === "all" ? 0 : batchIndex + (hasAllCard ? 1 : 0);
-            const cards = batches.length + (hasAllCard ? 1 : 0);
-            const contentWidth = GRID_PADDING * 2 + cards * BATCH_CARD_WIDTH + (cards - 1) * SWITCHER_GAP;
-            const cardLeft = GRID_PADDING + index * (BATCH_CARD_WIDTH + SWITCHER_GAP);
-            const x = cardLeft - (screenWidth - BATCH_CARD_WIDTH) / 2;
-            switcherRef.current?.scrollTo({ x: Math.max(0, Math.min(x, contentWidth - screenWidth)), animated });
-        },
-        [activeView, batches, hasAllCard, screenWidth]
-    );
-    useEffect(() => {
-        scrollSwitcherToSelected(true);
-    }, [scrollSwitcherToSelected]);
 
     // Keep the open sheet in step with refreshed data (e.g. after admitting someone and coming back).
     useEffect(() => {
@@ -258,41 +238,24 @@ export function SeatsScreen() {
 
     const listHeader = (
         <View>
-            <ScrollView
-                ref={switcherRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.switcher}
-                // First layout: jump straight to the selected card, without animating from the start.
-                onContentSizeChange={() => scrollSwitcherToSelected(false)}
-            >
-                {hasAllCard && (
-                    <BatchCard
-                        title="All batches"
-                        caption={`${seats.length} seats`}
-                        filled={seats.filter((s) => freeBatches(s).free === 0).length}
-                        total={seats.length}
-                        selected={activeView === "all"}
-                        onPress={() => setView("all")}
-                        styles={styles}
-                        theme={theme}
-                    />
-                )}
-                {batches.map((batch) => (
-                    <BatchCard
-                        key={batch.id}
-                        title={batch.name}
-                        caption={batchTimeLabel(batch)}
-                        filled={seats.filter((s) => s.batches.some((b) => b.batch_id === batch.id && !b.available)).length}
-                        total={seats.length}
-                        running={isRunningNow(batch)}
-                        selected={activeView === batch.id}
-                        onPress={() => setView(batch.id)}
-                        styles={styles}
-                        theme={theme}
-                    />
-                ))}
-            </ScrollView>
+            <BatchSwitcher<MapView>
+                meter="occupancy"
+                selectedKey={activeView}
+                onSelect={setView}
+                items={[
+                    ...(hasAllCard
+                        ? [{ key: "all" as MapView, title: "All batches", caption: `${seats.length} seats`, filled: seats.filter((s) => freeBatches(s).free === 0).length, total: seats.length }]
+                        : []),
+                    ...batches.map((batch) => ({
+                        key: batch.id as MapView,
+                        title: batch.name,
+                        caption: batchTimeLabel(batch),
+                        filled: seats.filter((s) => s.batches.some((b) => b.batch_id === batch.id && !b.available)).length,
+                        total: seats.length,
+                        tag: isRunningNow(batch) ? "Now" : undefined,
+                    })),
+                ]}
+            />
 
             <View style={styles.controls}>
                 <View style={styles.searchBar}>
@@ -415,60 +378,6 @@ export function SeatsScreen() {
     );
 }
 
-type Styles = ReturnType<typeof createStyles>;
-
-/** A batch in the switcher: name, time, how full it is, and a "Now" tag while it's running. */
-function BatchCard({
-    title,
-    caption,
-    filled,
-    total,
-    running = false,
-    selected,
-    onPress,
-    styles,
-    theme,
-}: {
-    title: string;
-    caption: string;
-    filled: number;
-    total: number;
-    running?: boolean;
-    selected: boolean;
-    onPress: () => void;
-    styles: Styles;
-    theme: Theme;
-}) {
-    const ratio = total > 0 ? filled / total : 0;
-    return (
-        <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            accessibilityLabel={`${title}, ${caption}, ${filled} of ${total} taken${running ? ", running now" : ""}`}
-            onPress={onPress}
-            style={({ pressed }) => [styles.batchCard, selected && styles.batchCardSelected, pressed && styles.tilePressed]}
-        >
-            <View style={styles.batchCardTop}>
-                <Text style={[styles.batchCardTitle, selected && { color: theme.accent }]} numberOfLines={1}>
-                    {title}
-                </Text>
-                {running && <Text style={styles.nowTag}>Now</Text>}
-            </View>
-            <Text style={styles.batchCardCaption} numberOfLines={1}>
-                {caption}
-            </Text>
-            <View style={styles.batchCardBottom}>
-                <View style={styles.meterTrack}>
-                    <View style={[styles.meterFill, { width: `${Math.round(ratio * 100)}%`, backgroundColor: ratio >= 1 ? theme.destructive : ratio >= 0.8 ? theme.warning : theme.accent }]} />
-                </View>
-                <Text style={styles.batchCardCount}>
-                    {filled}/{total}
-                </Text>
-            </View>
-        </Pressable>
-    );
-}
-
 function tileLook(theme: Theme, state: SeatState): { background: string; border: string; number: string } {
     switch (state) {
         case "free":
@@ -487,73 +396,6 @@ const createStyles = (theme: Theme, tileSize: number) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-        },
-        switcher: {
-            gap: SWITCHER_GAP,
-            paddingHorizontal: GRID_PADDING,
-            paddingTop: 16,
-            paddingBottom: 4,
-        },
-        batchCard: {
-            width: BATCH_CARD_WIDTH,
-            padding: 12,
-            borderRadius: RADIUS.lg,
-            backgroundColor: theme.card,
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        batchCardSelected: {
-            borderColor: theme.accent,
-            backgroundColor: theme.accent + "0D",
-        },
-        batchCardTop: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-        },
-        batchCardTitle: {
-            flex: 1,
-            fontFamily: "sans-semibold",
-            fontSize: 15,
-            color: theme.primary,
-        },
-        nowTag: {
-            fontFamily: "sans-semibold",
-            fontSize: 10,
-            color: "#fff",
-            backgroundColor: theme.accent,
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-            borderRadius: RADIUS.sm,
-            overflow: "hidden",
-        },
-        batchCardCaption: {
-            fontFamily: "sans-regular",
-            fontSize: 12,
-            color: theme.mutedForeground,
-            marginTop: 2,
-        },
-        batchCardBottom: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 12,
-        },
-        meterTrack: {
-            flex: 1,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: theme.muted,
-            overflow: "hidden",
-        },
-        meterFill: {
-            height: "100%",
-            borderRadius: 2,
-        },
-        batchCardCount: {
-            fontFamily: "sans-medium",
-            fontSize: 12,
-            color: theme.primary,
         },
         controls: {
             paddingHorizontal: GRID_PADDING,

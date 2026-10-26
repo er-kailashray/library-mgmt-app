@@ -20,7 +20,11 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
 - `POST /api/admission`
 - `GET /api/payments`, `POST /api/payments`
 - `GET /api/dashboard`
-- `GET /api/attendance` (optional `?date=YYYY-MM-DD`, defaults to today), `POST /api/attendance`
+- `GET /api/attendance` (optional `?date=YYYY-MM-DD`, defaults to today), `POST /api/attendance`.
+  The roster includes `live_session` `{ date, batch_id }` (or null): the session on right now and
+  the day it belongs to - after midnight an overnight batch (10 PM - 2 AM) is still the previous
+  day's, so the app opens on that day. A check-in without `check_in_at` ("now") is accepted for
+  today and for any batch whose session for that date is running; other days need the time.
 - `POST /api/members/{id}/remind` — SMS reminder to one member (via the existing Twilio SMS
   provider in `app/Notifications`)
 - `POST /api/reminders/overdue` — SMS reminder to every currently overdue member in the library;

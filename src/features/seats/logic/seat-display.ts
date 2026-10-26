@@ -1,4 +1,4 @@
-import { formatTime, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
+import { formatTimeRange, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
 import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
 
 /** "12" from "12", "012" or "S-12"; seat numbers are shown without padding or prefixes. */
@@ -13,8 +13,7 @@ export function seatLabel(value: string | number): string {
 
 /** "8 AM – 12 PM" (minutes only when they aren't :00). */
 export function batchTimeLabel(batch: Pick<MatrixBatchRef, "start_time" | "end_time">): string {
-    const short = (time: string) => formatTime(time).replace(":00 ", " ");
-    return `${short(batch.start_time)} – ${short(batch.end_time)}`;
+    return formatTimeRange(batch.start_time, batch.end_time);
 }
 
 /** Whether a batch is on right now, including ones that run past midnight. */

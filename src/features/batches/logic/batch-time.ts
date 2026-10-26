@@ -24,6 +24,12 @@ export function formatTime(time: string): string {
 	return `${h % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
+/** "8 AM – 12 PM" (minutes only when they aren't :00), for compact batch labels. */
+export function formatTimeRange(start: string, end: string): string {
+	const short = (time: string) => formatTime(time).replace(":00 ", " ");
+	return `${short(start)} – ${short(end)}`;
+}
+
 /** An end at or before the start means the batch runs past midnight. */
 export function runsPastMidnight(start: string, end: string): boolean {
 	return toMinutes(end) <= toMinutes(start);
