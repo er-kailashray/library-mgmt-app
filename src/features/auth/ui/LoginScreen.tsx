@@ -2,12 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AuthBrand } from "@/features/auth/ui/AuthBrand";
 import { loginApi, saveAuthData } from "@/services/api/auth.api";
-import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { ApiError } from "@/services/api/client";
+import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 const PHONE_MIN = 10;
 const PASSWORD_MIN = 6;
@@ -41,6 +47,11 @@ export function LoginScreen() {
 			await saveAuthData(response.token, response.user);
 			router.replace("/home");
 		} catch (error) {
+			// Registered but never confirmed the OTP: the backend has sent a code, so finish verification.
+			if (error instanceof ApiError && error.data?.requires_verification) {
+				router.push({ pathname: "/otp", params: { phone } });
+				return;
+			}
 			setApiError("Unable to sign in. Please check your phone number and password.");
 		} finally {
 			setIsSubmitting(false);
@@ -50,101 +61,94 @@ export function LoginScreen() {
 	const styles = createStyles(theme);
 
 	return (
-		<SafeAreaView style={styles.safe} edges={["top"]}>
-			<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-			<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-				<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-					<View style={styles.brandBlock}>
-						<View style={styles.logoWrap}>
-							<View style={styles.logoMark}>
-								<Text style={styles.logoLetter}>L</Text>
+		<ScreenBackground>
+			<SafeAreaView style={styles.safe} edges={["top"]}>
+				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+				<KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+					<ScrollView keyboardShouldPersistTaps="handled" style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+						<View style={styles.brandBlock}>
+							<View style={styles.brandRow}>
+								<AuthBrand />
 							</View>
-							<View>
-								<Text style={styles.wordmark}>Librum</Text>
-								<Text style={styles.wordmarkSub}>Library Pro</Text>
-							</View>
+							<Text style={styles.screenTitle}>Sign in to your library</Text>
+							<Text style={styles.screenSubtitle}>Use your registered phone number and password.</Text>
 						</View>
-						<Text style={styles.screenTitle}>Welcome back</Text>
-						<Text style={styles.screenSubtitle}>Sign in with your phone number and password.</Text>
-					</View>
 
-					<View style={styles.card}>
-						<View style={styles.form}>
-							<View style={styles.field}>
-								<Text style={styles.label}>Phone number</Text>
-								<TextInput
-									style={[styles.input, ((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError]}
-									placeholder="10-digit mobile number"
-									placeholderTextColor={theme.mutedForeground + "80"}
-									keyboardType="phone-pad"
-									maxLength={15}
-									autoCapitalize="none"
-									autoCorrect={false}
-									value={phone}
-									onChangeText={setPhone}
-								/>
-								{showErrors && phoneErrorSubmit ? (
-									<Text style={styles.fieldError}>
-										Enter at least {PHONE_MIN} digits.
-									</Text>
-								) : null}
-							</View>
-
-							<View style={styles.field}>
-								<Text style={styles.label}>Password</Text>
-								<View style={styles.passwordContainer}>
+						<View style={styles.card}>
+							<View style={styles.form}>
+								<View style={styles.field}>
+									<Text style={styles.label}>Phone number</Text>
 									<TextInput
-										style={[styles.input, ((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError]}
-										placeholder="••••••••"
+										style={[styles.input, ((showErrors && phoneErrorSubmit) || phoneError) && styles.inputError]}
+										placeholder="10-digit mobile number"
 										placeholderTextColor={theme.mutedForeground + "80"}
-										secureTextEntry={!isPasswordVisible}
-										value={password}
-										onChangeText={setPassword}
+										keyboardType="phone-pad"
+										maxLength={15}
+										autoCapitalize="none"
+										autoCorrect={false}
+										value={phone}
+										onChangeText={setPhone}
 									/>
-									<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button">
-										<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={theme.mutedForeground} />
-									</Pressable>
+									{showErrors && phoneErrorSubmit ? (
+										<Text style={styles.fieldError}>
+											Enter at least {PHONE_MIN} digits.
+										</Text>
+									) : null}
 								</View>
-								{showErrors && passwordErrorSubmit ? (
-									<Text style={styles.fieldError}>
-										Password must be at least {PASSWORD_MIN} characters.
+
+								<View style={styles.field}>
+									<Text style={styles.label}>Password</Text>
+									<View style={styles.passwordContainer}>
+										<TextInput
+											style={[styles.input, ((showErrors && passwordErrorSubmit) || passwordError) && styles.inputError]}
+											placeholder="••••••••"
+											placeholderTextColor={theme.mutedForeground + "80"}
+											secureTextEntry={!isPasswordVisible}
+											value={password}
+											onChangeText={setPassword}
+										/>
+										<Pressable style={styles.eyeButton} onPress={() => setIsPasswordVisible(!isPasswordVisible)} accessibilityRole="button">
+											<Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={20} color={theme.mutedForeground} />
+										</Pressable>
+									</View>
+									{showErrors && passwordErrorSubmit ? (
+										<Text style={styles.fieldError}>
+											Password must be at least {PASSWORD_MIN} characters.
+										</Text>
+									) : null}
+								</View>
+
+								<Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/forgot-password", params: { phone } })}>
+									<Text style={styles.forgot}>Forgot password?</Text>
+								</Pressable>
+								{apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
+
+								<Pressable accessibilityRole="button" style={[styles.primaryButton, isSubmitting && styles.disabledButton]} onPress={onSubmit} disabled={isSubmitting}>
+									<Text style={styles.primaryButtonText}>
+										{isSubmitting ? "Signing in..." : "Log in"}
 									</Text>
-								) : null}
+								</Pressable>
 							</View>
+						</View>
 
-							<Pressable accessibilityRole="button" onPress={() => { }}>
-								<Text style={styles.forgot}>Forgot password?</Text>
-							</Pressable>
-							{apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
-
-							<Pressable accessibilityRole="button" style={[styles.primaryButton, isSubmitting && styles.disabledButton]} onPress={onSubmit} disabled={isSubmitting}>
-								<Text style={styles.primaryButtonText}>
-									{isSubmitting ? "Signing in..." : "Log in"}
-								</Text>
+						<View style={styles.linkRow}>
+							<Text style={styles.linkMuted}>New here?</Text>
+							<Pressable accessibilityRole="button" onPress={() => router.push("/register")}>
+								<Text style={styles.linkAccent}>Create library account</Text>
 							</Pressable>
 						</View>
-					</View>
 
-					<View style={styles.linkRow}>
-						<Text style={styles.linkMuted}>New here?</Text>
-						<Pressable accessibilityRole="button" onPress={() => router.push("/register")}>
-							<Text style={styles.linkAccent}>Create library account</Text>
-						</Pressable>
-					</View>
-
-					<View style={styles.poweredByBlock}>
-						<Text style={styles.poweredByText}>Powered by Kailash Ray</Text>
-					</View>
-				</ScrollView>
-			</KeyboardAvoidingView>
-		</SafeAreaView>
+						<PoweredBy />
+					</ScrollView>
+				</KeyboardAvoidingView>
+			</SafeAreaView>
+		</ScreenBackground>
 	);
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: theme.background,
 	},
 	flex: {
 		flex: 1,
@@ -159,52 +163,21 @@ const createStyles = (theme: any) => StyleSheet.create({
 		alignItems: "center",
 		marginBottom: 32,
 	},
-	logoWrap: {
-		alignItems: "center",
-		gap: 12,
-		marginBottom: 24,
-	},
-	logoMark: {
-		width: 64,
-		height: 64,
-		borderRadius: RADIUS.sm,
-		backgroundColor: theme.accent,
-		alignItems: "center",
-		justifyContent: "center",
-		...FLOATING_SHADOW,
-		shadowColor: theme.accent,
-	},
-	logoLetter: {
-		fontFamily: "sans-extrabold",
-		fontSize: 32,
-		color: "#fff",
-	},
-	wordmark: {
-		fontFamily: "sans-extrabold",
-		fontSize: 28,
-		color: theme.primary,
-		letterSpacing: -0.5,
-		textAlign: "center",
-	},
-	wordmarkSub: {
-		fontFamily: "sans-medium",
-		fontSize: 15,
-		color: theme.mutedForeground,
-		marginTop: -2,
-		textAlign: "center",
+	brandRow: {
+		marginBottom: 56,
 	},
 	screenTitle: {
 		fontFamily: "sans-extrabold",
-		fontSize: 28,
+		fontSize: 22,
 		color: theme.primary,
-		marginBottom: 8,
+		marginBottom: 6,
 		textAlign: "center",
 	},
 	screenSubtitle: {
 		fontFamily: "sans-medium",
-		fontSize: 16,
+		fontSize: 15,
 		color: theme.mutedForeground,
-		lineHeight: 22,
+		lineHeight: 21,
 		textAlign: "center",
 	},
 	card: {
@@ -276,8 +249,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		opacity: 0.6,
 	},
 	primaryButtonText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 16,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 	apiError: {
@@ -302,14 +274,5 @@ const createStyles = (theme: any) => StyleSheet.create({
 		fontFamily: "sans-bold",
 		color: theme.accent,
 		fontSize: 14,
-	},
-	poweredByBlock: {
-		alignItems: "center",
-		marginTop: 32,
-	},
-	poweredByText: {
-		fontFamily: "sans-medium",
-		color: theme.mutedForeground,
-		fontSize: 13,
 	},
 });

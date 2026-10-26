@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="480" viewBox="0 0 600 480">
+	<circle cx="300" cy="245" r="205" fill="#14B8A6" opacity="0.1"/>
+	<rect x="60" y="380" width="480" height="4" rx="2" fill="#1C1917" opacity="0.1"/>
+	
+	<rect x="76" y="92" width="290" height="288" rx="18" fill="#1C1917" opacity="0.07"/>
+	<rect x="70" y="84" width="290" height="288" rx="18" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.08" stroke-width="2"/>
+	<text x="90" y="114" font-family="Plus Jakarta Sans" font-size="16" font-weight="800" fill="#1C1917" text-anchor="start" opacity="1">Seat map</text>
+	<text x="90" y="132" font-family="Plus Jakarta Sans" font-size="11" font-weight="500" fill="#A8A29E" text-anchor="start" opacity="1">Morning batch · 6–10 AM</text>
+	<rect x="90" y="150" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="109" y="172" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">A1</text><rect x="140" y="150" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="159" y="172" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">A2</text><rect x="190" y="150" width="38" height="34" rx="8" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+				<text x="209" y="172" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#A8A29E" text-anchor="middle" opacity="1">A3</text><rect x="240" y="150" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="259" y="172" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">A4</text><rect x="290" y="150" width="38" height="34" rx="8" fill="#E26D4D" />
+				<text x="309" y="172" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">A5</text><rect x="90" y="194" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="109" y="216" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">B1</text><rect x="140" y="194" width="38" height="34" rx="8" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+				<text x="159" y="216" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#A8A29E" text-anchor="middle" opacity="1">B2</text><rect x="190" y="194" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="209" y="216" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">B3</text><rect x="240" y="194" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="259" y="216" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">B4</text><rect x="290" y="194" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="309" y="216" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">B5</text><rect x="90" y="238" width="38" height="34" rx="8" fill="#E26D4D" />
+				<text x="109" y="260" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">C1</text><rect x="140" y="238" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="159" y="260" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">C2</text><rect x="190" y="238" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="209" y="260" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">C3</text><rect x="240" y="238" width="38" height="34" rx="8" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+				<text x="259" y="260" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#A8A29E" text-anchor="middle" opacity="1">C4</text><rect x="290" y="238" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="309" y="260" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">C5</text><rect x="90" y="282" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="109" y="304" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">D1</text><rect x="140" y="282" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="159" y="304" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">D2</text><rect x="190" y="282" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="209" y="304" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">D3</text><rect x="240" y="282" width="38" height="34" rx="8" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.15" stroke-width="2"/>
+				<text x="259" y="304" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#A8A29E" text-anchor="middle" opacity="1">D4</text><rect x="290" y="282" width="38" height="34" rx="8" fill="#14B8A6" />
+				<text x="309" y="304" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" opacity="1">D5</text>
+	<rect x="90" y="338" width="11" height="11" rx="3" fill="#14B8A6" /><text x="107" y="348" font-family="Plus Jakarta Sans" font-size="11" font-weight="500" fill="#78716C" text-anchor="start" opacity="1">Occupied</text><rect x="178" y="338" width="11" height="11" rx="3" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.2" stroke-width="1.5"/><text x="195" y="348" font-family="Plus Jakarta Sans" font-size="11" font-weight="500" fill="#78716C" text-anchor="start" opacity="1">Free</text><rect x="236" y="338" width="11" height="11" rx="3" fill="#E26D4D" /><text x="253" y="348" font-family="Plus Jakarta Sans" font-size="11" font-weight="500" fill="#78716C" text-anchor="start" opacity="1">Fee due</text>
+
+	
+	<rect x="342" y="158" width="228" height="150" rx="16" fill="#1C1917" opacity="0.07"/>
+	<rect x="336" y="150" width="228" height="150" rx="16" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.08" stroke-width="2"/>
+	<rect x="352" y="166" width="80" height="22" rx="11" fill="#E26D4D" opacity="0.15"/>
+	<text x="392" y="181" font-family="Plus Jakarta Sans" font-size="11" font-weight="700" fill="#E26D4D" text-anchor="middle" opacity="1">Due today</text>
+	<circle cx="372" cy="216" r="18" fill="#14B8A6"/>
+	<text x="372" y="221" font-family="Plus Jakarta Sans" font-size="12" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="1">RS</text>
+	<text x="400" y="212" font-family="Plus Jakarta Sans" font-size="14" font-weight="800" fill="#1C1917" text-anchor="start" opacity="1">Rahul Sharma</text>
+	<text x="400" y="229" font-family="Plus Jakarta Sans" font-size="11" font-weight="500" fill="#A8A29E" text-anchor="start" opacity="1">Seat C1 · Morning</text>
+	<text x="352" y="278" font-family="Plus Jakarta Sans" font-size="22" font-weight="800" fill="#1C1917" text-anchor="start" opacity="1">₹1,200</text>
+	<rect x="468" y="256" width="80" height="30" rx="10" fill="#E26D4D"/>
+	<text x="508" y="276" font-family="Plus Jakarta Sans" font-size="12" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="1">Remind</text>
+	
+	<circle cx="560" cy="152" r="16" fill="#14B8A6" stroke="#FDFCF9" stroke-width="4"/>
+	<path d="M553.28 152 L558.4 157.12 L567.2 146.88" fill="none" stroke="#FFFFFF" stroke-width="3.04" stroke-linecap="round" stroke-linejoin="round"/>
+
+	
+	<rect x="380" y="324" width="190" height="56" rx="14" fill="#1C1917" opacity="0.07"/>
+	<rect x="374" y="316" width="190" height="56" rx="14" fill="#FFFFFF" stroke="#1C1917" stroke-opacity="0.08" stroke-width="2"/>
+	<rect x="388" y="330" width="28" height="28" rx="8" fill="#14B8A6" opacity="0.18"/>
+	<circle cx="402" cy="344" r="7" fill="none" stroke="#14B8A6" stroke-width="2.5"/>
+	<path d="M402 340 V344 H405" fill="none" stroke="#14B8A6" stroke-width="2" stroke-linecap="round"/>
+	<text x="426" y="341" font-family="Plus Jakarta Sans" font-size="12" font-weight="800" fill="#1C1917" text-anchor="start" opacity="1">Evening batch</text>
+	<text x="426" y="357" font-family="Plus Jakarta Sans" font-size="10" font-weight="500" fill="#A8A29E" text-anchor="start" opacity="1">41 of 50 seats filled</text>
+	<path d="M318 102 Q318 112 328 112 Q318 112 318 122 Q318 112 308 112 Q318 112 318 102Z" fill="#E26D4D"/>
+</svg>

@@ -1,595 +1,777 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "expo-image";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthUser } from "@/features/auth/types/auth.types";
 import { getDashboardApi } from "@/features/home/logic/home-api";
 import { pickProfilePhoto, uploadProfilePhoto } from "@/features/settings/logic/profile-photo";
 import { handleLogout } from "@/features/settings/logic/settings-logic";
+import { getSubscriptionApi, subscriptionChipLabel } from "@/features/subscription/logic/subscription-api";
 import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } from "@/services/api/auth.api";
-import { RADIUS } from "@/shared/constants/layout";
+import { updateNotificationSettingsApi } from "@/services/api/push.api";
+import { registerForPushNotifications } from "@/services/push/push-notifications";
+import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { Theme } from "@/shared/constants/theme";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { PhotoViewer } from "@/shared/ui/PhotoViewer";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { SegmentedControl } from "@/shared/ui/SegmentedControl";
+import { Text, TextInput } from "@/shared/ui/Text";
 import { getInitials } from "@/shared/utils/text";
 
-interface SettingsItem {
-	icon: keyof typeof Ionicons.glyphMap;
-	label: string;
-	onPress: () => void;
-	destructive?: boolean;
-}
+type IconName = keyof typeof Ionicons.glyphMap;
 
-interface SettingsGroup {
-	title: string;
-	items: SettingsItem[];
-}
+/** Icon tile colours per row, like iOS Settings: each kind of setting keeps its own colour. */
+const TINTS = {
+    library: "#0EA5E9",
+    location: "#10B981",
+    photos: "#EC4899",
+    facilities: "#F59E0B",
+    appearance: "#6366F1",
+    notifications: "#E26D4D",
+    password: "#64748B",
+};
 
+const THEME_MODES = [
+    { key: "system" as const, label: "System" },
+    { key: "light" as const, label: "Light" },
+    { key: "dark" as const, label: "Dark" },
+];
+
+/**
+ * Settings: the owner's profile and plan up top, then grouped rows (iOS Settings style) for the
+ * library, app preferences and the account. Reached from the profile button on Home.
+ */
 export function SettingsScreen() {
-	const router = useRouter();
-	const { theme, mode, setMode } = useTheme();
-	const insets = useSafeAreaInsets();
-	const [isLoggingOut, setIsLoggingOut] = useState(false);
-	const [user, setUser] = useState<AuthUser | null>(null);
-	const { data: dashboard } = useApiData(getDashboardApi, []);
+    const router = useRouter();
+    const { theme, mode, setMode } = useTheme();
+    const bottomInset = useScreenBottomInset();
+    const window = useWindowDimensions();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
-	useEffect(() => {
-		const loadUser = async () => {
-			setUser(await getStoredAuthUser());
-			// The cached copy can be stale (e.g. photo URL), so refresh it from the server.
-			try {
-				const freshUser = await getMeApi();
-				await updateStoredAuthUser(freshUser);
-				setUser(freshUser);
-			} catch {
-				// Offline or token issue - keep showing the cached user.
-			}
-		};
-		void loadUser();
-	}, []);
+    const [user, setUser] = useState<AuthUser | null>(null);
+    const { data: dashboard } = useApiData(getDashboardApi, []);
+    const { data: subscription, refetch: refetchSubscription } = useApiData(getSubscriptionApi, []);
 
-	const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
-	const [editProfileName, setEditProfileName] = useState("");
-	const [editProfilePhone, setEditProfilePhone] = useState("");
-	const [isSavingProfile, setIsSavingProfile] = useState(false);
-	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    // Pick up a plan change when coming back from the Subscription screen.
+    useFocusEffect(
+        useCallback(() => {
+            void refetchSubscription();
+        }, [refetchSubscription])
+    );
 
-	const handleChangePhoto = useCallback(async () => {
-		const uri = await pickProfilePhoto();
-		if (!uri) return;
-		try {
-			setIsUploadingPhoto(true);
-			setUser(await uploadProfilePhoto(uri));
-		} catch (err: any) {
-			Alert.alert("Error", err.message || "Failed to upload photo.");
-		} finally {
-			setIsUploadingPhoto(false);
-		}
-	}, []);
+    const planColor = subscription
+        ? { trial: theme.accent, active: theme.success, grace: theme.warning, expired: theme.destructive }[subscription.state]
+        : theme.mutedForeground;
 
-	const openEditProfile = useCallback(() => {
-		if (!user) return;
-		setEditProfileName(user.name);
-		setEditProfilePhone(user.phone);
-		setIsEditProfileVisible(true);
-	}, [user]);
+    useEffect(() => {
+        const loadUser = async () => {
+            setUser(await getStoredAuthUser());
+            // The cached copy can be stale (e.g. photo URL), so refresh it from the server.
+            try {
+                const freshUser = await getMeApi();
+                await updateStoredAuthUser(freshUser);
+                setUser(freshUser);
+            } catch {
+                // Offline or token issue - keep showing the cached user.
+            }
+        };
+        void loadUser();
+    }, []);
 
-	const handleSaveProfile = useCallback(async () => {
-		if (!editProfileName.trim()) {
-			Alert.alert("Error", "Please enter your name.");
-			return;
-		}
-		if (editProfilePhone.trim().length < 10) {
-			Alert.alert("Error", "Please enter a valid 10-digit phone number.");
-			return;
-		}
-		try {
-			setIsSavingProfile(true);
-			const response = await updateProfileApi({ name: editProfileName.trim(), phone: editProfilePhone.trim() });
-			await updateStoredAuthUser(response.user);
-			setUser(response.user);
-			setIsEditProfileVisible(false);
-		} catch (err: any) {
-			Alert.alert("Error", err.message || "Failed to update profile.");
-		} finally {
-			setIsSavingProfile(false);
-		}
-	}, [editProfileName, editProfilePhone]);
+    // --- Profile photo -----------------------------------------------------------------------
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [isPhotoPreviewVisible, setIsPhotoPreviewVisible] = useState(false);
 
-	const onLogout = useCallback(async () => {
-		Alert.alert("Logout", "Are you sure you want to log out?", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Logout",
-				style: "destructive",
-				onPress: async () => {
-					setIsLoggingOut(true);
-					try {
-						await handleLogout();
-					} finally {
-						setIsLoggingOut(false);
-					}
-				},
-			},
-		]);
-	}, []);
+    const handleChangePhoto = useCallback(async () => {
+        const uri = await pickProfilePhoto();
+        if (!uri) return;
+        try {
+            setIsUploadingPhoto(true);
+            setUser(await uploadProfilePhoto(uri));
+        } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to upload photo.");
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    }, []);
 
-	const SETTINGS_GROUPS: SettingsGroup[] = [
-		{
-			title: "Library Setup",
-			items: [
-				{
-					icon: "business-outline",
-					label: "Edit Library Name & Seats",
-					onPress: () => router.push("/library-profile"),
-				},
-				{
-					icon: "location-outline",
-					label: "Library Location",
-					onPress: () => router.push("/library-location"),
-				},
-				{
-					icon: "images-outline",
-					label: "Manage Photos",
-					onPress: () => router.push("/library-photos"),
-				},
-				{
-					icon: "star-outline",
-					label: "Amenities (AC, Wi-Fi, Water)",
-					onPress: () => router.push("/library-amenities"),
-				},
-			],
-		},
-		{
-			title: "Account Options",
-			items: [
-				{
-					icon: "person-circle-outline",
-					label: "Edit Profile (Name & Number)",
-					onPress: openEditProfile,
-				},
-				{
-					icon: "log-out-outline",
-					label: isLoggingOut ? "Logging out..." : "Logout",
-					onPress: onLogout,
-					destructive: true,
-				},
-			],
-		},
-	];
+    // --- Edit profile ------------------------------------------------------------------------
+    const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
+    const [editProfileName, setEditProfileName] = useState("");
+    const [editProfilePhone, setEditProfilePhone] = useState("");
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-	const styles = createStyles(theme);
+    const openEditProfile = useCallback(() => {
+        if (!user) return;
+        setEditProfileName(user.name);
+        setEditProfilePhone(user.phone);
+        setIsEditProfileVisible(true);
+    }, [user]);
 
-	return (
-		<SafeAreaView style={styles.safe} edges={["top"]}>
-			<View style={styles.headerWrapper}>
-				<View style={styles.header}>
-					<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-						<Ionicons name="arrow-back" size={24} color={theme.primary} />
-					</Pressable>
-					<View style={styles.headerText}>
-						<Text style={styles.headerTitle}>Settings</Text>
-						<Text style={styles.headerSubtitle}>Library & account preferences</Text>
-					</View>
-				</View>
-			</View>
+    const handleSaveProfile = useCallback(async () => {
+        if (!editProfileName.trim()) {
+            Alert.alert("Error", "Please enter your name.");
+            return;
+        }
+        if (editProfilePhone.trim().length < 10) {
+            Alert.alert("Error", "Please enter a valid 10-digit phone number.");
+            return;
+        }
+        try {
+            setIsSavingProfile(true);
+            const response = await updateProfileApi({ name: editProfileName.trim(), phone: editProfilePhone.trim() });
+            await updateStoredAuthUser(response.user);
+            setUser(response.user);
+            setIsEditProfileVisible(false);
+        } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to update profile.");
+        } finally {
+            setIsSavingProfile(false);
+        }
+    }, [editProfileName, editProfilePhone]);
 
-			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-				<View style={styles.profileCenterBlock}>
-					<Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={handleChangePhoto} disabled={isUploadingPhoto} style={styles.avatarHugeWrap}>
-						<View style={styles.avatarHugeBackground}>
-							{user?.profile_photo_url ? (
-								<Image source={{ uri: user.profile_photo_url }} style={styles.avatarHugeImage} />
-							) : (
-								<Text style={styles.avatarHugeText}>{getInitials(user?.name || "")}</Text>
-							)}
-							{isUploadingPhoto && (
-								<View style={styles.avatarHugeOverlay}>
-									<ActivityIndicator color="#fff" />
-								</View>
-							)}
-						</View>
-						<View style={styles.avatarCameraBadge}>
-							<Ionicons name="camera" size={16} color={theme.background} />
-						</View>
-					</Pressable>
-					<Text style={styles.libraryHugeName}>{dashboard?.library_name || "My Library"}</Text>
-					{user && (
-						<View style={styles.ownerInfoRow}>
-							<View style={styles.ownerInfoPill}>
-								<Ionicons name="person-outline" size={14} color={theme.mutedForeground} />
-								<Text style={styles.ownerInfoText}>{user.name}</Text>
-							</View>
-							<View style={styles.ownerInfoPill}>
-								<Ionicons name="call-outline" size={14} color={theme.mutedForeground} />
-								<Text style={styles.ownerInfoText}>{user.phone}</Text>
-							</View>
-						</View>
-					)}
-				</View>
+    // --- Notifications -----------------------------------------------------------------------
+    const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+    const notificationsOn = user?.push_notifications_enabled ?? true;
 
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>App Preferences</Text>
-					<View style={styles.groupCard}>
-						<View style={styles.optionRowNoPress}>
-							<View style={styles.iconCircle}>
-								<Ionicons name="color-palette-outline" size={20} color={theme.primary} />
-							</View>
-							<View style={styles.themeToggleContainer}>
-								<Text style={styles.optionText}>Theme Mode</Text>
-								<View style={styles.segmentControl}>
-									{(["system", "light", "dark"] as const).map((m) => (
-										<Pressable key={m} onPress={() => setMode(m)} style={[styles.segment, mode === m && styles.segmentActive]}>
-											<Text style={[styles.segmentText, mode === m && styles.segmentTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
-										</Pressable>
-									))}
-								</View>
-							</View>
-						</View>
-					</View>
-				</View>
+    const handleToggleNotifications = useCallback(
+        async (enabled: boolean) => {
+            if (!user) return;
+            setIsSavingNotifications(true);
+            try {
+                if (enabled && (await registerForPushNotifications()) === "denied") {
+                    Alert.alert("Notifications are blocked", "Allow notifications for Librum in your phone's settings, then turn this on again.", [
+                        { text: "Not now", style: "cancel" },
+                        { text: "Open Settings", onPress: () => void Linking.openSettings() },
+                    ]);
+                    return;
+                }
+                const response = await updateNotificationSettingsApi(enabled);
+                const updated = { ...user, push_notifications_enabled: response.data.push_notifications_enabled };
+                await updateStoredAuthUser(updated);
+                setUser(updated);
+            } catch (err: any) {
+                Alert.alert("Error", err.message || "Couldn't update notifications.");
+            } finally {
+                setIsSavingNotifications(false);
+            }
+        },
+        [user]
+    );
 
-				{SETTINGS_GROUPS.map((group, gIndex) => (
-					<View key={`group-${gIndex}`} style={styles.section}>
-						<Text style={styles.sectionTitle}>{group.title}</Text>
-						<View style={styles.groupCard}>
-							{group.items.map((item, iIndex) => (
-								<Pressable key={`item-${gIndex}-${iIndex}`} accessibilityRole="button" style={({ pressed }) => [styles.optionRow, pressed && styles.optionRowPressed, iIndex !== group.items.length - 1 && styles.optionRowBorder]} onPress={item.onPress} disabled={isLoggingOut && item.destructive}>
-									<View style={[styles.iconCircle, item.destructive && styles.iconCircleDestructive]}>
-										<Ionicons name={item.icon} size={20} color={item.destructive ? theme.destructive : theme.primary} />
-									</View>
-									<Text style={[styles.optionText, item.destructive && styles.logoutText]}>{item.label}</Text>
-									<Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
-								</Pressable>
-							))}
-						</View>
-					</View>
-				))}
+    // --- Log out -----------------------------------------------------------------------------
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const onLogout = useCallback(() => {
+        Alert.alert("Log out?", "You'll need your phone number and password to sign in again.", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Log out",
+                style: "destructive",
+                onPress: async () => {
+                    setIsLoggingOut(true);
+                    try {
+                        await handleLogout();
+                    } finally {
+                        setIsLoggingOut(false);
+                    }
+                },
+            },
+        ]);
+    }, []);
 
-				<View style={styles.footerBlock}>
-					<Text style={styles.footerText}>Powered by Kailash Ray</Text>
-					<Text style={styles.versionText}>v1.0.0</Text>
-				</View>
-			</ScrollView>
+    const hasPhoto = !!user?.profile_photo_url;
 
-			<Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)}>
-				<Pressable style={styles.editModalOverlay} onPress={() => setIsEditProfileVisible(false)} />
-				<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.editModalSheetWrap}>
-					<View style={styles.editModalSheet}>
-						<Text style={styles.editModalTitle}>Edit Profile</Text>
+    return (
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <ScreenHeader title="Settings" subtitle={dashboard?.library_name ?? "Your library and account"} />
 
-						<Text style={styles.inputLabel}>Your Name</Text>
-						<TextInput
-							style={styles.inputField}
-							value={editProfileName}
-							onChangeText={setEditProfileName}
-							autoCapitalize="words"
-							placeholder="e.g. Asha Owner"
-							placeholderTextColor={theme.mutedForeground + "80"}
-						/>
+                <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + bottomInset }]} showsVerticalScrollIndicator={false}>
+                    {/* Profile: photo (tap to view, camera to change), who you are, and Edit. */}
+                    <View style={styles.profileCard}>
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={hasPhoto ? "View profile photo" : "Add profile photo"}
+                            onPress={hasPhoto ? () => setIsPhotoPreviewVisible(true) : handleChangePhoto}
+                            disabled={isUploadingPhoto}
+                            style={styles.avatarWrap}
+                        >
+                            <View style={styles.avatar}>
+                                {hasPhoto ? (
+                                    <Image source={{ uri: user!.profile_photo_url! }} style={styles.avatarImage} transition={150} />
+                                ) : (
+                                    <Text style={styles.avatarInitials}>{getInitials(user?.name || "")}</Text>
+                                )}
+                                {isUploadingPhoto && (
+                                    <View style={styles.avatarOverlay}>
+                                        <ActivityIndicator color="#fff" />
+                                    </View>
+                                )}
+                            </View>
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel="Change profile photo"
+                                style={styles.cameraBadge}
+                                onPress={handleChangePhoto}
+                                disabled={isUploadingPhoto}
+                                hitSlop={8}
+                            >
+                                <Ionicons name="camera" size={12} color={theme.background} />
+                            </Pressable>
+                        </Pressable>
+                        <View style={styles.profileText}>
+                            <Text style={styles.profileName} numberOfLines={1}>
+                                {user?.name ?? " "}
+                            </Text>
+                            <Text style={styles.profileMeta} numberOfLines={1}>
+                                {[dashboard?.library_name, user?.phone].filter(Boolean).join(" · ")}
+                            </Text>
+                        </View>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={openEditProfile} disabled={!user} style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}>
+                            <Text style={styles.editPillText}>Edit</Text>
+                        </Pressable>
+                    </View>
 
-						<Text style={styles.inputLabel}>Phone Number</Text>
-						<TextInput
-							style={styles.inputField}
-							value={editProfilePhone}
-							onChangeText={setEditProfilePhone}
-							keyboardType="phone-pad"
-							maxLength={15}
-							placeholder="10-digit mobile number"
-							placeholderTextColor={theme.mutedForeground + "80"}
-						/>
-						<Text style={styles.inputHint}>This is the number you use to log in.</Text>
+                    {/* Plan: the one thing here with a status, so it gets its own card. */}
+                    <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Plan and billing${subscription ? `, ${subscriptionChipLabel(subscription)}` : ""}`}
+                        onPress={() => router.push("/subscription")}
+                        style={({ pressed }) => [styles.planCard, pressed && styles.pressed]}
+                    >
+                        <View style={[styles.tile, { backgroundColor: planColor }]}>
+                            <Ionicons name="diamond" size={16} color="#fff" />
+                        </View>
+                        <View style={styles.planText}>
+                            <Text style={styles.rowLabel}>Plan & Billing</Text>
+                            <Text style={[styles.planStatus, { color: planColor }]}>{subscription ? subscriptionChipLabel(subscription) : "Loading…"}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} />
+                    </Pressable>
 
-						<Pressable style={[styles.editSaveBtn, isSavingProfile && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSavingProfile}>
-							{isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
-						</Pressable>
-					</View>
-				</KeyboardAvoidingView>
-			</Modal>
-		</SafeAreaView>
-	);
+                    <Group title="Library" styles={styles}>
+                        <Row
+                            icon="business"
+                            tint={TINTS.library}
+                            label="Name & seats"
+                            value={dashboard ? `${dashboard.total_seats} seats` : undefined}
+                            onPress={() => router.push("/library-profile")}
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <Row
+                            icon="location"
+                            tint={TINTS.location}
+                            label="Location"
+                            value={dashboard ? (dashboard.library_address ? "Set" : "Not set") : undefined}
+                            valueTone={dashboard && !dashboard.library_address ? "warning" : undefined}
+                            onPress={() => router.push("/library-location")}
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <Row icon="images" tint={TINTS.photos} label="Photos" onPress={() => router.push("/library-photos")} styles={styles} theme={theme} />
+                        <Row
+                            icon="star"
+                            tint={TINTS.facilities}
+                            label="Facilities"
+                            hint="AC, Wi-Fi, newspaper and more"
+                            onPress={() => router.push("/library-amenities")}
+                            styles={styles}
+                            theme={theme}
+                            isLast
+                        />
+                    </Group>
+
+                    <Group title="Preferences" styles={styles}>
+                        <View style={styles.stackedRow}>
+                            <View style={styles.rowHead}>
+                                <View style={[styles.tile, { backgroundColor: TINTS.appearance }]}>
+                                    <Ionicons name="contrast" size={16} color="#fff" />
+                                </View>
+                                <Text style={styles.rowLabel}>Appearance</Text>
+                            </View>
+                            <View style={styles.stackedBody}>
+                                <SegmentedControl segments={THEME_MODES} value={mode} onChange={setMode} />
+                            </View>
+                        </View>
+                        <Row
+                            icon="notifications"
+                            tint={TINTS.notifications}
+                            label="Notifications"
+                            hint="Dues, renewals, batch starts and plan alerts"
+                            styles={styles}
+                            theme={theme}
+                            isLast
+                            right={
+                                isSavingNotifications ? (
+                                    <ActivityIndicator color={theme.accent} />
+                                ) : (
+                                    <Switch
+                                        value={notificationsOn}
+                                        onValueChange={handleToggleNotifications}
+                                        disabled={!user}
+                                        trackColor={{ false: theme.muted, true: theme.accent }}
+                                        thumbColor="#fff"
+                                        accessibilityLabel="Push notifications"
+                                    />
+                                )
+                            }
+                        />
+                    </Group>
+
+                    <Group title="Account" styles={styles}>
+                        <Row icon="key" tint={TINTS.password} label="Change password" onPress={() => router.push("/change-password")} styles={styles} theme={theme} isLast />
+                    </Group>
+
+                    <Pressable
+                        accessibilityRole="button"
+                        onPress={onLogout}
+                        disabled={isLoggingOut}
+                        style={({ pressed }) => [styles.logout, (pressed || isLoggingOut) && styles.pressed]}
+                    >
+                        {isLoggingOut ? <ActivityIndicator color={theme.destructive} /> : <Text style={styles.logoutText}>Log out</Text>}
+                    </Pressable>
+
+                    <PoweredBy style={styles.footer}>
+                        <Text style={styles.version}>v1.0.0</Text>
+                    </PoweredBy>
+                    {/* Development builds only: the numbers that decide how big text looks on this phone. */}
+                    {__DEV__ && (
+                        <Text style={styles.devInfo} selectable>
+                            {`${Platform.OS} · screen ${Math.round(window.width)} × ${Math.round(window.height)} · system text ${Math.round(PixelRatio.getFontScale() * 100)}% · pixel ratio ${PixelRatio.get()}`}
+                        </Text>
+                    )}
+                </ScrollView>
+
+                <PhotoViewer
+                    visible={isPhotoPreviewVisible}
+                    photos={hasPhoto ? [{ key: "profile", uri: user!.profile_photo_url! }] : []}
+                    onClose={() => setIsPhotoPreviewVisible(false)}
+                    renderFooter={() => (
+                        <Pressable
+                            accessibilityRole="button"
+                            style={styles.previewChangeBtn}
+                            onPress={() => {
+                                setIsPhotoPreviewVisible(false);
+                                void handleChangePhoto();
+                            }}
+                        >
+                            <Ionicons name="camera-outline" size={18} color="#fff" />
+                            <Text style={styles.previewChangeText}>Change photo</Text>
+                        </Pressable>
+                    )}
+                />
+
+                <Modal visible={isEditProfileVisible} transparent animationType="slide" onRequestClose={() => setIsEditProfileVisible(false)} statusBarTranslucent>
+                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.sheetRoot}>
+                        <Pressable style={styles.sheetBackdrop} onPress={() => setIsEditProfileVisible(false)} accessibilityLabel="Close" />
+                        <View style={[styles.sheet, { paddingBottom: 20 + bottomInset }]}>
+                            <View style={styles.sheetHandle} />
+                            <Text style={styles.sheetTitle}>Edit profile</Text>
+
+                            <Text style={styles.inputLabel}>Your name</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editProfileName}
+                                onChangeText={setEditProfileName}
+                                autoCapitalize="words"
+                                placeholder="e.g. Suresh Kumar"
+                                placeholderTextColor={theme.mutedForeground + "80"}
+                            />
+
+                            <Text style={styles.inputLabel}>Phone number</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editProfilePhone}
+                                onChangeText={setEditProfilePhone}
+                                keyboardType="phone-pad"
+                                maxLength={15}
+                                placeholder="10-digit mobile number"
+                                placeholderTextColor={theme.mutedForeground + "80"}
+                            />
+                            <Text style={styles.inputHint}>This is the number you sign in with.</Text>
+
+                            <Pressable style={({ pressed }) => [styles.saveBtn, (pressed || isSavingProfile) && styles.pressed]} onPress={handleSaveProfile} disabled={isSavingProfile}>
+                                {isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save changes</Text>}
+                            </Pressable>
+                        </View>
+                    </KeyboardAvoidingView>
+                </Modal>
+            </SafeAreaView>
+        </ScreenBackground>
+    );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
-	safe: {
-		flex: 1,
-		backgroundColor: theme.background,
-	},
-	headerWrapper: {
-		backgroundColor: theme.background,
-		paddingTop: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: theme.border,
-		zIndex: 10,
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingBottom: 16,
-		gap: 16,
-	},
-	headerText: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 22,
-		color: theme.primary,
-		marginBottom: 2,
-	},
-	headerSubtitle: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-	},
-	headerActionCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: theme.card,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
-	},
-	scroll: {
-		paddingHorizontal: 20,
-		paddingTop: 24,
-		paddingBottom: 40,
-	},
-	profileCenterBlock: {
-		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 40,
-		paddingHorizontal: 16,
-	},
-	// iOS shadow lives on the wrapper because overflow: "hidden" (needed to clip the photo) would clip it.
-	avatarHugeWrap: {
-		marginBottom: 20,
-		shadowColor: theme.accent,
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.3,
-		shadowRadius: 16,
-	},
-	avatarHugeBackground: {
-		width: 110,
-		height: 110,
-		borderRadius: 55,
-		backgroundColor: theme.accent,
-		alignItems: "center",
-		justifyContent: "center",
-		overflow: "hidden",
-		elevation: 8,
-	},
-	avatarHugeImage: {
-		width: "100%",
-		height: "100%",
-	},
-	avatarHugeOverlay: {
-		...StyleSheet.absoluteFill,
-		backgroundColor: "rgba(0,0,0,0.4)",
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	avatarCameraBadge: {
-		position: "absolute",
-		right: 2,
-		bottom: 2,
-		width: 32,
-		height: 32,
-		borderRadius: 16,
-		backgroundColor: theme.primary,
-		borderWidth: 2,
-		borderColor: theme.background,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	avatarHugeText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 36,
-		color: "#fff",
-	},
-	libraryHugeName: {
-		fontFamily: "sans-extrabold",
-		fontSize: 28,
-		color: theme.primary,
-		textAlign: "center",
-		lineHeight: 34,
-		marginBottom: 12,
-	},
-	ownerInfoRow: {
-		flexDirection: "row",
-		justifyContent: "center",
-		gap: 10,
-	},
-	ownerInfoPill: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 6,
-		backgroundColor: theme.card,
-		borderWidth: 1,
-		borderColor: theme.border,
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-	},
-	ownerInfoText: {
-		fontFamily: "sans-bold",
-		fontSize: 13,
-		color: theme.mutedForeground,
-	},
-	section: {
-		marginBottom: 32,
-	},
-	sectionTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 14,
-		textTransform: "uppercase",
-		letterSpacing: 1,
-		color: theme.mutedForeground,
-		marginBottom: 16,
-		marginLeft: 4,
-	},
-	groupCard: {
-		backgroundColor: theme.card,
-		borderRadius: RADIUS.md,
-		overflow: "hidden",
-		borderWidth: 1.5,
-		borderColor: theme.border,
-	},
-	optionRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 18,
-	},
-	optionRowNoPress: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 18,
-	},
-	themeToggleContainer: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		flexWrap: "wrap", // Allow wrapping if content is too wide
-		gap: 8,
-	},
-	segmentControl: {
-		flexDirection: "row",
-		backgroundColor: theme.background,
-		borderRadius: RADIUS.sm,
-		padding: 3, // Reduced padding
-		gap: 2, // Reduced gap
-		borderWidth: 1,
-		borderColor: theme.border,
-	},
-	segment: {
-		paddingHorizontal: 10, // Reduced padding
-		paddingVertical: 6, // Reduced padding
-		borderRadius: RADIUS.sm,
-	},
-	segmentActive: {
-		backgroundColor: theme.accent,
-	},
-	segmentText: {
-		fontFamily: "sans-bold",
-		fontSize: 11, // Slightly smaller text for consistency
-		color: theme.mutedForeground,
-	},
-	segmentTextActive: {
-		fontFamily: "sans-extrabold",
-		color: "#fff",
-	},
-	optionRowPressed: {
-		backgroundColor: theme.muted + "40",
-	},
-	optionRowBorder: {
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: theme.border,
-	},
-	iconCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: RADIUS.sm,
-		backgroundColor: theme.background,
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 12, // Reduced margin slightly
-		borderWidth: 1,
-		borderColor: theme.border,
-	},
-	iconCircleDestructive: {
-		backgroundColor: theme.destructive + "15",
-		borderColor: theme.destructive + "30",
-	},
-	optionText: {
-		flex: 1,
-		fontFamily: "sans-bold",
-		fontSize: 15,
-		color: theme.primary,
-	},
-	logoutText: {
-		color: theme.destructive,
-	},
-	footerBlock: {
-		alignItems: "center",
-		marginTop: 20,
-		marginBottom: 20,
-	},
-	footerText: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-		marginBottom: 4,
-	},
-	versionText: {
-		fontFamily: "sans-bold",
-		fontSize: 12,
-		color: theme.mutedForeground + "80",
-	},
-	editModalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
-	},
-	editModalSheetWrap: {
-		position: "absolute",
-		bottom: 0,
-		left: 0,
-		right: 0,
-	},
-	editModalSheet: {
-		backgroundColor: theme.background,
-		borderTopLeftRadius: RADIUS.lg,
-		borderTopRightRadius: RADIUS.lg,
-		padding: 24,
-		paddingBottom: 32,
-	},
-	editModalTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 18,
-		color: theme.primary,
-		marginBottom: 20,
-	},
-	inputLabel: {
-		fontFamily: "sans-bold",
-		fontSize: 13,
-		color: theme.primary,
-		marginBottom: 8,
-		textTransform: "uppercase",
-		letterSpacing: 1,
-	},
-	inputField: {
-		fontFamily: "sans-medium",
-		backgroundColor: theme.card,
-		borderWidth: 1,
-		borderColor: theme.border,
-		borderRadius: RADIUS.md,
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		fontSize: 15,
-		color: theme.primary,
-		marginBottom: 16,
-	},
-	inputHint: {
-		fontFamily: "sans-medium",
-		fontSize: 12,
-		color: theme.mutedForeground,
-		marginTop: -10,
-		marginBottom: 16,
-	},
-	editSaveBtn: {
-		backgroundColor: theme.accent,
-		borderRadius: RADIUS.md,
-		paddingVertical: 16,
-		alignItems: "center",
-		marginTop: 8,
-	},
-	editSaveBtnText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 15,
-		color: "#fff",
-	},
-});
+type Styles = ReturnType<typeof createStyles>;
+
+/** A titled card of rows; rows split by hairlines that start at the label. */
+function Group({ title, styles, children }: { title: string; styles: Styles; children: ReactNode }) {
+    return (
+        <View style={styles.group}>
+            <Text style={styles.groupTitle}>{title}</Text>
+            <View style={styles.groupCard}>{children}</View>
+        </View>
+    );
+}
+
+/** One setting: coloured icon tile, label (and hint), an optional value, then a chevron or a control. */
+function Row({
+    icon,
+    tint,
+    label,
+    hint,
+    value,
+    valueTone,
+    onPress,
+    right,
+    isLast = false,
+    styles,
+    theme,
+}: {
+    icon: IconName;
+    tint: string;
+    label: string;
+    hint?: string;
+    value?: string;
+    valueTone?: "warning";
+    onPress?: () => void;
+    right?: ReactNode;
+    isLast?: boolean;
+    styles: Styles;
+    theme: Theme;
+}) {
+    const content = (
+        <>
+            <View style={[styles.tile, { backgroundColor: tint }]}>
+                <Ionicons name={icon} size={16} color="#fff" />
+            </View>
+            <View style={[styles.rowMain, !isLast && styles.rowDivider]}>
+                <View style={styles.rowText}>
+                    <Text style={styles.rowLabel}>{label}</Text>
+                    {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+                </View>
+                {value ? <Text style={[styles.rowValue, valueTone === "warning" && { color: theme.warning }]}>{value}</Text> : null}
+                {right ?? (onPress ? <Ionicons name="chevron-forward" size={18} color={theme.mutedForeground} /> : null)}
+            </View>
+        </>
+    );
+
+    return onPress ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={value ? `${label}, ${value}` : label} onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+            {content}
+        </Pressable>
+    ) : (
+        <View style={styles.row}>{content}</View>
+    );
+}
+
+const TILE = 30;
+const ROW_PADDING = 14;
+
+const createStyles = (theme: Theme) =>
+    StyleSheet.create({
+        safe: {
+            flex: 1,
+        },
+        scroll: {
+            paddingHorizontal: 20,
+            paddingTop: 16,
+        },
+        pressed: {
+            opacity: 0.7,
+        },
+        profileCard: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            padding: 16,
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        avatarWrap: {
+            width: 60,
+            height: 60,
+        },
+        avatar: {
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: theme.accent,
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+        },
+        avatarImage: {
+            width: "100%",
+            height: "100%",
+        },
+        avatarInitials: {
+            fontFamily: "sans-semibold",
+            fontSize: 20,
+            color: "#fff",
+        },
+        avatarOverlay: {
+            ...StyleSheet.absoluteFill,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        cameraBadge: {
+            position: "absolute",
+            right: -2,
+            bottom: -2,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: theme.primary,
+            borderWidth: 2,
+            borderColor: theme.card,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        profileText: {
+            flex: 1,
+        },
+        profileName: {
+            fontFamily: "sans-semibold",
+            fontSize: 17,
+            color: theme.primary,
+        },
+        profileMeta: {
+            fontFamily: "sans-regular",
+            fontSize: 13,
+            color: theme.mutedForeground,
+            marginTop: 3,
+        },
+        editPill: {
+            paddingHorizontal: 14,
+            paddingVertical: 7,
+            borderRadius: RADIUS.sm,
+            backgroundColor: theme.muted,
+        },
+        editPillText: {
+            fontFamily: "sans-semibold",
+            fontSize: 13,
+            color: theme.primary,
+        },
+        planCard: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 12,
+            paddingHorizontal: ROW_PADDING,
+            paddingVertical: 13,
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        planText: {
+            flex: 1,
+        },
+        planStatus: {
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            marginTop: 2,
+        },
+        group: {
+            marginTop: 24,
+        },
+        groupTitle: {
+            fontFamily: "sans-semibold",
+            fontSize: 13,
+            color: theme.mutedForeground,
+            marginBottom: 8,
+            paddingLeft: 4,
+        },
+        groupCard: {
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: "hidden",
+        },
+        row: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingLeft: ROW_PADDING,
+        },
+        rowPressed: {
+            backgroundColor: theme.muted,
+        },
+        tile: {
+            width: TILE,
+            height: TILE,
+            borderRadius: RADIUS.sm,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        rowMain: {
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: 12,
+            paddingVertical: 13,
+            paddingRight: ROW_PADDING,
+            minHeight: 50,
+        },
+        rowDivider: {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.mutedForeground + "33",
+        },
+        rowText: {
+            flex: 1,
+        },
+        rowLabel: {
+            fontFamily: "sans-medium",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        rowHint: {
+            fontFamily: "sans-regular",
+            fontSize: 12,
+            color: theme.mutedForeground,
+            marginTop: 2,
+        },
+        rowValue: {
+            fontFamily: "sans-regular",
+            fontSize: 14,
+            color: theme.mutedForeground,
+        },
+        // Appearance: label row, then the full-width System / Light / Dark control under it.
+        stackedRow: {
+            paddingHorizontal: ROW_PADDING,
+            paddingTop: 13,
+            paddingBottom: 14,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.mutedForeground + "33",
+        },
+        rowHead: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+        },
+        stackedBody: {
+            marginTop: 12,
+            marginLeft: TILE + 12,
+        },
+        logout: {
+            marginTop: 24,
+            alignItems: "center",
+            paddingVertical: 15,
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        logoutText: {
+            fontFamily: "sans-semibold",
+            fontSize: 15,
+            color: theme.destructive,
+        },
+        footer: {
+            marginTop: 28,
+        },
+        version: {
+            fontFamily: "sans-regular",
+            fontSize: 12,
+            color: theme.mutedForeground,
+        },
+        devInfo: {
+            fontFamily: "sans-regular",
+            fontSize: 11,
+            color: theme.mutedForeground,
+            textAlign: "center",
+            marginTop: 8,
+        },
+        previewChangeBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 22,
+            paddingVertical: 12,
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.accent,
+        },
+        previewChangeText: {
+            ...BUTTON_TEXT,
+            color: "#fff",
+        },
+        sheetRoot: {
+            flex: 1,
+            justifyContent: "flex-end",
+        },
+        sheetBackdrop: {
+            ...StyleSheet.absoluteFill,
+            backgroundColor: "rgba(0,0,0,0.45)",
+        },
+        sheet: {
+            backgroundColor: theme.background,
+            borderTopLeftRadius: RADIUS.lg + 4,
+            borderTopRightRadius: RADIUS.lg + 4,
+            paddingHorizontal: 20,
+            paddingTop: 10,
+            ...FLOATING_SHADOW,
+        },
+        sheetHandle: {
+            alignSelf: "center",
+            width: 36,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: theme.mutedForeground + "55",
+            marginBottom: 16,
+        },
+        sheetTitle: {
+            fontFamily: "sans-bold",
+            fontSize: 20,
+            color: theme.primary,
+            marginBottom: 8,
+        },
+        inputLabel: {
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            color: theme.mutedForeground,
+            marginTop: 14,
+            marginBottom: 6,
+        },
+        input: {
+            height: 48,
+            paddingHorizontal: 14,
+            borderRadius: RADIUS.md,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+            fontFamily: "sans-regular",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        inputHint: {
+            fontFamily: "sans-regular",
+            fontSize: 12,
+            color: theme.mutedForeground,
+            marginTop: 6,
+        },
+        saveBtn: {
+            marginTop: 22,
+            alignItems: "center",
+            paddingVertical: 15,
+            borderRadius: RADIUS.md,
+            backgroundColor: theme.accent,
+        },
+        saveBtnText: {
+            ...BUTTON_TEXT,
+            color: "#fff",
+        },
+    });

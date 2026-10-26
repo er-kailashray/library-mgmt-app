@@ -1,617 +1,694 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableWithoutFeedback,
-    View,
-} from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCallback, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getMembersApi } from "@/features/members/logic/members.api";
-import { Member } from "@/features/members/types/members.types";
-import { createPaymentApi, getPaymentsApi } from "@/features/payments/logic/payments-api";
-import { PAYMENT_MODE_LABELS, Payment, PaymentMode } from "@/features/payments/types/payments.types";
-import { remindAllOverdueApi } from "@/features/reminders/logic/reminders-api";
-import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { describePaymentPeriod, PAYMENT_STATUS_LOOK } from "@/features/payments/logic/payment-display";
+import { getPaymentsApi } from "@/features/payments/logic/payments-api";
+import { Payment } from "@/features/payments/types/payments.types";
+import { remindAllOverdueApi, remindMemberApi } from "@/features/reminders/logic/reminders-api";
+import { RADIUS } from "@/shared/constants/layout";
+import { Theme } from "@/shared/constants/theme";
 import { useApiData } from "@/shared/hooks/useApiData";
+import { useScreenBottomInset } from "@/shared/hooks/useScreenBottomInset";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { FilterChip } from "@/shared/ui/FilterChip";
+import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
+import { MemberAvatar } from "@/shared/ui/MemberAvatar";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { SegmentedControl } from "@/shared/ui/SegmentedControl";
+import { Text, TextInput } from "@/shared/ui/Text";
+import { formatRupee } from "@/shared/utils/currency";
+import { addDays, formatShortDate, fromIsoDate, todayIso } from "@/shared/utils/dates";
 
+import { MonthPickerSheet } from "./MonthPickerSheet";
+import { RecordPaymentSheet } from "./RecordPaymentSheet";
+
+type Tab = "received" | "due";
+type ReceivedFilter = "all" | "PAID" | "PARTIAL" | "REFUNDED";
+
+const RECEIVED_FILTERS: { key: ReceivedFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "PAID", label: "Paid" },
+    { key: "PARTIAL", label: "Partial" },
+    { key: "REFUNDED", label: "Refunds" },
+];
+
+const AVATAR_SIZE = 40;
+
+/** One flat list: a heading per day (Received only), then rows that share a rounded card. */
+type ListItem =
+    | { type: "day"; key: string; label: string; total: number }
+    | { type: "payment"; key: string; payment: Payment; isFirst: boolean; isLast: boolean }
+    | { type: "due"; key: string; payment: Payment; isFirst: boolean; isLast: boolean };
+
+/** "YYYY-MM" for the current month. */
+function currentMonth(): string {
+    return todayIso().slice(0, 7);
+}
+
+/** "YYYY-MM" shifted by whole months. */
+function shiftMonth(month: string, delta: number): string {
+    const [y, m] = month.split("-").map(Number);
+    const date = new Date(y, m - 1 + delta, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "October 2026" (or "Oct 2026") from "YYYY-MM". */
+function formatMonth(month: string, short = false): string {
+    return fromIsoDate(`${month}-01`).toLocaleDateString("en-IN", { month: short ? "short" : "long", year: "numeric" });
+}
+
+function dayLabel(iso: string): string {
+    if (iso === todayIso()) return "Today";
+    if (iso === addDays(todayIso(), -1)) return "Yesterday";
+    return fromIsoDate(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function daysSince(iso: string): number {
+    return Math.max(0, Math.round((fromIsoDate(todayIso()).getTime() - fromIsoDate(iso).getTime()) / 86_400_000));
+}
+
+/** "10:42 AM" when it was entered on the day it's dated (the time the money was taken), else null. */
+function timeTaken(payment: Payment): string | null {
+    if (!payment.recorded_at) return null;
+    const recorded = new Date(payment.recorded_at);
+    const sameDay = `${recorded.getFullYear()}-${String(recorded.getMonth() + 1).padStart(2, "0")}-${String(recorded.getDate()).padStart(2, "0")}` === payment.date.slice(0, 10);
+    return sameDay ? recorded.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase() : null;
+}
+
+/** What a payment was for: the period it covers, else the seats it was for. */
+function paymentDetail(payment: Payment): string {
+    const period = describePaymentPeriod(payment);
+    if (period) return period;
+    const seats = (payment.seats ?? []).filter((s) => s.batch_name).map((s) => `${s.batch_name} · Seat ${s.seat_number ?? "—"}`);
+    return seats.join("   ");
+}
+
+const sumOf = (list: Payment[]) => list.reduce((sum, p) => sum + p.amount, 0);
+
+/**
+ * Payments: money received month by month (grouped by day, with the month's total and how it
+ * compares to the month before), and who owes money now, with Remind and Collect on each. "Record
+ * payment" picks the member, then opens their payment sheet, which works out the period paid for.
+ */
 export function PaymentsScreen() {
     const router = useRouter();
     const { theme } = useTheme();
-    const insets = useSafeAreaInsets();
-    const [showPaymentForm, setShowPaymentForm] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "pending">("all");
+    const bottomInset = useScreenBottomInset();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
-    const { data, isLoading, error, refetch: fetchPayments } = useApiData(getPaymentsApi, []);
-    const payments = data ?? [];
+    const params = useLocalSearchParams<{ tab?: string }>();
+    const [tab, setTab] = useState<Tab>(params.tab === "due" ? "due" : "received");
+    const [month, setMonth] = useState(currentMonth());
+    const [isMonthPickerVisible, setMonthPickerVisible] = useState(false);
+    const [isRecordSheetVisible, setRecordSheetVisible] = useState(false);
+    const [receivedFilter, setReceivedFilter] = useState<ReceivedFilter>("all");
+    const [query, setQuery] = useState("");
+    const [remindingId, setRemindingId] = useState<string | null>(null);
+    const [isRemindingAll, setIsRemindingAll] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const { data, isLoading, error, refetch } = useApiData(getPaymentsApi, []);
 
     useFocusEffect(
         useCallback(() => {
-            void fetchPayments();
-        }, [fetchPayments])
+            void refetch();
+        }, [refetch])
     );
 
-    // Form State
-    const [members, setMembers] = useState<Member[]>([]);
-    const [isMemberPickerVisible, setMemberPickerVisible] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-    const [amount, setAmount] = useState("");
-    const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
-    const [notes, setNotes] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isSendingBulkReminder, setIsSendingBulkReminder] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await refetch();
+        setIsRefreshing(false);
+    }, [refetch]);
 
-    const openPaymentForm = useCallback(async () => {
-        setShowPaymentForm(true);
-        try {
-            const response = await getMembersApi();
-            if (response.status) {
-                // Members who left have no seat to pay for; they settle up when readmitted.
-                setMembers((response.data || []).filter((m) => m.status === "active"));
-            }
-        } catch {
-            // The member picker will just show as empty; the form still validates selection is required.
+    // The API returns money received (payments, partials, refunds) and current dues (PENDING) together.
+    const { received, dues } = useMemo(() => {
+        const payments = data ?? [];
+        return { received: payments.filter((p) => p.status !== "PENDING"), dues: payments.filter((p) => p.status === "PENDING") };
+    }, [data]);
+
+    const q = query.trim().toLowerCase();
+    const matches = useCallback((p: Payment) => !q || p.member_name.toLowerCase().includes(q), [q]);
+
+    // Net of refunds (stored as negative amounts) - the same figure Home shows for the month.
+    const monthReceived = useMemo(() => received.filter((p) => p.date.startsWith(month)), [received, month]);
+    const monthTotal = sumOf(monthReceived);
+    const previousTotal = sumOf(received.filter((p) => p.date.startsWith(shiftMonth(month, -1))));
+    const monthRefunded = Math.abs(sumOf(monthReceived.filter((p) => p.status === "REFUNDED")));
+    const monthCount = monthReceived.filter((p) => p.status !== "REFUNDED").length;
+    const change = previousTotal > 0 ? Math.round(((monthTotal - previousTotal) / previousTotal) * 100) : null;
+    const dueTotal = sumOf(dues);
+
+    const items = useMemo((): ListItem[] => {
+        if (tab === "due") {
+            // Longest overdue first.
+            const sorted = dues.filter(matches).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+            return sorted.map((payment, index) => ({ type: "due" as const, key: payment.id, payment, isFirst: index === 0, isLast: index === sorted.length - 1 }));
         }
-    }, []);
-
-    const totalCollection = payments.reduce((sum, p) => (p.status === "PAID" ? sum + p.amount : sum), 0);
-    const pendingAmount = payments.reduce((sum, p) => (p.status === "PENDING" ? sum + p.amount : sum), 0);
-
-    const filteredPayments = payments.filter((p) => {
-        const matchesSearch = p.member_name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = filterStatus === "all" || p.status.toLowerCase() === filterStatus;
-        return matchesSearch && matchesStatus;
-    });
-
-    const handleMarkPayment = useCallback(async () => {
-        if (!selectedMember || !amount) {
-            Alert.alert("Error", "Please select a member and enter an amount.");
-            return;
+        const shown = monthReceived.filter((p) => matches(p) && (receivedFilter === "all" || p.status === receivedFilter));
+        const byDay = new Map<string, Payment[]>();
+        for (const payment of shown) {
+            const day = payment.date.slice(0, 10);
+            byDay.set(day, [...(byDay.get(day) ?? []), payment]);
         }
+        return [...byDay.entries()]
+            .sort(([a], [b]) => b.localeCompare(a))
+            .flatMap(([day, list]) => [
+                { type: "day" as const, key: `day-${day}`, label: dayLabel(day), total: sumOf(list) },
+                ...list.map((payment, index) => ({ type: "payment" as const, key: payment.id, payment, isFirst: index === 0, isLast: index === list.length - 1 })),
+            ]);
+    }, [tab, dues, monthReceived, receivedFilter, matches]);
 
+    const openMember = (payment: Payment, collect = false) =>
+        router.push({ pathname: "/members/[id]", params: { id: String(payment.member_id), ...(collect ? { collect: "1" } : {}) } });
+
+    const handleRemind = async (payment: Payment) => {
         try {
-            setIsSubmitting(true);
-            await createPaymentApi({
-                member_id: selectedMember.id,
-                amount: Number(amount),
-                payment_mode: paymentMode,
-                notes: notes || undefined,
-            });
-            setShowPaymentForm(false);
-            setSelectedMember(null);
-            setAmount("");
-            setPaymentMode("cash");
-            setNotes("");
-            await fetchPayments();
+            setRemindingId(payment.id);
+            await remindMemberApi(payment.member_id);
+            Alert.alert("Reminder sent", `${payment.member_name} got an SMS about the ${formatRupee(payment.amount)} due.`);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to record payment.");
+            Alert.alert("Couldn't send", err.message || "Failed to send the reminder.");
         } finally {
-            setIsSubmitting(false);
+            setRemindingId(null);
         }
-    }, [selectedMember, amount, paymentMode, notes, fetchPayments]);
+    };
 
-    const handleRemindAllDue = useCallback(async () => {
+    const handleRemindAll = useCallback(async () => {
         try {
-            setIsSendingBulkReminder(true);
+            setIsRemindingAll(true);
             const response = await remindAllOverdueApi();
             Alert.alert("Reminders sent", response.message || `Sent ${response.data.sent} reminder(s).`);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to send reminders.");
+            Alert.alert("Couldn't send", err.message || "Failed to send reminders.");
         } finally {
-            setIsSendingBulkReminder(false);
+            setIsRemindingAll(false);
         }
     }, []);
 
-    const styles = createStyles(theme);
+    const subtitle = !data
+        ? "Money in, and who owes"
+        : `${formatRupee(sumOf(received.filter((p) => p.date.startsWith(currentMonth()))))} in ${formatMonth(currentMonth(), true).split(" ")[0]}` +
+          (dues.length > 0 ? ` · ${formatRupee(dueTotal)} due from ${dues.length}` : " · nobody owes");
 
-    const renderPaymentItem = ({ item }: { item: Payment }) => {
-        const hasLeft = item.member_status === "inactive";
+    const renderItem = ({ item }: { item: ListItem }) => {
+        if (item.type === "day") {
+            return (
+                <View style={styles.dayHeader}>
+                    <Text style={styles.dayLabel}>{item.label}</Text>
+                    <Text style={styles.dayTotal}>{formatRupee(item.total)}</Text>
+                </View>
+            );
+        }
+        const { payment, isFirst, isLast } = item;
+        const left = payment.member_status === "inactive";
+
+        if (item.type === "due") {
+            const days = daysSince(payment.date);
+            const busy = remindingId === payment.id;
+            return (
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${payment.member_name} owes ${formatRupee(payment.amount)}`}
+                    onPress={() => openMember(payment)}
+                    style={({ pressed }) => [styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, pressed && styles.rowPressed]}
+                >
+                    <View style={styles.avatar}>
+                        <MemberAvatar id={payment.member_id} name={payment.member_name} size={AVATAR_SIZE} />
+                    </View>
+                    <View style={[styles.rowMain, !isLast && styles.rowDivider]}>
+                        <View style={styles.rowTop}>
+                            <View style={styles.rowText}>
+                                <Text style={styles.name} numberOfLines={1}>
+                                    {payment.member_name}
+                                </Text>
+                                <Text style={styles.detail} numberOfLines={1}>
+                                    Due since {formatShortDate(payment.date)} · {days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}
+                                </Text>
+                            </View>
+                            <Text style={[styles.amount, { color: theme.destructive }]}>{formatRupee(payment.amount)}</Text>
+                        </View>
+                        <View style={styles.dueActions}>
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Remind ${payment.member_name} by SMS`}
+                                style={({ pressed }) => [styles.smallBtn, pressed && styles.rowPressed]}
+                                onPress={() => handleRemind(payment)}
+                                disabled={busy}
+                            >
+                                {busy ? (
+                                    <ActivityIndicator size="small" color={theme.primary} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="chatbox-ellipses-outline" size={14} color={theme.primary} />
+                                        <Text style={styles.smallBtnText}>Remind</Text>
+                                    </>
+                                )}
+                            </Pressable>
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Collect from ${payment.member_name}`}
+                                style={({ pressed }) => [styles.smallBtn, styles.smallBtnPrimary, pressed && styles.rowPressed]}
+                                onPress={() => openMember(payment, true)}
+                            >
+                                <Ionicons name="wallet-outline" size={14} color="#fff" />
+                                <Text style={[styles.smallBtnText, styles.smallBtnTextPrimary]}>Collect</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Pressable>
+            );
+        }
+
+        const look = PAYMENT_STATUS_LOOK[payment.status] ?? PAYMENT_STATUS_LOOK.PAID;
+        const isRefund = payment.status === "REFUNDED";
+        const isPartial = payment.status === "PARTIAL";
+        const detail = paymentDetail(payment);
+        const time = timeTaken(payment);
         return (
             <Pressable
-                style={[styles.paymentCard, hasLeft && styles.paymentCardFaded]}
-                onPress={() => router.push({ pathname: "/members/[id]", params: { id: String(item.member_id) } })}>
-                <View style={[styles.paymentIconBox, { backgroundColor: item.status === "PAID" ? theme.success + "15" : theme.accent + "15" }]}>
-                    <Ionicons name={item.status === "PAID" ? "checkmark-circle" : "time"} size={24} color={item.status === "PAID" ? theme.success : theme.accent} />
+                accessibilityRole="button"
+                accessibilityLabel={`${payment.member_name}, ${look.label}, ${formatRupee(Math.abs(payment.amount))}`}
+                onPress={() => openMember(payment)}
+                style={({ pressed }) => [styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, pressed && styles.rowPressed]}
+            >
+                <View style={styles.avatar}>
+                    <MemberAvatar id={payment.member_id} name={payment.member_name} size={AVATAR_SIZE} faded={left} />
                 </View>
-                <View style={styles.paymentInfo}>
-                    <View style={styles.paymentNameRow}>
-                        <Text style={styles.paymentName}>{item.member_name}</Text>
-                        {hasLeft && (
-                            <View style={styles.leftBadge}>
-                                <Text style={styles.leftBadgeText}>Left</Text>
-                            </View>
-                        )}
+                <View style={[styles.rowMain, styles.rowTop, !isLast && styles.rowDivider]}>
+                    <View style={[styles.rowText, left && styles.faded]}>
+                        <Text style={styles.name} numberOfLines={1}>
+                            {payment.member_name}
+                            {left ? <Text style={styles.leftTag}>  · Left</Text> : null}
+                        </Text>
+                        <Text style={styles.detail} numberOfLines={1}>
+                            {isPartial ? "Partial · " : ""}
+                            {detail || look.label}
+                        </Text>
                     </View>
-                    <Text style={styles.paymentDate}>{item.date}</Text>
-                </View>
-                <View style={styles.paymentAmountBlock}>
-                    <Text style={[styles.paymentAmount, { color: item.status === "PAID" ? theme.success : theme.accent }]}>
-                        {item.status === "PAID" ? "+" : ""}
-                        ₹{item.amount}
-                    </Text>
-                    <Text style={styles.paymentStatus}>{item.status}</Text>
+                    <View style={styles.trailing}>
+                        <Text style={[styles.amount, { color: isRefund ? theme.destructive : isPartial ? theme.accent : theme.primary }]}>
+                            {isRefund ? "−" : "+"}
+                            {formatRupee(Math.abs(payment.amount))}
+                        </Text>
+                        <Text style={styles.trailingMeta} numberOfLines={1}>
+                            {[payment.method, time].filter(Boolean).join(" · ")}
+                        </Text>
+                    </View>
                 </View>
             </Pressable>
         );
     };
 
-    if (showPaymentForm) {
-        return (
-            <SafeAreaView style={styles.safe} edges={["top"]}>
-                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
-                        <View style={styles.header}>
-                            <Pressable style={styles.headerActionCircle} onPress={() => setShowPaymentForm(false)}>
-                                <Ionicons name="close" size={24} color={theme.primary} />
-                            </Pressable>
-                            <View style={styles.headerText}>
-                                <Text style={styles.headerTitle}>Mark Payment</Text>
-                                <Text style={styles.headerSubtitle}>Record a student payment</Text>
-                            </View>
+    const receivedHeader = (
+        <View style={styles.headerBlock}>
+            <View style={styles.hero}>
+                {/* Tap the month to jump to any other month. */}
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${formatMonth(month)}, pick a month`}
+                    onPress={() => setMonthPickerVisible(true)}
+                    style={({ pressed }) => [styles.monthPill, pressed && styles.rowPressed]}
+                >
+                    <Text style={styles.monthText}>{formatMonth(month)}</Text>
+                </Pressable>
+                <Text style={styles.heroAmount}>{formatRupee(monthTotal)}</Text>
+                <View style={styles.heroMetaRow}>
+                    <Text style={styles.heroMeta}>
+                        {monthCount === 0 ? "Nothing received" : `${monthCount} payment${monthCount === 1 ? "" : "s"}`}
+                        {monthRefunded > 0 ? ` · ${formatRupee(monthRefunded)} refunded` : ""}
+                    </Text>
+                    {change !== null && (
+                        <View style={[styles.changeBadge, { backgroundColor: (change >= 0 ? theme.success : theme.destructive) + "18" }]}>
+                            <Ionicons name={change >= 0 ? "arrow-up" : "arrow-down"} size={11} color={change >= 0 ? theme.success : theme.destructive} />
+                            <Text style={[styles.changeText, { color: change >= 0 ? theme.success : theme.destructive }]}>{Math.abs(change)}% vs last month</Text>
                         </View>
+                    )}
+                </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {RECEIVED_FILTERS.map((f) => (
+                    <FilterChip key={f.key} label={f.label} selected={receivedFilter === f.key} onPress={() => setReceivedFilter(f.key)} />
+                ))}
+            </ScrollView>
+        </View>
+    );
 
-                        <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Member</Text>
-                                <Pressable style={styles.input} onPress={() => setMemberPickerVisible(true)}>
-                                    <Text style={[styles.pickerText, !selectedMember && { color: theme.mutedForeground + "80" }]}>
-                                        {selectedMember ? selectedMember.name : "Select a member"}
-                                    </Text>
-                                </Pressable>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Amount (₹)</Text>
-                                <TextInput style={styles.input} placeholder="e.g. 500" placeholderTextColor={theme.mutedForeground + "80"} keyboardType="numeric" value={amount} onChangeText={setAmount} />
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Payment Mode</Text>
-                                <View style={styles.modeRow}>
-                                    {(Object.keys(PAYMENT_MODE_LABELS) as PaymentMode[]).map((mode) => (
-                                        <Pressable key={mode} style={[styles.modeChip, paymentMode === mode && styles.modeChipActive]} onPress={() => setPaymentMode(mode)}>
-                                            <Text style={[styles.modeChipText, paymentMode === mode && styles.modeChipTextActive]}>{PAYMENT_MODE_LABELS[mode]}</Text>
-                                        </Pressable>
-                                    ))}
-                                </View>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Notes (Optional)</Text>
-                                <TextInput style={[styles.input, styles.textArea]} placeholder="e.g. Cash payment for April" placeholderTextColor={theme.mutedForeground + "80"} multiline numberOfLines={4} value={notes} onChangeText={setNotes} />
-                            </View>
-
-                            <Pressable style={[styles.primaryButton, isSubmitting && { opacity: 0.7 }]} onPress={handleMarkPayment} disabled={isSubmitting}>
-                                {isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryButtonText}>Confirm Payment</Text>}
-                            </Pressable>
-                        </ScrollView>
-                    </KeyboardAvoidingView>
-                </TouchableWithoutFeedback>
-
-                <Modal visible={isMemberPickerVisible} animationType="slide" transparent onRequestClose={() => setMemberPickerVisible(false)}>
-                    <Pressable style={styles.modalOverlay} onPress={() => setMemberPickerVisible(false)} />
-                    <View style={styles.memberPickerSheet}>
-                        <Text style={styles.memberPickerTitle}>Select Member</Text>
-                        <FlatList
-                            data={members}
-                            keyExtractor={(item) => item.id.toString()}
-                            style={{ maxHeight: 400 }}
-                            ListEmptyComponent={<Text style={styles.emptyText}>No members found.</Text>}
-                            renderItem={({ item }) => (
-                                <Pressable
-                                    style={styles.memberPickerRow}
-                                    onPress={() => {
-                                        setSelectedMember(item);
-                                        setMemberPickerVisible(false);
-                                    }}>
-                                    <Text style={styles.memberPickerName}>{item.name}</Text>
-                                    <Text style={styles.memberPickerPhone}>{item.phone}</Text>
-                                </Pressable>
-                            )}
-                        />
-                    </View>
-                </Modal>
-            </SafeAreaView>
-        );
-    }
+    const dueHeader = (
+        <View style={styles.headerBlock}>
+            <View style={styles.hero}>
+                <Text style={styles.heroLabel}>Owed to you now</Text>
+                <Text style={[styles.heroAmount, dueTotal > 0 && { color: theme.destructive }]}>{formatRupee(dueTotal)}</Text>
+                <Text style={styles.heroMeta}>{dues.length === 0 ? "Everyone is paid up" : `from ${dues.length} member${dues.length === 1 ? "" : "s"}, longest overdue first`}</Text>
+                {dues.length > 0 && (
+                    <Pressable
+                        accessibilityRole="button"
+                        style={({ pressed }) => [styles.remindAll, (pressed || isRemindingAll) && styles.rowPressed]}
+                        onPress={handleRemindAll}
+                        disabled={isRemindingAll}
+                    >
+                        {isRemindingAll ? (
+                            <ActivityIndicator size="small" color={theme.accent} />
+                        ) : (
+                            <>
+                                <Ionicons name="megaphone-outline" size={15} color={theme.accent} />
+                                <Text style={styles.remindAllText}>Remind everyone by SMS</Text>
+                            </>
+                        )}
+                    </Pressable>
+                )}
+            </View>
+        </View>
+    );
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Payments</Text>
-                    <Text style={styles.headerSubtitle}>Revenue & collections</Text>
-                </View>
-            </View>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <ScreenHeader title="Payments" subtitle={subtitle} />
 
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Total Collected</Text>
-                    <Text style={[styles.summaryValue, { color: theme.accent }]}>₹{totalCollection.toLocaleString("en-IN")}</Text>
+                <View style={styles.controls}>
+                    <SegmentedControl
+                        segments={[
+                            { key: "received", label: "Received" },
+                            { key: "due", label: "Due", count: dues.length, alert: dues.length > 0 },
+                        ]}
+                        value={tab}
+                        onChange={setTab}
+                    />
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={18} color={theme.mutedForeground} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search by member name"
+                            placeholderTextColor={theme.mutedForeground + "99"}
+                            value={query}
+                            onChangeText={setQuery}
+                            autoCorrect={false}
+                        />
+                        {query.length > 0 && (
+                            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setQuery("")} hitSlop={10}>
+                                <Ionicons name="close-circle" size={18} color={theme.mutedForeground} />
+                            </Pressable>
+                        )}
+                    </View>
                 </View>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Pending</Text>
-                    <Text style={[styles.summaryValue, { color: theme.primary }]}>₹{pendingAmount.toLocaleString("en-IN")}</Text>
-                </View>
-            </View>
 
-            {pendingAmount > 0 && (
-                <Pressable style={[styles.remindAllBtn, isSendingBulkReminder && { opacity: 0.7 }]} onPress={handleRemindAllDue} disabled={isSendingBulkReminder}>
-                    {isSendingBulkReminder ? (
-                        <ActivityIndicator color={theme.accent} size="small" />
-                    ) : (
-                        <>
-                            <Ionicons name="megaphone-outline" size={16} color={theme.accent} />
-                            <Text style={styles.remindAllBtnText}>Remind everyone who&apos;s due (SMS)</Text>
-                        </>
-                    )}
-                </Pressable>
-            )}
-
-            <View style={styles.listHeader}>
-                <Text style={styles.listTitle}>Recent Transactions</Text>
-                <View style={styles.filterRow}>
-                    <Pressable onPress={() => setFilterStatus("all")} style={[styles.filterBtn, filterStatus === "all" && { backgroundColor: theme.accent }]}>
-                        <Text style={[styles.filterBtnText, filterStatus === "all" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>All</Text>
-                    </Pressable>
-                    <Pressable onPress={() => setFilterStatus("paid")} style={[styles.filterBtn, filterStatus === "paid" && { backgroundColor: theme.accent }]}>
-                        <Text style={[styles.filterBtnText, filterStatus === "paid" && { color: theme.background === "#0C0A09" ? theme.primary : "#fff" }]}>Paid</Text>
-                    </Pressable>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <LoadingState />
-            ) : error ? (
-                <ErrorState message={error} onRetry={fetchPayments} />
-            ) : filteredPayments.length === 0 ? (
-                payments.length === 0 ? (
-                    <EmptyState icon="cash-outline" title="No payments recorded yet" subtitle="Payments you record will show up here." />
+                {isLoading && !data ? (
+                    <LoadingState />
+                ) : error && !data ? (
+                    <ErrorState message={error} onRetry={refetch} />
                 ) : (
-                    <EmptyState icon="search-outline" title="No transactions found" subtitle="Try adjusting your search or filters." />
-                )
-            ) : (
-                <FlatList data={filteredPayments} renderItem={renderPaymentItem} keyExtractor={(item) => item.id} contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} />
-            )}
+                    <FlashList
+                        data={items}
+                        keyExtractor={(item) => item.key}
+                        // Day headings, payments and dues recycle separately (different layouts).
+                        getItemType={(item) => item.type}
+                        renderItem={renderItem}
+                        // Due rows show a spinner while their reminder sends.
+                        extraData={remindingId}
+                        ListHeaderComponent={tab === "received" ? receivedHeader : dueHeader}
+                        ListEmptyComponent={
+                            tab === "due" ? (
+                                q ? (
+                                    <EmptyState icon="search-outline" title="No one matches" subtitle="Try a different name." />
+                                ) : (
+                                    <EmptyState icon="checkmark-circle-outline" title="Nobody owes anything" subtitle="Every active member is paid up." />
+                                )
+                            ) : monthReceived.length === 0 ? (
+                                <EmptyState icon="cash-outline" title={`Nothing received in ${formatMonth(month)}`} subtitle="Use the arrows or tap the month to see other months." />
+                            ) : (
+                                <EmptyState icon="search-outline" title="No payments match" subtitle="Try a different name or filter." />
+                            )
+                        }
+                        contentContainerStyle={{ paddingBottom: FAB_CLEARANCE + bottomInset }}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
+                    />
+                )}
 
-            <Pressable style={[styles.fab, { bottom: 30 + insets.bottom }]} onPress={openPaymentForm}>
-                <Ionicons name="add" size={32} color={theme.background} />
-            </Pressable>
-        </SafeAreaView>
+                <MonthPickerSheet
+                    visible={isMonthPickerVisible}
+                    value={month}
+                    maxMonth={currentMonth()}
+                    onPick={(picked) => {
+                        setMonth(picked);
+                        setMonthPickerVisible(false);
+                    }}
+                    onClose={() => setMonthPickerVisible(false)}
+                />
+                <RecordPaymentSheet
+                    visible={isRecordSheetVisible}
+                    onClose={() => setRecordSheetVisible(false)}
+                    onPick={(member) => {
+                        setRecordSheetVisible(false);
+                        router.push({ pathname: "/members/[id]", params: { id: String(member.id), collect: "1" } });
+                    }}
+                />
+
+                <FloatingActionButton label="Record payment" onPress={() => setRecordSheetVisible(true)} />
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
-const createStyles = (theme: any) => StyleSheet.create({
-    safe: {
-        flex: 1,
-        backgroundColor: theme.background,
-    },
-    flex: {
-        flex: 1,
-    },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 20,
-        gap: 16,
-    },
-    headerActionCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    headerText: {
-        flex: 1,
-    },
-    headerTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-    },
-    headerSubtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
-    },
-    summaryRow: {
-        flexDirection: "row",
-        paddingHorizontal: 20,
-        gap: 12,
-        marginBottom: 24,
-    },
-    summaryCard: {
-        flex: 1,
-        padding: 20,
-        borderRadius: RADIUS.md,
-        backgroundColor: theme.card,
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    summaryLabel: {
-        fontFamily: "sans-bold",
-        fontSize: 12,
-        color: theme.mutedForeground,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 4,
-    },
-    summaryValue: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-    },
-    remindAllBtn: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        marginHorizontal: 20,
-        marginBottom: 20,
-        paddingVertical: 12,
-        borderRadius: RADIUS.md,
-        backgroundColor: theme.accent + "15",
-        borderWidth: 1,
-        borderColor: theme.accent + "30",
-    },
-    remindAllBtnText: {
-        fontFamily: "sans-bold",
-        fontSize: 13,
-        color: theme.accent,
-    },
-    listHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        marginBottom: 16,
-    },
-    listTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 18,
-        color: theme.primary,
-    },
-    filterRow: {
-        flexDirection: "row",
-        gap: 8,
-    },
-    filterBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: RADIUS.sm,
-        backgroundColor: theme.card,
-        borderWidth: 1,
-        borderColor: theme.border,
-    },
-    filterBtnText: {
-        fontFamily: "sans-bold",
-        fontSize: 12,
-        color: theme.mutedForeground,
-    },
-    listContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 100,
-    },
-    paymentCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: theme.card,
-        borderRadius: RADIUS.md,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    paymentIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: RADIUS.sm,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    paymentCardFaded: {
-        opacity: 0.55,
-    },
-    paymentInfo: {
-        flex: 1,
-        marginLeft: 16,
-    },
-    paymentNameRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-    paymentName: {
-        fontFamily: "sans-extrabold",
-        fontSize: 16,
-        color: theme.primary,
-    },
-    leftBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-        backgroundColor: theme.mutedForeground + "20",
-    },
-    leftBadgeText: {
-        fontFamily: "sans-bold",
-        fontSize: 10,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        color: theme.mutedForeground,
-    },
-    paymentDate: {
-        fontFamily: "sans-medium",
-        fontSize: 12,
-        color: theme.mutedForeground,
-        marginTop: 2,
-    },
-    paymentAmountBlock: {
-        alignItems: "flex-end",
-    },
-    paymentAmount: {
-        fontFamily: "sans-extrabold",
-        fontSize: 16,
-    },
-    paymentStatus: {
-        fontFamily: "sans-bold",
-        fontSize: 10,
-        color: theme.mutedForeground,
-        textTransform: "uppercase",
-        marginTop: 2,
-    },
-    formScroll: {
-        paddingHorizontal: 20,
-        paddingBottom: 40,
-    },
-    formGroup: {
-        marginBottom: 20,
-    },
-    label: {
-        fontFamily: "sans-bold",
-        fontSize: 14,
-        color: theme.primary,
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    input: {
-        backgroundColor: theme.card,
-        borderRadius: RADIUS.md,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontFamily: "sans-medium",
-        fontSize: 15,
-        color: theme.primary,
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    textArea: {
-        height: 100,
-        textAlignVertical: "top",
-    },
-    pickerText: {
-        fontFamily: "sans-medium",
-        fontSize: 15,
-        color: theme.primary,
-    },
-    modeRow: {
-        flexDirection: "row",
-        gap: 10,
-    },
-    modeChip: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: RADIUS.md,
-        alignItems: "center",
-        backgroundColor: theme.card,
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    modeChipActive: {
-        backgroundColor: theme.accent,
-        borderColor: theme.accent,
-    },
-    modeChipText: {
-        fontFamily: "sans-bold",
-        fontSize: 13,
-        color: theme.mutedForeground,
-    },
-    modeChipTextActive: {
-        color: "#fff",
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-    },
-    memberPickerSheet: {
-        backgroundColor: theme.background,
-        borderTopLeftRadius: RADIUS.lg,
-        borderTopRightRadius: RADIUS.lg,
-        padding: 24,
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        maxHeight: "70%",
-    },
-    memberPickerTitle: {
-        fontFamily: "sans-extrabold",
-        fontSize: 18,
-        color: theme.primary,
-        marginBottom: 16,
-    },
-    memberPickerRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.border,
-    },
-    memberPickerName: {
-        fontFamily: "sans-bold",
-        fontSize: 15,
-        color: theme.primary,
-    },
-    memberPickerPhone: {
-        fontFamily: "sans-medium",
-        fontSize: 13,
-        color: theme.mutedForeground,
-    },
-    primaryButton: {
-        backgroundColor: theme.accent,
-        borderRadius: RADIUS.md,
-        paddingVertical: 16,
-        alignItems: "center",
-        marginTop: 12,
-    },
-    primaryButtonText: {
-        fontFamily: "sans-extrabold",
-        fontSize: 16,
-        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
-    },
-    fab: {
-        position: "absolute",
-        right: 20,
-        bottom: 30,
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: theme.accent,
-        alignItems: "center",
-        justifyContent: "center",
-        ...FLOATING_SHADOW,
-        shadowColor: theme.accent,
-    },
-    emptyText: {
-        fontFamily: "sans-bold",
-        fontSize: 16,
-        color: theme.mutedForeground,
-    },
-});
+const createStyles = (theme: Theme) =>
+    StyleSheet.create({
+        safe: {
+            flex: 1,
+        },
+        controls: {
+            paddingHorizontal: 20,
+            paddingTop: 16,
+            gap: 12,
+        },
+        searchBar: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            height: 44,
+            paddingHorizontal: 14,
+            borderRadius: RADIUS.md,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        searchInput: {
+            flex: 1,
+            height: "100%",
+            fontFamily: "sans-regular",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        headerBlock: {
+            paddingTop: 14,
+        },
+        hero: {
+            marginHorizontal: 20,
+            padding: 16,
+            borderRadius: RADIUS.lg,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        monthPill: {
+            alignSelf: "flex-start",
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: RADIUS.sm,
+            backgroundColor: theme.muted,
+            marginBottom: 10,
+        },
+        monthText: {
+            fontFamily: "sans-semibold",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        heroLabel: {
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            color: theme.mutedForeground,
+        },
+        heroAmount: {
+            fontFamily: "sans-bold",
+            fontSize: 30,
+            color: theme.primary,
+            marginTop: 2,
+        },
+        heroMetaRow: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 4,
+        },
+        heroMeta: {
+            fontFamily: "sans-regular",
+            fontSize: 13,
+            color: theme.mutedForeground,
+            marginTop: 2,
+        },
+        changeBadge: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 3,
+            paddingHorizontal: 7,
+            paddingVertical: 3,
+            borderRadius: RADIUS.sm,
+        },
+        changeText: {
+            fontFamily: "sans-semibold",
+            fontSize: 11,
+        },
+        remindAll: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
+            marginTop: 14,
+            paddingVertical: 10,
+            borderRadius: RADIUS.md,
+            backgroundColor: theme.accent + "14",
+        },
+        remindAllText: {
+            fontFamily: "sans-semibold",
+            fontSize: 13,
+            color: theme.accent,
+        },
+        chips: {
+            gap: 8,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+        },
+        dayHeader: {
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            paddingHorizontal: 24,
+            paddingTop: 18,
+            paddingBottom: 8,
+        },
+        dayLabel: {
+            fontFamily: "sans-semibold",
+            fontSize: 13,
+            color: theme.mutedForeground,
+        },
+        dayTotal: {
+            fontFamily: "sans-medium",
+            fontSize: 13,
+            color: theme.mutedForeground,
+        },
+        // Rows in a group share one rounded card, split by hairlines that start at the text.
+        row: {
+            flexDirection: "row",
+            alignItems: "flex-start",
+            marginHorizontal: 20,
+            paddingLeft: 16,
+            backgroundColor: theme.card,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: theme.border,
+        },
+        rowFirst: {
+            borderTopWidth: 1,
+            borderTopLeftRadius: RADIUS.lg,
+            borderTopRightRadius: RADIUS.lg,
+        },
+        rowLast: {
+            borderBottomWidth: 1,
+            borderBottomLeftRadius: RADIUS.lg,
+            borderBottomRightRadius: RADIUS.lg,
+        },
+        rowPressed: {
+            opacity: 0.7,
+        },
+        avatar: {
+            marginRight: 12,
+            paddingTop: 13,
+        },
+        rowMain: {
+            flex: 1,
+            paddingVertical: 13,
+            paddingRight: 16,
+        },
+        rowTop: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+        },
+        rowDivider: {
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: theme.mutedForeground + "33",
+        },
+        rowText: {
+            flex: 1,
+        },
+        faded: {
+            opacity: 0.6,
+        },
+        name: {
+            fontFamily: "sans-semibold",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        leftTag: {
+            fontFamily: "sans-regular",
+            fontSize: 12,
+            color: theme.mutedForeground,
+        },
+        detail: {
+            fontFamily: "sans-regular",
+            fontSize: 12,
+            color: theme.mutedForeground,
+            marginTop: 3,
+        },
+        trailing: {
+            alignItems: "flex-end",
+        },
+        amount: {
+            fontFamily: "sans-semibold",
+            fontSize: 15,
+        },
+        trailingMeta: {
+            fontFamily: "sans-regular",
+            fontSize: 11,
+            color: theme.mutedForeground,
+            marginTop: 3,
+        },
+        dueActions: {
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 10,
+        },
+        smallBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            minWidth: 92,
+            justifyContent: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: RADIUS.sm,
+            backgroundColor: theme.muted,
+        },
+        smallBtnPrimary: {
+            backgroundColor: theme.accent,
+        },
+        smallBtnText: {
+            fontFamily: "sans-semibold",
+            fontSize: 12,
+            color: theme.primary,
+        },
+        smallBtnTextPrimary: {
+            color: "#fff",
+        },
+    });

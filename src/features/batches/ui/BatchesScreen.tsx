@@ -2,35 +2,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { createBatchApi, getBatchesApi } from "@/features/batches/logic/batches-api";
+import { durationLabel, findClash, formatTime, fromMinutes, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
+import { createBatchApi, deleteBatchApi, getBatchesApi, updateBatchApi } from "@/features/batches/logic/batches-api";
 import { Batch } from "@/features/batches/types/batches.types";
 import { useApiData } from "@/shared/hooks/useApiData";
+import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { FloatingActionButton, FAB_CLEARANCE } from "@/shared/ui/FloatingActionButton";
+import { Text, TextInput } from "@/shared/ui/Text";
+import { formatRupee as formatAmount } from "@/shared/utils/currency";
 
-const TIME_OPTIONS = ["05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00"];
+import { BatchTimeWheelPicker } from "./BatchTimeWheelPicker";
 
 function formatRupee(amountStr: string): string {
 	const amount = parseFloat(amountStr) || 0;
-	return new Intl.NumberFormat("en-IN", {
-		style: "currency",
-		currency: "INR",
-		maximumFractionDigits: 0,
-	}).format(amount);
-}
-
-function formatTimeDisplay(t: string): string {
-	if (!t) return "Select Time";
-	const parts = t.split(":");
-	if (parts.length < 2) return t;
-	let hour = parseInt(parts[0], 10);
-	const min = parts[1];
-	const ampm = hour >= 12 ? "PM" : "AM";
-	hour = hour % 12 || 12;
-	return `${hour < 10 ? "0" : ""}${hour}:${min} ${ampm}`;
+	return formatAmount(amount);
 }
 
 export function BatchesScreen() {
@@ -41,14 +34,75 @@ export function BatchesScreen() {
 	const { data: batches, isLoading, error, refetch: fetchBatches } = useApiData(getBatchesApi, []);
 
 	const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+	// The batch being edited; null while creating a new one.
+	const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
 	const [newName, setNewName] = useState("");
 	const [newStartTime, setNewStartTime] = useState("");
 	const [newEndTime, setNewEndTime] = useState("");
 	const [newFee, setNewFee] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
 
 	const [selectingTimeFor, setSelectingTimeFor] = useState<"start" | "end" | null>(null);
+
+	const openCreate = () => {
+		setEditingBatch(null);
+		setNewName("");
+		setNewStartTime("");
+		setNewEndTime("");
+		setNewFee("");
+		setSubmitError(null);
+		setSelectingTimeFor(null);
+		setIsAddModalVisible(true);
+	};
+
+	const openEdit = (batch: Batch) => {
+		setEditingBatch(batch);
+		setNewName(batch.name);
+		setNewStartTime(batch.start_time.slice(0, 5));
+		setNewEndTime(batch.end_time.slice(0, 5));
+		setNewFee(String(parseFloat(batch.monthly_fee)));
+		setSubmitError(null);
+		setSelectingTimeFor(null);
+		setIsAddModalVisible(true);
+	};
+
+	const handleDeleteBatch = () => {
+		if (!editingBatch) return;
+		const batch = editingBatch;
+
+		// The backend refuses this too; say so up front instead of after a round trip.
+		if (batch.allocations_count > 0) {
+			Alert.alert(
+				"Can't delete this batch",
+				`${batch.allocations_count} member${batch.allocations_count === 1 ? " is" : "s are"} in ${batch.name}. Move them to another batch or end their membership first.`
+			);
+			return;
+		}
+
+		Alert.alert(`Delete ${batch.name}?`, "Past seat and attendance records for this batch will also be removed. This can't be undone.", [
+			{ text: "Cancel", style: "cancel" },
+			{
+				text: "Delete",
+				style: "destructive",
+				onPress: async () => {
+					try {
+						setIsDeleting(true);
+						setSubmitError(null);
+						await deleteBatchApi(batch.id);
+						setIsAddModalVisible(false);
+						setEditingBatch(null);
+						await fetchBatches();
+					} catch (err: any) {
+						setSubmitError(err.message || "Could not delete the batch. Please try again.");
+					} finally {
+						setIsDeleting(false);
+					}
+				},
+			},
+		]);
+	};
 
 	const handleCreateBatch = async () => {
 		setSubmitError(null);
@@ -56,23 +110,33 @@ export function BatchesScreen() {
 			setSubmitError("Please fill out all fields.");
 			return;
 		}
+		if (newStartTime === newEndTime) {
+			setSubmitError("The end time must be different from the start time.");
+			return;
+		}
+		if (clash) {
+			setSubmitError(clashMessage);
+			return;
+		}
 
 		try {
 			setIsSubmitting(true);
-			await createBatchApi({
+			const payload = {
 				name: newName,
 				start_time: newStartTime,
 				end_time: newEndTime,
 				monthly_fee: newFee,
-			});
+			};
+			if (editingBatch) {
+				await updateBatchApi(editingBatch.id, payload);
+			} else {
+				await createBatchApi(payload);
+			}
 			setIsAddModalVisible(false);
-			setNewName("");
-			setNewStartTime("");
-			setNewEndTime("");
-			setNewFee("");
+			setEditingBatch(null);
 			await fetchBatches();
 		} catch (err: any) {
-			setSubmitError(err.message || "Failed to create batch due to an unknown overlap.");
+			setSubmitError(err.message || (editingBatch ? "Could not save the batch. Please try again." : "Could not create the batch. Please try again."));
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -81,184 +145,180 @@ export function BatchesScreen() {
 	const styles = createStyles(theme);
 	const batchList = batches ?? [];
 
-	const renderTimePicker = () => (
-		<View style={styles.timePickerContainer}>
-			<Text style={styles.timePickerTitle}>Select {selectingTimeFor === "start" ? "Start" : "End"} Time</Text>
-			<ScrollView horizontal={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.timePickerGrid}>
-				{TIME_OPTIONS.map((time) => (
-					<Pressable
-						key={time}
-						style={styles.timePickerPill}
-						onPress={() => {
-							if (selectingTimeFor === "start") setNewStartTime(time);
-							if (selectingTimeFor === "end") setNewEndTime(time);
-							setSelectingTimeFor(null);
-						}}>
-						<Text style={styles.timePickerPillText}>{formatTimeDisplay(time)}</Text>
-					</Pressable>
-				))}
-			</ScrollView>
-			<Pressable style={styles.timePickerCancelBtn} onPress={() => setSelectingTimeFor(null)}>
-				<Text style={styles.timePickerCancelText}>Cancel</Text>
-			</Pressable>
-		</View>
-	);
+	// Checked live as times are picked, with the same rule the backend enforces.
+	const hasBothTimes = !!newStartTime && !!newEndTime;
+	const sameTimes = hasBothTimes && newStartTime === newEndTime;
+	// When editing, the batch's own current slot doesn't count as a clash.
+	const otherBatches = editingBatch ? batchList.filter((b) => b.id !== editingBatch.id) : batchList;
+	const clash = hasBothTimes && !sameTimes ? findClash(otherBatches, newStartTime, newEndTime) : null;
+	// Dues are worked out from the batch's current fee, so a change also reaches members already in it.
+	const feeChangedWithMembers =
+		!!editingBatch && editingBatch.allocations_count > 0 && newFee !== "" && parseFloat(newFee) !== parseFloat(editingBatch.monthly_fee);
+	const clashMessage = clash ? `This time overlaps with ${clash.name} (${formatTime(clash.start_time)} - ${formatTime(clash.end_time)}).` : "";
+
+	// Start opens on 6:00 AM; end opens four hours after the chosen start.
+	const pickerInitialValue =
+		selectingTimeFor === "start"
+			? newStartTime || "06:00"
+			: newEndTime || (newStartTime ? fromMinutes(toMinutes(newStartTime) + 4 * 60) : "10:00");
 
 	return (
-		<SafeAreaView style={styles.safe} edges={["top"]}>
-			<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-			<View style={styles.headerWrapper}>
-				<View style={styles.header}>
-					<Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-						<Ionicons name="arrow-back" size={24} color={theme.primary} />
-					</Pressable>
-					<View style={styles.headerText}>
-						<Text style={styles.headerTitle}>Seat Batches</Text>
-						<Text style={styles.headerSubtitle}>Manage timeslots & pricing</Text>
+		<ScreenBackground>
+			<SafeAreaView style={styles.safe} edges={["top"]}>
+				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+				<ScreenHeader
+					title="Batches"
+					subtitle="Manage timeslots & pricing"
+				/>
+
+				<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: FAB_CLEARANCE + insets.bottom }]} showsVerticalScrollIndicator={false}>
+					<View style={styles.summaryContainer}>
+						<Text style={styles.sectionTitle}>Active Batches ({batchList.length})</Text>
 					</View>
-					<Pressable
-						accessibilityRole="button"
-						style={[styles.headerActionCircle, { backgroundColor: theme.primary, borderColor: theme.primary }]}
-						onPress={() => {
-							setSubmitError(null);
-							setIsAddModalVisible(true);
-						}}>
-						<Ionicons name="add" size={24} color={theme.background} />
-					</Pressable>
-				</View>
-			</View>
 
-			<ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-				<View style={styles.summaryContainer}>
-					<Text style={styles.sectionTitle}>Active Batches ({batchList.length})</Text>
-				</View>
+					{isLoading ? (
+						<LoadingState />
+					) : error ? (
+						<ErrorState message={error} onRetry={fetchBatches} />
+					) : batchList.length === 0 ? (
+						<EmptyState icon="calendar-outline" title="No batches available yet" subtitle="Tap the + icon in the header to create your first timeslot." />
+					) : (
+						batchList.map((batch) => (
+							<Pressable
+								key={batch.id}
+								accessibilityRole="button"
+								accessibilityLabel={`Edit ${batch.name}`}
+								style={({ pressed }) => [styles.batchCard, pressed && { opacity: 0.85 }]}
+								onPress={() => openEdit(batch)}>
+								<View style={styles.batchHeader}>
+									<View style={styles.batchTitleWrap}>
+										<Text style={styles.batchName}>{batch.name}</Text>
+										<View style={styles.timeWrap}>
+											<Ionicons name="time-outline" size={14} color={theme.mutedForeground} />
+											<Text style={styles.timeText}>
+												{formatTime(batch.start_time)} - {formatTime(batch.end_time)} · {durationLabel(batch.start_time, batch.end_time)}
+											</Text>
+										</View>
+									</View>
+									<View style={styles.priceBadge}>
+										<Text style={styles.priceText}>{formatRupee(batch.monthly_fee)}</Text>
+									</View>
+									<Ionicons name="create-outline" size={20} color={theme.mutedForeground} style={styles.editIcon} />
+								</View>
+							</Pressable>
+						))
+					)}
+				</ScrollView>
 
-				{isLoading ? (
-					<LoadingState />
-				) : error ? (
-					<ErrorState message={error} onRetry={fetchBatches} />
-				) : batchList.length === 0 ? (
-					<EmptyState icon="calendar-outline" title="No batches available yet" subtitle="Tap the + icon in the header to create your first timeslot." />
-				) : (
-					batchList.map((batch) => (
-						<View key={batch.id} style={styles.batchCard}>
-							<View style={styles.batchHeader}>
-								<View style={styles.batchTitleWrap}>
-									<Text style={styles.batchName}>{batch.name}</Text>
-									<View style={styles.timeWrap}>
-										<Ionicons name="time-outline" size={14} color={theme.mutedForeground} />
-										<Text style={styles.timeText}>
-											{formatTimeDisplay(batch.start_time)} - {formatTimeDisplay(batch.end_time)}
+				<FloatingActionButton label="Add batch" onPress={openCreate} />
+
+				<Modal visible={isAddModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsAddModalVisible(false)}>
+					<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
+						<View style={styles.modalContent}>
+							{selectingTimeFor ? (
+								<BatchTimeWheelPicker
+									title={selectingTimeFor === "start" ? "Batch starts at" : "Batch ends at"}
+									initialValue={pickerInitialValue}
+									onCancel={() => setSelectingTimeFor(null)}
+									onDone={(value) => {
+										if (selectingTimeFor === "start") setNewStartTime(value);
+										else setNewEndTime(value);
+										setSubmitError(null);
+										setSelectingTimeFor(null);
+									}}
+								/>
+							) : (
+								<>
+									<View style={styles.modalHeader}>
+										<Text style={styles.modalTitle}>{editingBatch ? "Edit Batch" : "Create New Batch"}</Text>
+										<Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setIsAddModalVisible(false)}>
+											<Ionicons name="close" size={24} color={theme.primary} />
+										</Pressable>
+									</View>
+
+									<Text style={styles.inputLabel}>Batch Name</Text>
+									<TextInput style={styles.modalInput} placeholder="e.g. Morning Batch" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
+
+									<View style={styles.modalRowGroup}>
+										<View style={{ flex: 1 }}>
+											<Text style={styles.inputLabel}>Start Time</Text>
+											<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("start")}>
+												<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
+												<Text style={[styles.modalTimeSelectorText, !newStartTime && { color: theme.mutedForeground + "80" }]}>{newStartTime ? formatTime(newStartTime) : "Select time"}</Text>
+											</Pressable>
+										</View>
+										<View style={{ flex: 1 }}>
+											<Text style={styles.inputLabel}>End Time</Text>
+											<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("end")}>
+												<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
+												<Text style={[styles.modalTimeSelectorText, !newEndTime && { color: theme.mutedForeground + "80" }]}>{newEndTime ? formatTime(newEndTime) : "Select time"}</Text>
+											</Pressable>
+										</View>
+									</View>
+
+									{hasBothTimes && (
+										<View style={styles.timeSummary}>
+											{sameTimes ? (
+												<Text style={styles.timeSummaryError}>Start and end can't be the same time.</Text>
+											) : clash ? (
+												<Text style={styles.timeSummaryError}>{clashMessage}</Text>
+											) : (
+												<Text style={styles.timeSummaryText}>
+													{durationLabel(newStartTime, newEndTime)}
+													{runsPastMidnight(newStartTime, newEndTime) ? " · runs past midnight" : ""}
+												</Text>
+											)}
+										</View>
+									)}
+
+									<Text style={styles.inputLabel}>Monthly Fee (Rs)</Text>
+									<TextInput style={styles.modalInput} placeholder="e.g. 800" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
+
+									{feeChangedWithMembers && (
+										<Text style={styles.feeWarning}>
+											{editingBatch.allocations_count} member{editingBatch.allocations_count === 1 ? " is" : "s are"} in this batch. The new fee will also be used for their dues.
 										</Text>
-									</View>
-								</View>
-								<View style={styles.priceBadge}>
-									<Text style={styles.priceText}>{formatRupee(batch.monthly_fee)}</Text>
-								</View>
-							</View>
-						</View>
-					))
-				)}
-			</ScrollView>
+									)}
 
-			<Modal visible={isAddModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsAddModalVisible(false)}>
-				<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
-					<View style={styles.modalContent}>
-						{selectingTimeFor ? (
-							renderTimePicker()
-						) : (
-							<>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Create New Batch</Text>
-									<Pressable accessibilityRole="button" style={styles.modalCloseButton} onPress={() => setIsAddModalVisible(false)}>
-										<Ionicons name="close" size={24} color={theme.primary} />
+									{submitError && (
+										<View style={styles.errorBox}>
+											<Ionicons name="alert-circle" size={18} color={theme.destructive} />
+											<Text style={styles.errorText}>{submitError}</Text>
+										</View>
+									)}
+
+									<Pressable
+										style={[styles.modalSubmitBtn, (isSubmitting || sameTimes || !!clash) && { opacity: 0.5 }]}
+										onPress={handleCreateBatch}
+										disabled={isSubmitting || sameTimes || !!clash}>
+										{isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSubmitText}>{editingBatch ? "Save Changes" : "Create Batch"}</Text>}
 									</Pressable>
-								</View>
 
-								<Text style={styles.inputLabel}>Batch Name</Text>
-								<TextInput style={styles.modalInput} placeholder="e.g. Morning Focus" value={newName} onChangeText={setNewName} placeholderTextColor={theme.mutedForeground + "80"} />
-
-								<View style={styles.modalRowGroup}>
-									<View style={{ flex: 1 }}>
-										<Text style={styles.inputLabel}>Start Time</Text>
-										<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("start")}>
-											<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
-											<Text style={[styles.modalTimeSelectorText, !newStartTime && { color: theme.mutedForeground + "80" }]}>{formatTimeDisplay(newStartTime)}</Text>
+									{editingBatch && (
+										<Pressable accessibilityRole="button" style={styles.deleteBtn} onPress={handleDeleteBatch} disabled={isDeleting || isSubmitting}>
+											{isDeleting ? (
+												<ActivityIndicator color={theme.destructive} size="small" />
+											) : (
+												<>
+													<Ionicons name="trash-outline" size={18} color={theme.destructive} />
+													<Text style={styles.deleteText}>Delete Batch</Text>
+												</>
+											)}
 										</Pressable>
-									</View>
-									<View style={{ flex: 1 }}>
-										<Text style={styles.inputLabel}>End Time</Text>
-										<Pressable style={styles.modalTimeSelector} onPress={() => setSelectingTimeFor("end")}>
-											<Ionicons name="time-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
-											<Text style={[styles.modalTimeSelectorText, !newEndTime && { color: theme.mutedForeground + "80" }]}>{formatTimeDisplay(newEndTime)}</Text>
-										</Pressable>
-									</View>
-								</View>
-
-								<Text style={styles.inputLabel}>Monthly Fee (Rs)</Text>
-								<TextInput style={styles.modalInput} placeholder="500" value={newFee} onChangeText={setNewFee} keyboardType="numeric" placeholderTextColor={theme.mutedForeground + "80"} />
-
-								{submitError && (
-									<View style={styles.errorBox}>
-										<Ionicons name="alert-circle" size={18} color={theme.destructive} />
-										<Text style={styles.errorText}>{submitError}</Text>
-									</View>
-								)}
-
-								<Pressable style={[styles.modalSubmitBtn, isSubmitting && { opacity: 0.7 }]} onPress={handleCreateBatch} disabled={isSubmitting}>
-									{isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSubmitText}>Create Batch</Text>}
-								</Pressable>
-							</>
-						)}
-					</View>
-				</KeyboardAvoidingView>
-			</Modal>
-		</SafeAreaView>
+									)}
+								</>
+							)}
+						</View>
+					</KeyboardAvoidingView>
+				</Modal>
+			</SafeAreaView>
+		</ScreenBackground>
 	);
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
 	safe: {
 		flex: 1,
-		backgroundColor: theme.background,
-	},
-	headerWrapper: {
-		backgroundColor: theme.background,
-		paddingTop: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: theme.border,
-		zIndex: 10,
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingBottom: 16,
-		gap: 16,
-	},
-	headerText: {
-		flex: 1,
-	},
-	headerTitle: {
-		fontFamily: "sans-extrabold",
-		fontSize: 22,
-		color: theme.primary,
-		marginBottom: 2,
-	},
-	headerSubtitle: {
-		fontFamily: "sans-medium",
-		fontSize: 14,
-		color: theme.mutedForeground,
-	},
-	headerActionCircle: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: theme.card,
-		alignItems: "center",
-		justifyContent: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
 	},
 	scroll: {
 		paddingHorizontal: 20,
@@ -269,22 +329,15 @@ const createStyles = (theme: any) => StyleSheet.create({
 		marginBottom: 16,
 	},
 	sectionTitle: {
-		fontFamily: "sans-bold",
-		fontSize: 14,
-		letterSpacing: 1.2,
-		color: theme.mutedForeground,
-		textTransform: "uppercase",
+		fontFamily: "sans-extrabold",
+		fontSize: 15,
+		color: theme.primary,
 	},
 	batchCard: {
 		backgroundColor: theme.card,
-		borderRadius: 20,
+		borderRadius: RADIUS.md,
 		padding: 20,
 		marginBottom: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.08,
-		shadowRadius: 20,
-		elevation: 4,
 		borderWidth: 1.5,
 		borderColor: theme.border,
 	},
@@ -430,49 +483,46 @@ const createStyles = (theme: any) => StyleSheet.create({
 		elevation: 4,
 	},
 	modalSubmitText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 16,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
-	timePickerContainer: {
-		height: 450,
-	},
-	timePickerTitle: {
-		fontFamily: "sans-bold",
-		fontSize: 18,
-		color: theme.primary,
-		marginBottom: 24,
-		textAlign: "center",
-	},
-	timePickerGrid: {
+	deleteBtn: {
 		flexDirection: "row",
-		flexWrap: "wrap",
-		justifyContent: "space-between",
-		gap: 12,
-		paddingBottom: 20,
-	},
-	timePickerPill: {
-		width: "30%",
-		backgroundColor: theme.card,
-		paddingVertical: 14,
-		borderRadius: 14,
+		justifyContent: "center",
 		alignItems: "center",
-		borderWidth: 1.5,
-		borderColor: theme.border,
-	},
-	timePickerPillText: {
-		fontFamily: "sans-bold",
-		fontSize: 14,
-		color: theme.primary,
-	},
-	timePickerCancelBtn: {
+		gap: 8,
 		padding: 16,
-		alignItems: "center",
-		marginTop: 12,
+		marginTop: 8,
 	},
-	timePickerCancelText: {
+	deleteText: {
 		fontFamily: "sans-extrabold",
 		fontSize: 16,
-		color: theme.accent,
+		color: theme.destructive,
+	},
+	editIcon: {
+		marginLeft: 10,
+		marginTop: 4,
+	},
+	feeWarning: {
+		fontFamily: "sans-semibold",
+		fontSize: 13,
+		lineHeight: 18,
+		color: theme.warning,
+		marginTop: -8,
+		marginBottom: 16,
+	},
+	timeSummary: {
+		marginTop: -8,
+		marginBottom: 20,
+	},
+	timeSummaryText: {
+		fontFamily: "sans-semibold",
+		fontSize: 13,
+		color: theme.mutedForeground,
+	},
+	timeSummaryError: {
+		fontFamily: "sans-semibold",
+		fontSize: 13,
+		color: theme.destructive,
 	},
 });

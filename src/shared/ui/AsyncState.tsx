@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
 import { Theme } from "@/shared/constants/theme";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { Text } from "@/shared/ui/Text";
 
 export function LoadingState({ style }: { style?: StyleProp<ViewStyle> }) {
     const { theme } = useTheme();
@@ -45,7 +47,7 @@ export function EmptyState({
             <Ionicons name={icon} size={56} color={theme.mutedForeground} style={{ opacity: 0.4 }} />
             <Text style={s.emptyTitle}>{title}</Text>
             {subtitle ? <Text style={s.emptySubtitle}>{subtitle}</Text> : null}
-            {actionLabel && onAction && (
+            {!!actionLabel && onAction && (
                 <Pressable style={s.retryBtn} onPress={onAction}>
                     <Text style={s.retryBtnText}>{actionLabel}</Text>
                 </Pressable>
@@ -83,7 +85,7 @@ const createStyles = (theme: Theme) =>
             marginTop: 16,
         },
         retryBtnText: {
-            fontFamily: "sans-extrabold",
+            ...BUTTON_TEXT,
             fontSize: 14,
             color: "#fff",
         },

@@ -1,15 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ID_PROOF_TYPE_OPTIONS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
-import { ChoiceChips } from "@/shared/ui/ChoiceChips";
 import { PhotoPickerTile } from "@/shared/ui/PhotoPickerTile";
+import { Text } from "@/shared/ui/Text";
 
 export interface IdProofDraft {
     type: IdProofType;
@@ -18,33 +19,38 @@ export interface IdProofDraft {
 }
 
 interface AddIdProofCardProps {
-    title: string;
     onAdd: () => void;
 }
 
-/** Dashed empty-state card shown before any ID proof exists, with an "Add ID Proof" button. */
-export function AddIdProofCard({ title, onAdd }: AddIdProofCardProps) {
+/** Shown before any ID proof exists: one tappable card. The ID types are listed in the sheet it opens. */
+export function AddIdProofCard({ onAdd }: AddIdProofCardProps) {
     const { theme } = useTheme();
     const styles = createStyles(theme);
 
     return (
-        <View style={[styles.card, styles.cardEmpty]}>
-            <View style={styles.cardHeader}>
-                <View style={styles.cardIcon}>
-                    <Ionicons name="card-outline" size={20} color={theme.mutedForeground} />
-                </View>
-                <View style={styles.cardHeaderText}>
-                    <Text style={styles.cardTitle}>{title}</Text>
-                    <Text style={styles.cardSubtitle}>Aadhaar, PAN, driving licence or college ID</Text>
-                </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Add ID proof" style={({ pressed }) => [styles.addCard, pressed && { opacity: 0.85 }]} onPress={onAdd}>
+            <View style={styles.addCardIcon}>
+                <MaterialCommunityIcons name="card-account-details-outline" size={22} color={theme.accent} />
             </View>
-            <Pressable accessibilityRole="button" style={styles.addBtn} onPress={onAdd}>
-                <Ionicons name="add" size={18} color={theme.accent} />
-                <Text style={styles.addBtnText}>Add ID Proof</Text>
-            </Pressable>
-        </View>
+            <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Add ID proof</Text>
+                <Text style={styles.cardSubtitle}>Take a photo or pick one from your gallery</Text>
+            </View>
+            <View style={styles.addCardPlus}>
+                <Ionicons name="add" size={20} color="#fff" />
+            </View>
+        </Pressable>
     );
 }
+
+/** An icon per ID type, so the choices are easy to tell apart at a glance. */
+const ID_TYPE_ICONS: Record<IdProofType, keyof typeof MaterialCommunityIcons.glyphMap> = {
+    aadhaar: "card-account-details-outline",
+    pan: "card-text-outline",
+    voter_id_dl: "license",
+    student_id: "school-outline",
+    other: "file-document-outline",
+};
 
 interface IdProofSheetProps {
     visible: boolean;
@@ -111,7 +117,27 @@ export function IdProofSheet({ visible, onClose, initial, onSave, isSaving = fal
                 <View style={[styles.sheet, { paddingBottom: 32 + insets.bottom }]}>
                     <Text style={styles.sheetTitle}>{title}</Text>
 
-                    <ChoiceChips label="ID Type" value={type} options={ID_PROOF_TYPE_OPTIONS} onChange={setType} />
+                    <Text style={styles.label}>ID Type</Text>
+                    {/* Equal-size tiles, two per row, so long and short names line up. */}
+                    <View style={styles.typeGrid} accessibilityRole="radiogroup">
+                        {ID_PROOF_TYPE_OPTIONS.map((option) => {
+                            const selected = type === option.value;
+                            return (
+                                <Pressable
+                                    key={option.value}
+                                    accessibilityRole="radio"
+                                    accessibilityState={{ selected }}
+                                    style={[styles.typeTile, selected && styles.typeTileSelected]}
+                                    onPress={() => setType(option.value)}>
+                                    <MaterialCommunityIcons name={ID_TYPE_ICONS[option.value]} size={22} color={selected ? theme.accent : theme.mutedForeground} />
+                                    <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]} numberOfLines={2}>
+                                        {option.label}
+                                    </Text>
+                                    {selected && <Ionicons name="checkmark-circle" size={18} color={theme.accent} style={styles.typeCheck} />}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
 
                     <Text style={styles.label}>Photos</Text>
                     <View style={styles.tileRow}>
@@ -134,29 +160,31 @@ export function IdProofSheet({ visible, onClose, initial, onSave, isSaving = fal
 
 const createStyles = (theme: Theme) =>
     StyleSheet.create({
-        card: {
-            backgroundColor: theme.card,
-            borderRadius: RADIUS.md,
-            borderWidth: 1.5,
-            borderColor: theme.border,
-            padding: 16,
-            gap: 14,
-        },
-        cardEmpty: {
-            borderStyle: "dashed",
-        },
-        cardHeader: {
+        addCard: {
             flexDirection: "row",
             alignItems: "center",
+            gap: 14,
+            backgroundColor: theme.card,
+            borderRadius: RADIUS.md,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 14,
         },
-        cardIcon: {
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: theme.muted,
+        addCardIcon: {
+            width: 44,
+            height: 44,
+            borderRadius: RADIUS.sm,
+            backgroundColor: theme.accent + "1A",
             alignItems: "center",
             justifyContent: "center",
-            marginRight: 14,
+        },
+        addCardPlus: {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: theme.accent,
+            alignItems: "center",
+            justifyContent: "center",
         },
         cardHeaderText: {
             flex: 1,
@@ -171,20 +199,6 @@ const createStyles = (theme: Theme) =>
             fontSize: 12,
             color: theme.mutedForeground,
             marginTop: 2,
-        },
-        addBtn: {
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            height: 42,
-            borderRadius: RADIUS.sm,
-            backgroundColor: theme.accent + "15",
-        },
-        addBtnText: {
-            fontFamily: "sans-bold",
-            fontSize: 14,
-            color: theme.accent,
         },
         overlay: {
             flex: 1,
@@ -216,6 +230,48 @@ const createStyles = (theme: Theme) =>
             textTransform: "uppercase",
             letterSpacing: 1,
         },
+        typeGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: 10,
+            marginBottom: 20,
+        },
+        // Two per row at a fixed height; an odd last tile keeps the same size.
+        typeTile: {
+            width: "48.5%",
+            minHeight: 64,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            paddingLeft: 12,
+            // Room for the corner check so a two-line label never runs under it.
+            paddingRight: 24,
+            paddingVertical: 10,
+            backgroundColor: theme.card,
+            borderRadius: RADIUS.md,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+        },
+        typeTileSelected: {
+            borderColor: theme.accent,
+            backgroundColor: theme.accent + "12",
+        },
+        typeLabel: {
+            flex: 1,
+            fontFamily: "sans-semibold",
+            fontSize: 13,
+            lineHeight: 17,
+            color: theme.primary,
+        },
+        typeLabelSelected: {
+            fontFamily: "sans-bold",
+        },
+        typeCheck: {
+            position: "absolute",
+            top: 6,
+            right: 6,
+        },
         tileRow: {
             flexDirection: "row",
             gap: 12,
@@ -231,8 +287,7 @@ const createStyles = (theme: Theme) =>
             opacity: 0.5,
         },
         saveBtnText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
         sheetHint: {

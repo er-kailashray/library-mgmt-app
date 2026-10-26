@@ -27,6 +27,12 @@ export interface CreateAdmissionRequest {
     name: string;
     phone: string;
     gender?: Gender;
+    /** For the owner's records only. */
+    address?: string;
+    /** "YYYY-MM-DD" they started; today if omitted. */
+    join_date?: string;
+    /** Existing members: last day already paid for before using the app (not counted as money received today). */
+    paid_until?: string;
     allocations: AdmissionAllocation[];
     /** First payment taken at the desk; omit for "pay later". */
     payment?: { amount: number; payment_mode: PaymentMode };

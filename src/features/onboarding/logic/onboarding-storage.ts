@@ -10,3 +10,8 @@ export async function getOnboardingComplete(): Promise<boolean> {
 export async function setOnboardingComplete(): Promise<void> {
 	await AsyncStorage.setItem(STORAGE_KEYS.onboardingComplete, "true");
 }
+
+/** Development aid: forget that onboarding was seen, so it shows again (also on the next app start). */
+export async function clearOnboardingComplete(): Promise<void> {
+	await AsyncStorage.removeItem(STORAGE_KEYS.onboardingComplete);
+}

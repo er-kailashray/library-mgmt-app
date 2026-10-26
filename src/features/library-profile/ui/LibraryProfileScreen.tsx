@@ -2,13 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLibraryProfileApi, updateLibraryProfileApi } from "@/features/library-profile/logic/library-profile-api";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useApiData } from "@/shared/hooks/useApiData";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { ErrorState, LoadingState } from "@/shared/ui/AsyncState";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text, TextInput } from "@/shared/ui/Text";
 
 export function LibraryProfileScreen() {
     const router = useRouter();
@@ -59,60 +63,54 @@ export function LibraryProfileScreen() {
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable accessibilityRole="button" style={styles.headerActionCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View style={styles.headerText}>
-                    <Text style={styles.headerTitle}>Library Profile</Text>
-                    <Text style={styles.headerSubtitle}>Name & total seats</Text>
-                </View>
-            </View>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <ScreenHeader title="Library Profile" subtitle="Name & total seats" />
 
-            {isLoading ? (
-                <LoadingState />
-            ) : error || !profile ? (
-                <ErrorState message={error || "Could not load library profile."} onRetry={refetch} />
-            ) : (
-                <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
-                        <View style={styles.inputWrap}>
-                            <Text style={styles.inputLabel}>Library Name</Text>
-                            <TextInput
-                                style={styles.inputField}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="e.g. Gyan Library"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                                autoCapitalize="words"
-                            />
-                        </View>
+                {isLoading ? (
+                    <LoadingState />
+                ) : error || !profile ? (
+                    <ErrorState message={error || "Could not load library profile."} onRetry={refetch} />
+                ) : (
+                    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+                        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+                            <View style={styles.inputWrap}>
+                                <Text style={styles.inputLabel}>Library Name</Text>
+                                <TextInput
+                                    style={styles.inputField}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="e.g. Gyan Library"
+                                    placeholderTextColor={theme.mutedForeground + "80"}
+                                    autoCapitalize="words"
+                                />
+                            </View>
 
-                        <View style={styles.inputWrap}>
-                            <Text style={styles.inputLabel}>Total Seats</Text>
-                            <TextInput
-                                style={styles.inputField}
-                                value={seats}
-                                onChangeText={setSeats}
-                                placeholder="e.g. 40"
-                                placeholderTextColor={theme.mutedForeground + "80"}
-                                keyboardType="number-pad"
-                                maxLength={3}
-                            />
-                            <Text style={styles.inputHint}>
-                                Reducing this will remove the highest-numbered seats - you can&apos;t remove a seat that currently has a member assigned to it.
-                            </Text>
-                        </View>
+                            <View style={styles.inputWrap}>
+                                <Text style={styles.inputLabel}>Total Seats</Text>
+                                <TextInput
+                                    style={styles.inputField}
+                                    value={seats}
+                                    onChangeText={setSeats}
+                                    placeholder="e.g. 40"
+                                    placeholderTextColor={theme.mutedForeground + "80"}
+                                    keyboardType="number-pad"
+                                    maxLength={3}
+                                />
+                                <Text style={styles.inputHint}>
+                                    Reducing this will remove the highest-numbered seats - you can&apos;t remove a seat that currently has a member assigned to it.
+                                </Text>
+                            </View>
 
-                        <Pressable style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
-                            {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
-                        </Pressable>
-                    </ScrollView>
-                </KeyboardAvoidingView>
-            )}
-        </SafeAreaView>
+                            <Pressable style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
+                                {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+                            </Pressable>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                )}
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
@@ -120,41 +118,9 @@ const createStyles = (theme: any) =>
     StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: theme.background,
         },
         flex: {
             flex: 1,
-        },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 16,
-            gap: 16,
-        },
-        headerActionCircle: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: theme.card,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1.5,
-            borderColor: theme.border,
-        },
-        headerText: {
-            flex: 1,
-        },
-        headerTitle: {
-            fontFamily: "sans-extrabold",
-            fontSize: 20,
-            color: theme.primary,
-        },
-        headerSubtitle: {
-            fontFamily: "sans-medium",
-            fontSize: 14,
-            color: theme.mutedForeground,
         },
         scroll: {
             paddingHorizontal: 20,
@@ -196,8 +162,7 @@ const createStyles = (theme: any) =>
             marginTop: 12,
         },
         saveBtnText: {
-            fontFamily: "sans-extrabold",
-            fontSize: 15,
+            ...BUTTON_TEXT,
             color: "#fff",
         },
     });

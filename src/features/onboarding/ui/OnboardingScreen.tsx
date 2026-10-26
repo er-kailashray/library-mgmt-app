@@ -1,29 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Image, type ImageSource } from "expo-image";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import type { ComponentProps } from "react";
 import { useCallback, useRef, useState } from "react";
-import {
-	FlatList,
-	ListRenderItemInfo,
-	NativeScrollEvent,
-	NativeSyntheticEvent,
-	Pressable,
-	StyleSheet,
-	Text,
-	useWindowDimensions,
-	View,
-} from "react-native";
+import { FlatList, ListRenderItemInfo, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setOnboardingComplete } from "@/features/onboarding/logic/onboarding-storage";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { Text } from "@/shared/ui/Text";
 
 type Slide = {
 	key: string;
-	icon: ComponentProps<typeof Ionicons>["name"];
-	iconBg: string;
+	image: ImageSource | number;
 	title: string;
 	body: string;
 };
@@ -39,22 +30,19 @@ export function OnboardingScreen() {
 	const SLIDES: Slide[] = [
 		{
 			key: "1",
-			icon: "library-outline",
-			iconBg: theme.accent,
+			image: require("@/assets/images/onboarding/welcome.png"),
 			title: "Welcome to Librum",
-			body: "Run your library from one calm place—balances, renewals, and members at a glance.",
+			body: "Members, seats and fee dues for your whole library, all in one calm place.",
 		},
 		{
 			key: "2",
-			icon: "people-outline",
-			iconBg: theme.subscription,
-			title: "Built for desks & shelves",
-			body: "Track who borrows what, stay ahead of due dates, and keep your desk uncluttered.",
+			image: require("@/assets/images/onboarding/desk.png"),
+			title: "Every seat, every batch",
+			body: "See who sits where in each batch, and send a reminder before a fee falls due.",
 		},
 		{
 			key: "3",
-			icon: "sparkles-outline",
-			iconBg: theme.accent,
+			image: require("@/assets/images/onboarding/ready.png"),
 			title: "Ready when you are",
 			body: "Sign in with your phone to sync, or create a new library in a few taps.",
 		},
@@ -86,8 +74,8 @@ export function OnboardingScreen() {
 	const renderItem = useCallback(
 		({ item }: ListRenderItemInfo<Slide>) => (
 			<View style={[styles.page, { width }]}>
-				<View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-					<Ionicons name={item.icon} size={44} color="#fff" />
+				<View style={styles.illustrationWrap}>
+					<Image source={item.image} style={styles.illustration} contentFit="contain" />
 				</View>
 				<Text style={styles.title}>{item.title}</Text>
 				<Text style={styles.body}>{item.body}</Text>
@@ -97,54 +85,54 @@ export function OnboardingScreen() {
 	);
 
 	return (
-		<SafeAreaView style={styles.safe}>
-			<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-			<View style={styles.topBar}>
-				<View style={styles.brandRow}>
-					<View style={styles.brandMark}>
-						<Text style={styles.brandLetter}>L</Text>
+		<ScreenBackground>
+			<SafeAreaView style={styles.safe}>
+				<StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+				<View style={styles.topBar}>
+					<View style={styles.brandRow}>
+						<Image source={require("@/assets/images/logo.png")} style={styles.brandMark} />
+						<Text style={styles.brandName}>Librum</Text>
 					</View>
-					<Text style={styles.brandName}>Librum</Text>
+					<Pressable accessibilityRole="button" onPress={() => void finish()} hitSlop={12}>
+						<Text style={styles.skip}>Skip</Text>
+					</Pressable>
 				</View>
-				<Pressable accessibilityRole="button" onPress={() => void finish()} hitSlop={12}>
-					<Text style={styles.skip}>Skip</Text>
-				</Pressable>
-			</View>
 
-			<FlatList
-				ref={listRef}
-				style={styles.list}
-				data={SLIDES}
-				keyExtractor={(item) => item.key}
-				renderItem={renderItem}
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={onScroll}
-				onScrollToIndexFailed={({ index: i }) => {
-					setTimeout(() => listRef.current?.scrollToIndex({ index: i, animated: false }), 100);
-				}}
-				getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-			/>
+				<FlatList
+					ref={listRef}
+					style={styles.list}
+					data={SLIDES}
+					keyExtractor={(item) => item.key}
+					renderItem={renderItem}
+					horizontal
+					pagingEnabled
+					showsHorizontalScrollIndicator={false}
+					onMomentumScrollEnd={onScroll}
+					onScrollToIndexFailed={({ index: i }) => {
+						setTimeout(() => listRef.current?.scrollToIndex({ index: i, animated: false }), 100);
+					}}
+					getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+				/>
 
-			<View style={styles.footer}>
-				<View style={styles.dots}>
-					{SLIDES.map((s, i) => (
-						<View key={s.key} style={[styles.dot, i === index && styles.dotActive]} />
-					))}
+				<View style={styles.footer}>
+					<View style={styles.dots}>
+						{SLIDES.map((s, i) => (
+							<View key={s.key} style={[styles.dot, i === index && styles.dotActive]} />
+						))}
+					</View>
+					<Pressable accessibilityRole="button" style={styles.primaryBtn} onPress={goNext}>
+						<Text style={styles.primaryBtnText}>{index === SLIDES.length - 1 ? "Get started" : "Next"}</Text>
+					</Pressable>
 				</View>
-				<Pressable accessibilityRole="button" style={styles.primaryBtn} onPress={goNext}>
-					<Text style={styles.primaryBtnText}>{index === SLIDES.length - 1 ? "Get started" : "Next"}</Text>
-				</Pressable>
-			</View>
-		</SafeAreaView>
+			</SafeAreaView>
+		</ScreenBackground>
 	);
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
+	// Transparent so the gradient behind shows through.
 	safe: {
 		flex: 1,
-		backgroundColor: theme.background,
 	},
 	list: {
 		flex: 1,
@@ -165,15 +153,6 @@ const createStyles = (theme: any) => StyleSheet.create({
 	brandMark: {
 		width: 40,
 		height: 40,
-		borderRadius: RADIUS.sm,
-		backgroundColor: theme.accent,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	brandLetter: {
-		fontFamily: "sans-extrabold",
-		fontSize: 20,
-		color: "#fff",
 	},
 	brandName: {
 		fontFamily: "sans-extrabold",
@@ -188,16 +167,21 @@ const createStyles = (theme: any) => StyleSheet.create({
 	page: {
 		flex: 1,
 		paddingHorizontal: 28,
-		paddingTop: 24,
+		paddingBottom: 12,
 		alignItems: "center",
 	},
-	iconWrap: {
-		width: 112,
-		height: 112,
-		borderRadius: RADIUS.lg,
+	// Takes the space above the copy so the illustration sits centred in it.
+	illustrationWrap: {
+		flex: 1,
+		width: "100%",
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: 28,
+	},
+	illustration: {
+		width: "100%",
+		maxWidth: 440,
+		maxHeight: "100%",
+		aspectRatio: 5 / 4,
 	},
 	title: {
 		fontFamily: "sans-extrabold",
@@ -242,8 +226,7 @@ const createStyles = (theme: any) => StyleSheet.create({
 		paddingVertical: 18,
 	},
 	primaryBtnText: {
-		fontFamily: "sans-extrabold",
-		fontSize: 17,
+		...BUTTON_TEXT,
 		color: "#fff",
 	},
 });

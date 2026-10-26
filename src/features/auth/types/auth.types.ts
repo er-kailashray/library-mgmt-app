@@ -5,6 +5,7 @@ export interface AuthUser {
 	phone: string;
 	role: string;
 	profile_photo_url?: string | null;
+	push_notifications_enabled?: boolean;
 }
 
 /** Registration Payload */
@@ -14,4 +15,17 @@ export interface RegisterRequest {
 	password: string;
 	library_name: string;
 	total_seats: string;
+}
+
+/** Response of POST /api/verify-otp for the register flow. */
+export interface VerifyOtpResponse {
+	message: string;
+	token: string;
+	user: AuthUser;
+}
+
+/** Response of POST /api/resend-otp; `retry_after` is the cooldown in seconds. */
+export interface ResendOtpResponse {
+	message: string;
+	retry_after: number;
 }

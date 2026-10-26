@@ -1,9 +1,8 @@
-import "@/global.css";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useLayoutEffect, useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -15,27 +14,22 @@ import { ThemeProvider, useTheme } from "@/shared/providers/ThemeProvider";
 export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
-	initialRouteName: "index",
+	// The route the root stack is built on (expo-router renamed `initialRouteName` to `anchor`).
+	anchor: "index",
 };
 
 SplashScreen.preventAutoHideAsync();
 
-// Android (and some iOS accessibility settings) can scale text well past what this app's
-// compact grids/badges were designed for. Cap it rather than disable scaling outright, so
-// the UI stays usable for users with larger system text settings without breaking layout.
-(Text as any).defaultProps = (Text as any).defaultProps || {};
-(Text as any).defaultProps.maxFontSizeMultiplier = 1.2;
-(TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
-(TextInput as any).defaultProps.maxFontSizeMultiplier = 1.2;
+// Text ignores the phone's system text size so Android matches iOS: see src/shared/ui/Text.tsx.
 
 export default function RootLayout() {
 	const [fontsLoaded, error] = useFonts({
-		"sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
-		"sans-bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
-		"sans-medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
-		"sans-semibold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
-		"sans-extrabold": require("../assets/fonts/PlusJakartaSans-ExtraBold.ttf"),
-		"sans-light": require("../assets/fonts/PlusJakartaSans-Light.ttf"),
+		"sans-regular": require("../assets/fonts/Inter-Regular.ttf"),
+		"sans-bold": require("../assets/fonts/Inter-Bold.ttf"),
+		"sans-medium": require("../assets/fonts/Inter-Medium.ttf"),
+		"sans-semibold": require("../assets/fonts/Inter-SemiBold.ttf"),
+		"sans-extrabold": require("../assets/fonts/Inter-ExtraBold.ttf"),
+		"sans-light": require("../assets/fonts/Inter-Light.ttf"),
 	});
 
 	const [bootstrap, setBootstrap] = useState<{ done: boolean; onboardingComplete: boolean } | null>(null);

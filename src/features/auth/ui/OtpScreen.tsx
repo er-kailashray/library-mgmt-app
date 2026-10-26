@@ -1,21 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { resendRegisterOtpApi, verifyRegisterOtpApi } from "@/features/auth/logic/auth-register.api";
+import { saveAuthData } from "@/services/api/auth.api";
+import { ApiError } from "@/services/api/client";
 import { RADIUS } from "@/shared/constants/layout";
+import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { useTheme } from "@/shared/providers/ThemeProvider";
+import { OtpInput } from "@/shared/ui/OtpInput";
+import { PoweredBy } from "@/shared/ui/PoweredBy";
+import { ScreenBackground } from "@/shared/ui/ScreenBackground";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { Text } from "@/shared/ui/Text";
+
+const RESEND_COOLDOWN_SECONDS = 30;
 
 export function OtpScreen() {
     const router = useRouter();
@@ -25,128 +28,136 @@ export function OtpScreen() {
     const [otp, setOtp] = useState("");
     const [isVerifying, setIsVerifying] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [isResending, setIsResending] = useState(false);
+    // A code was sent just before this screen opened, so start on the backend's cooldown.
+    const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [cooldown]);
+
+    const handleResend = async () => {
+        if (cooldown > 0 || isResending) return;
+        setError(null);
+        setNotice(null);
+
+        try {
+            setIsResending(true);
+            const response = await resendRegisterOtpApi(phone);
+            setOtp("");
+            setNotice("A new code has been sent.");
+            setCooldown(response.retry_after ?? RESEND_COOLDOWN_SECONDS);
+        } catch (err: any) {
+            if (err instanceof ApiError && typeof err.data?.retry_after === "number") {
+                setCooldown(err.data.retry_after);
+            }
+            setError(err.message || "Could not send a new code. Please try again.");
+        } finally {
+            setIsResending(false);
+        }
+    };
 
     const handleVerify = async () => {
         setError(null);
+        setNotice(null);
         if (otp.length < 6) {
             setError("Please enter the 6-digit code.");
             return;
         }
 
-        setIsVerifying(true);
-        // Simulate API call
-        setTimeout(() => {
-            if (otp === "000111") {
-                router.replace("/login");
-            } else {
-                setError("Invalid OTP code. Use 000111 for testing.");
-                setIsVerifying(false);
-            }
-        }, 1000);
+        try {
+            setIsVerifying(true);
+            const response = await verifyRegisterOtpApi(phone, otp);
+            await saveAuthData(response.token, response.user);
+            router.replace("/home");
+        } catch (err: any) {
+            setError(err.message || "Could not verify the code. Please try again.");
+        } finally {
+            setIsVerifying(false);
+        }
     };
 
     const styles = createStyles(theme);
 
     return (
-        <SafeAreaView style={styles.safe} edges={["top"]}>
-            <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
-            <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.primary} />
-                </Pressable>
-                <View>
-                    <Text style={styles.title}>Verify Account</Text>
-                    <Text style={styles.subtitle}>Enter the code sent to {phone}</Text>
-                </View>
-            </View>
+        <ScreenBackground>
+            <SafeAreaView style={styles.safe} edges={["top"]}>
+                <StatusBar style={theme.background === "#0C0A09" ? "light" : "dark"} />
+                <ScreenHeader
+                    title="Verify Account"
+                    subtitle={`Enter the code sent to ${phone}`}
+                    right={<Image source={require("@/assets/images/logo.png")} style={styles.headerLogo} />}
+                />
 
-            <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                <View style={styles.content}>
-                    <View style={styles.otpCard}>
-                        <Ionicons name="mail-unread-outline" size={48} color={theme.accent} style={{ alignSelf: "center", marginBottom: 20 }} />
-                        <Text style={styles.instruction}>We've sent a 6-digit confirmation code to your mobile number.</Text>
+                <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+                    <View style={styles.content}>
+                        <View style={styles.otpCard}>
+                            <Ionicons name="mail-unread-outline" size={48} color={theme.accent} style={{ alignSelf: "center", marginBottom: 20 }} />
+                            <Text style={styles.instruction}>We've sent a 6-digit confirmation code to your mobile number.</Text>
 
-                        <TextInput
-                            style={[styles.otpInput, { letterSpacing: 8 }]}
-                            placeholder="000000"
-                            placeholderTextColor={theme.mutedForeground + "4D"}
-                            keyboardType="number-pad"
-                            maxLength={6}
-                            value={otp}
-                            onChangeText={setOtp}
-                        />
-
-                        {error && (
-                            <View style={styles.errorBox}>
-                                <Ionicons name="alert-circle" size={18} color={theme.destructive} />
-                                <Text style={styles.errorText}>{error}</Text>
+                            <View style={styles.otpInput}>
+                                <OtpInput value={otp} onChangeText={setOtp} />
                             </View>
-                        )}
 
-                        <Pressable style={styles.submitButton} onPress={handleVerify} disabled={isVerifying}>
-                            {isVerifying ? (
-                                <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
-                            ) : (
-                                <Text style={styles.submitButtonText}>Verify & Complete</Text>
+                            {notice && <Text style={styles.noticeText}>{notice}</Text>}
+
+                            {error && (
+                                <View style={styles.errorBox}>
+                                    <Ionicons name="alert-circle" size={18} color={theme.destructive} />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
                             )}
-                        </Pressable>
 
-                        <Pressable style={styles.resendButton}>
-                            <Text style={styles.resendText}>Didn't receive code? <Text style={{ color: theme.accent }}>Resend</Text></Text>
-                        </Pressable>
-                    </View>
+                            <Pressable style={styles.submitButton} onPress={handleVerify} disabled={isVerifying}>
+                                {isVerifying ? (
+                                    <ActivityIndicator color={theme.background === "#0C0A09" ? theme.primary : "#fff"} size="small" />
+                                ) : (
+                                    <Text style={styles.submitButtonText}>Verify & Complete</Text>
+                                )}
+                            </Pressable>
 
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>Powered by Kailash Ray</Text>
+                            <Pressable
+                                accessibilityRole="button"
+                                style={styles.resendButton}
+                                onPress={handleResend}
+                                disabled={cooldown > 0 || isResending}
+                            >
+                                {isResending ? (
+                                    <ActivityIndicator color={theme.accent} size="small" />
+                                ) : cooldown > 0 ? (
+                                    <Text style={styles.resendText}>Resend code in 0:{String(cooldown).padStart(2, "0")}</Text>
+                                ) : (
+                                    <Text style={styles.resendText}>Didn't receive code? <Text style={{ color: theme.accent }}>Resend</Text></Text>
+                                )}
+                            </Pressable>
+                        </View>
+
+                        <PoweredBy style={styles.footer} />
                     </View>
-                </View>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </ScreenBackground>
     );
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: theme.background,
     },
     flex: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        gap: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: theme.card,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1.5,
-        borderColor: theme.border,
-    },
-    title: {
-        fontFamily: "sans-extrabold",
-        fontSize: 22,
-        color: theme.primary,
-        marginBottom: 2,
-    },
-    subtitle: {
-        fontFamily: "sans-medium",
-        fontSize: 14,
-        color: theme.mutedForeground,
+    headerLogo: {
+        width: 40,
+        height: 40,
     },
     content: {
         flex: 1,
         padding: 20,
-        paddingTop: 40,
+        paddingTop: 24,
     },
     otpCard: {
         backgroundColor: theme.card,
@@ -164,15 +175,6 @@ const createStyles = (theme: any) => StyleSheet.create({
         marginBottom: 32,
     },
     otpInput: {
-        fontFamily: "sans-extrabold",
-        fontSize: 32,
-        backgroundColor: theme.background,
-        borderWidth: 1,
-        borderColor: theme.border,
-        borderRadius: RADIUS.md,
-        paddingVertical: 20,
-        textAlign: "center",
-        color: theme.primary,
         marginBottom: 24,
     },
     submitButton: {
@@ -182,9 +184,8 @@ const createStyles = (theme: any) => StyleSheet.create({
         alignItems: "center",
     },
     submitButtonText: {
-        fontFamily: "sans-extrabold",
-        fontSize: 15,
-        color: theme.background === "#0C0A09" ? theme.primary : "#fff",
+        ...BUTTON_TEXT,
+        color: "#fff",
     },
     resendButton: {
         marginTop: 24,
@@ -194,6 +195,13 @@ const createStyles = (theme: any) => StyleSheet.create({
         fontFamily: "sans-bold",
         fontSize: 14,
         color: theme.mutedForeground,
+    },
+    noticeText: {
+        fontFamily: "sans-semibold",
+        fontSize: 14,
+        color: theme.success,
+        textAlign: "center",
+        marginBottom: 16,
     },
     errorBox: {
         backgroundColor: theme.destructive + "1A",
@@ -211,13 +219,6 @@ const createStyles = (theme: any) => StyleSheet.create({
         flex: 1,
     },
     footer: {
-        alignItems: "center",
-        marginTop: "auto",
         paddingBottom: 20,
-    },
-    footerText: {
-        fontFamily: "sans-medium",
-        fontSize: 13,
-        color: theme.mutedForeground,
     },
 });
