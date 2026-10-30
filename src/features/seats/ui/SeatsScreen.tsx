@@ -6,9 +6,10 @@ import { Pressable, RefreshControl, View, useWindowDimensions } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BatchSwitcher } from "@/features/batches/ui/BatchSwitcher";
+import { useChangeSeat, type SeatChangeTarget } from "@/features/members/ui/useChangeSeat";
 import { batchTimeLabel, freeBatches, isRunningNow, seatLabel, seatNumber } from "@/features/seats/logic/seat-display";
-import { getSeatMatrixApi } from "@/features/seats/logic/seats-api";
-import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
+import { getSeatMatrixApi, unblockSeatApi } from "@/features/seats/logic/seats-api";
+import { MatrixBatchRef, SeatBlock, SeatMatrixSeat } from "@/features/seats/types/seats.types";
 import { RADIUS } from "@/shared/constants/layout";
 import { Theme } from "@/shared/constants/theme";
 import { ScaledSheet, space } from "@/shared/constants/ui-scale";
@@ -19,8 +20,11 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncState";
 import { ScreenBackground } from "@/shared/ui/ScreenBackground";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text, TextInput } from "@/shared/ui/Text";
+import { showToast } from "@/shared/ui/Toast";
+import { todayIso } from "@/shared/utils/dates";
 import { getInitials } from "@/shared/utils/text";
 
+import { BlockSeatSheet } from "./BlockSeatSheet";
 import { SeatSheet } from "./SeatSheet";
 
 const COLUMNS = 5;
@@ -35,7 +39,7 @@ const MAX_DOTS = 6;
 type MapView = number | "all";
 
 /** How a seat looks on the map for the current view. */
-type SeatState = "free" | "taken" | "due" | "partial" | "full";
+type SeatState = "free" | "taken" | "due" | "partial" | "full" | "blocked";
 
 type Block = { key: string; title: string; free: number; rows: SeatMatrixSeat[][] };
 type ListItem = { type: "header"; key: string; block: Block } | { type: "row"; key: string; seats: SeatMatrixSeat[] };
@@ -49,9 +53,11 @@ function chunk<T>(items: T[], size: number): T[][] {
 function seatState(seat: SeatMatrixSeat, view: MapView): SeatState {
     if (view === "all") {
         const { free, total } = freeBatches(seat);
+        if (total > 0 && seat.batches.every((b) => b.blocked)) return "blocked";
         return free === total ? "free" : free === 0 ? "full" : "partial";
     }
     const info = seat.batches.find((b) => b.batch_id === view);
+    if (info?.blocked) return "blocked";
     if (!info || info.available) return "free";
     return info.occupant?.is_due ? "due" : "taken";
 }
@@ -87,6 +93,27 @@ export function SeatsScreen() {
     const [freeOnly, setFreeOnly] = useState(false);
     const [query, setQuery] = useState("");
     const [openSeat, setOpenSeat] = useState<SeatMatrixSeat | null>(null);
+    const changeSeat = useChangeSeat(() => void refetch());
+    const pendingMove = useRef<SeatChangeTarget | null>(null);
+    // "Block seat" opens its form once the seat sheet has slid away.
+    const pendingBlock = useRef<SeatMatrixSeat | null>(null);
+    const [blockSeat, setBlockSeat] = useState<SeatMatrixSeat | null>(null);
+
+    const handleUnblock = useCallback(
+        async (block: SeatBlock, seat: SeatMatrixSeat) => {
+            try {
+                await unblockSeatApi(block.id);
+                showToast({
+                    message: block.starts_on > todayIso() ? "Block removed" : `${seatLabel(seat.seat_number)} is back in use`,
+                    detail: block.all_batches ? "In every batch." : undefined,
+                });
+                await refetch();
+            } catch (err: any) {
+                showToast({ message: "Couldn't unblock the seat", detail: err.message, tone: "error" });
+            }
+        },
+        [refetch]
+    );
     const [isRefreshing, setIsRefreshing] = useState(false);
     const listRef = useRef<FlashListRef<ListItem>>(null);
 
@@ -173,16 +200,22 @@ export function SeatsScreen() {
     const counts = useMemo(() => {
         if (activeView === "all") {
             const withRoom = seats.filter((s) => freeBatches(s).free > 0).length;
-            return { primary: withRoom, secondary: seats.length - withRoom, due: 0 };
+            return { primary: withRoom, secondary: seats.length - withRoom, due: 0, blocked: 0 };
         }
         const states = seats.map((s) => seatState(s, activeView));
-        return { primary: states.filter((st) => st === "free").length, secondary: states.filter((st) => st !== "free").length, due: states.filter((st) => st === "due").length };
+        return {
+            primary: states.filter((st) => st === "free").length,
+            // Blocked seats are neither free nor taken.
+            secondary: states.filter((st) => st !== "free" && st !== "blocked").length,
+            due: states.filter((st) => st === "due").length,
+            blocked: states.filter((st) => st === "blocked").length,
+        };
     }, [seats, activeView]);
 
     const subtitle = !data
         ? "Who sits where, and what's free"
         : focusBatch
-          ? `${counts.primary} free · ${counts.secondary} taken in ${focusBatch.name}${counts.due > 0 ? ` · ${counts.due} owe` : ""}`
+          ? `${counts.primary} free · ${counts.secondary} taken in ${focusBatch.name}${counts.due > 0 ? ` · ${counts.due} owe` : ""}${counts.blocked > 0 ? ` · ${counts.blocked} blocked` : ""}`
           : `${counts.primary} seats with room · ${counts.secondary} full`;
 
     const renderTile = (seat: SeatMatrixSeat) => {
@@ -192,7 +225,13 @@ export function SeatsScreen() {
         const look = tileLook(theme, state);
         const { free, total } = freeBatches(seat);
         const description =
-            activeView === "all" ? `free in ${free} of ${total} batches` : occupant ? `${occupant.name ?? "taken"}${occupant.is_due ? ", fee due" : ""}` : "free";
+            state === "blocked"
+                ? "blocked"
+                : activeView === "all"
+                  ? `free in ${free} of ${total} batches`
+                  : occupant
+                    ? `${occupant.name ?? "taken"}${occupant.is_due ? ", fee due" : ""}`
+                    : "free";
 
         return (
             <Pressable
@@ -200,15 +239,26 @@ export function SeatsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`${seatLabel(seat.seat_number)}, ${description}`}
                 onPress={() => setOpenSeat(seat)}
-                style={({ pressed }) => [styles.tile, { backgroundColor: look.background, borderColor: look.border }, highlighted && styles.tileHighlighted, pressed && styles.tilePressed]}
+                style={({ pressed }) => [
+                    styles.tile,
+                    { backgroundColor: look.background, borderColor: look.border },
+                    state === "blocked" && styles.tileBlocked,
+                    highlighted && styles.tileHighlighted,
+                    pressed && styles.tilePressed,
+                ]}
             >
                 {state === "due" && <View style={styles.dueDot} />}
                 <Text style={[styles.tileNumber, { color: look.number }]}>{seatNumber(seat.seat_number)}</Text>
-                {activeView === "all" ? (
+                {state === "blocked" ? (
+                    <Ionicons name="lock-closed" size={11} color={theme.mutedForeground} />
+                ) : activeView === "all" ? (
                     total <= MAX_DOTS ? (
                         <View style={styles.dots}>
                             {seat.batches.map((b) => (
-                                <View key={b.batch_id} style={[styles.dot, { backgroundColor: b.available ? theme.success : theme.mutedForeground + "55" }]} />
+                                <View
+                                    key={b.batch_id}
+                                    style={[styles.dot, b.blocked ? styles.dotBlocked : { backgroundColor: b.available ? theme.success : theme.mutedForeground + "55" }]}
+                                />
                             ))}
                         </View>
                     ) : (
@@ -251,8 +301,9 @@ export function SeatsScreen() {
                         key: batch.id as MapView,
                         title: batch.name,
                         caption: batchTimeLabel(batch),
-                        filled: seats.filter((s) => s.batches.some((b) => b.batch_id === batch.id && !b.available)).length,
-                        total: seats.length,
+                        // Blocked seats count as neither filled nor part of the batch's seats.
+                        filled: seats.filter((s) => s.batches.some((b) => b.batch_id === batch.id && b.occupant)).length,
+                        total: seats.length - seats.filter((s) => s.batches.some((b) => b.batch_id === batch.id && b.blocked)).length,
                         tag: isRunningNow(batch) ? "Now" : undefined,
                     })),
                 ]}
@@ -291,6 +342,8 @@ export function SeatsScreen() {
                                   { label: "Free", color: theme.success },
                                   { label: "Taken", color: theme.mutedForeground },
                                   { label: "Fee due", color: theme.destructive },
+                                  // Only once something is blocked, so the legend stays short.
+                                  ...(counts.blocked > 0 ? [{ label: "Blocked", color: theme.mutedForeground + "40" }] : []),
                               ]
                         ).map((entry) => (
                             <View key={entry.label} style={styles.legendItem}>
@@ -372,6 +425,41 @@ export function SeatsScreen() {
                         setOpenSeat(null);
                         router.push({ pathname: "/admission", params: { batch_id: String(batchId), seat_id: String(seatId) } });
                     }}
+                    onMove={(batchId, batchName, seat, occupant) => {
+                        // The seat picker opens once this sheet has slid away (onClosed).
+                        pendingMove.current = {
+                            memberId: occupant.member_id,
+                            memberName: occupant.name ?? "Member",
+                            batchId,
+                            batchName,
+                            seatId: seat.seat_id,
+                            seatNumber: seat.seat_number,
+                        };
+                        setOpenSeat(null);
+                    }}
+                    onBlock={(seat) => {
+                        pendingBlock.current = seat;
+                        setOpenSeat(null);
+                    }}
+                    onUnblock={handleUnblock}
+                    onClosed={() => {
+                        const move = pendingMove.current;
+                        pendingMove.current = null;
+                        if (move) void changeSeat.start(move);
+                        const toBlock = pendingBlock.current;
+                        pendingBlock.current = null;
+                        if (toBlock) setBlockSeat(toBlock);
+                    }}
+                />
+                {changeSeat.element}
+                <BlockSeatSheet
+                    seat={blockSeat}
+                    batches={batches}
+                    onClose={() => setBlockSeat(null)}
+                    onBlocked={() => {
+                        setBlockSeat(null);
+                        void refetch();
+                    }}
                 />
             </SafeAreaView>
         </ScreenBackground>
@@ -386,6 +474,9 @@ function tileLook(theme: Theme, state: SeatState): { background: string; border:
             return { background: theme.card, border: theme.warning + "66", number: theme.warning };
         case "full":
             return { background: theme.muted, border: "transparent", number: theme.mutedForeground };
+        case "blocked":
+            // Out of use: an empty dashed outline, unlike the filled grey of a taken seat.
+            return { background: "transparent", border: theme.mutedForeground + "66", number: theme.mutedForeground };
         default:
             // Taken, with or without a fee due (the red dot marks that).
             return { background: theme.muted, border: "transparent", number: theme.primary };
@@ -512,6 +603,10 @@ const createStyles = (theme: Theme, tileSize: number) =>
             justifyContent: "center",
             gap: 3,
         },
+        tileBlocked: {
+            borderStyle: "dashed",
+            borderWidth: 1.5,
+        },
         tileHighlighted: {
             borderWidth: 2,
             borderColor: theme.accent,
@@ -545,5 +640,10 @@ const createStyles = (theme: Theme, tileSize: number) =>
             width: 5,
             height: 5,
             borderRadius: 2.5,
+        },
+        // A batch where this seat is blocked: a hollow dot.
+        dotBlocked: {
+            borderWidth: 1,
+            borderColor: theme.mutedForeground,
         },
     });

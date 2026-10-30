@@ -16,7 +16,10 @@ export interface DashboardData {
         start_time: string;
         end_time: string;
         occupied: number;
+        /** Seats usable in this batch today: blocked seats are left out. */
         total: number;
+        /** Seats blocked in this batch today. */
+        blocked?: number;
         /** Checked in to this batch today (for the live batch card). */
         checked_in_today?: number;
     }[];

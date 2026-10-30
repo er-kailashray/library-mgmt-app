@@ -112,3 +112,19 @@ export async function uploadMemberIdProofApi(
     }
     return body;
 }
+
+/** Moves an active member to another free seat in the same batch; fee and renewal date don't change. */
+export async function changeSeatApi(
+    id: number | string,
+    batchId: number,
+    seatId: number
+): Promise<{ status: boolean; message?: string; data: { batch_id: number; batch_name: string; seat_id: number; seat_number: number; renewal_date: string } }> {
+    const token = await getStoredAuthToken();
+    if (!token) throw new Error("No auth token");
+
+    return apiPost(`/api/members/${id}/change-seat`, { batch_id: batchId, seat_id: seatId }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}

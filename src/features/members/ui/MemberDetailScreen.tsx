@@ -2,12 +2,13 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ID_PROOF_TYPE_LABELS, IdProofSide, IdProofType } from "@/features/admission/types/admission.types";
 import { AddIdProofCard, IdProofDraft, IdProofSheet } from "@/features/admission/ui/IdProofSheet";
 import { deactivateMemberApi, deleteMemberIdProofApi, getMemberDetailApi, getMemberIdProofSource, restartMemberApi, updateMemberApi, uploadMemberIdProofApi } from "@/features/members/logic/members.api";
+import { useChangeSeat } from "@/features/members/ui/useChangeSeat";
 import { GENDER_OPTIONS, Gender } from "@/features/members/types/members.types";
 import { createPaymentApi } from "@/features/payments/logic/payments-api";
 import { PAYMENT_MODE_LABELS, Payment, PaymentMode, PaymentStatus } from "@/features/payments/types/payments.types";
@@ -69,6 +70,13 @@ export function MemberDetailScreen() {
             void refetch();
         }, [refetch])
     );
+
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await refetch();
+        setIsRefreshing(false);
+    }, [refetch]);
     const [isDeactivating, setIsDeactivating] = useState(false);
     const [isSendingSms, setIsSendingSms] = useState(false);
     const [loadingIdProofSide, setLoadingIdProofSide] = useState<IdProofSide | null>(null);
@@ -129,6 +137,7 @@ export function MemberDetailScreen() {
 
     // Confirmations, as a sheet rather than a system alert.
     const confirmSheet = useActionSheet();
+    const changeSeat = useChangeSeat(() => void refetch());
     const openConfirm = confirmSheet.open;
 
     const handleRemoveIdProof = useCallback(() => {
@@ -452,7 +461,11 @@ export function MemberDetailScreen() {
                 ) : error || !member ? (
                     <ErrorState message={error || "Member not found."} onRetry={refetch} />
                 ) : (
-                    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                    <ScrollView
+                        contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom }]}
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
+                    >
                         {/* IDENTITY */}
                         <View style={styles.identityRow}>
                             {/* Same colour as the member has in every list. */}
@@ -573,6 +586,31 @@ export function MemberDetailScreen() {
                                                 </View>
                                                 <Text style={styles.listRowMeta}>Paid till {formatShortDate(allocation.renewal_date, true)}</Text>
                                             </View>
+                                            <Pressable
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Change ${member.name}'s seat in ${allocation.batch_name}`}
+                                                style={({ pressed }) => [styles.changeSeatBtn, pressed && { opacity: 0.7 }]}
+                                                onPress={() =>
+                                                    changeSeat.start({
+                                                        memberId: Number(member.id),
+                                                        memberName: member.name,
+                                                        batchId: allocation.batch_id,
+                                                        batchName: allocation.batch_name,
+                                                        seatId: allocation.seat_id,
+                                                        seatNumber: allocation.seat_number,
+                                                    })
+                                                }
+                                                disabled={changeSeat.loadingBatchId !== null}
+                                            >
+                                                {changeSeat.loadingBatchId === allocation.batch_id ? (
+                                                    <ActivityIndicator size="small" color={theme.primary} />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="swap-horizontal" size={14} color={theme.primary} />
+                                                        <Text style={styles.changeSeatText}>Change</Text>
+                                                    </>
+                                                )}
+                                            </Pressable>
                                         </View>
                                     ))
                                 )}
@@ -728,6 +766,7 @@ export function MemberDetailScreen() {
                 />
 
                 {confirmSheet.sheet}
+                {changeSeat.element}
 
                 <BottomSheet
                     visible={isPaymentSheetVisible}
@@ -1187,6 +1226,22 @@ const createStyles = (theme: any) =>
         seatText: {
             flex: 1,
             gap: 3,
+        },
+        changeSeatBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            minWidth: 84,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: RADIUS.sm,
+            backgroundColor: theme.muted,
+        },
+        changeSeatText: {
+            fontFamily: "sans-semibold",
+            fontSize: 12,
+            color: theme.primary,
         },
         seatBatchRow: {
             flexDirection: "row",

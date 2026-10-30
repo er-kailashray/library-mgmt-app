@@ -17,7 +17,23 @@ All endpoints below require `Authorization: Bearer <token>` and respond with the
   else `{ member_id, name, renewal_date, is_due }`; `is_due` once the renewal date is reached).
   The Seats map uses it to show who sits where; Admission only reads `available`. Admission also
   accepts `?batch_id=&seat_id=` to open with that batch and seat chosen ("Admit" on a free seat).
+- `POST /api/seats/{id}/block` `{ batch_ids?, starts_on?, ends_on?, reason? }` — takes a seat out
+  of use. No `batch_ids` = every batch (one row with `batch_id: null`, which also covers batches
+  added later). `starts_on` defaults to today (can't be in the past); no `ends_on` = until
+  unblocked, otherwise it frees itself after that day. 422 (`errors.batch_ids`) when someone sits
+  there in a covered batch, (`errors.starts_on`) when it overlaps an existing block.
+  `DELETE /api/seat-blocks/{id}` unblocks: a block that already ran ends yesterday (kept on
+  record), one that hadn't started is deleted. In `/seat-matrix` each batch cell has `blocked`
+  (the block in force today, else null; such a cell is not `available`) and each seat has
+  `blocks[]` (in force or upcoming). Admission and change-seat reject seats blocked today, and the
+  dashboard's `batch_occupancy[].total` / Reports' occupancy leave blocked seats out (`blocked`
+  gives the count).
 - `POST /api/admission`
+- `POST /api/members/{id}/change-seat` `{ batch_id, seat_id }` — moves an active member to another
+  free seat in a batch they're already in. The old allocation ends today and a new one carries the
+  same `renewal_date`, so fee, dues and paid-through don't change; seat history shows the move.
+  422 with `errors.seat_id` when the seat is taken or is already theirs, `errors.batch_id` when
+  they have no seat in that batch. Used from the member profile ("Change") and the Seats sheet.
 - `GET /api/payments`, `POST /api/payments`
 - `GET /api/dashboard`
 - `GET /api/attendance` (optional `?date=YYYY-MM-DD`, defaults to today), `POST /api/attendance`.

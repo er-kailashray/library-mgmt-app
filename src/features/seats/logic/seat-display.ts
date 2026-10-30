@@ -1,5 +1,6 @@
 import { formatTimeRange, runsPastMidnight, toMinutes } from "@/features/batches/logic/batch-time";
-import { MatrixBatchRef, SeatMatrixSeat } from "@/features/seats/types/seats.types";
+import { MatrixBatchRef, SeatBlock, SeatMatrixSeat } from "@/features/seats/types/seats.types";
+import { formatShortDate, todayIso } from "@/shared/utils/dates";
 
 /** "12" from "12", "012" or "S-12"; seat numbers are shown without padding or prefixes. */
 export function seatNumber(value: string | number): string {
@@ -27,4 +28,14 @@ export function isRunningNow(batch: Pick<MatrixBatchRef, "start_time" | "end_tim
 /** How many batches this seat is free in, out of how many there are. */
 export function freeBatches(seat: SeatMatrixSeat): { free: number; total: number } {
     return { free: seat.batches.filter((b) => b.available).length, total: seat.batches.length };
+}
+
+/** "Broken chair · till 15 Nov", "From 20 Nov · till 25 Nov", "Until unblocked". */
+export function blockSummary(block: SeatBlock, today = todayIso()): string {
+    const parts: string[] = [];
+    if (block.reason) parts.push(block.reason);
+    if (block.starts_on > today) parts.push(`from ${formatShortDate(block.starts_on)}`);
+    parts.push(block.ends_on ? `till ${formatShortDate(block.ends_on)}` : "until unblocked");
+    const text = parts.join(" · ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }

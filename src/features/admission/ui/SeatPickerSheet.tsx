@@ -20,6 +20,8 @@ type Props = {
 	selectedSeatId: number | null;
 	onPick: (seatId: number) => void;
 	onClose: () => void;
+	/** After the sheet has finished sliding away, e.g. to open a confirmation next. */
+	onClosed?: () => void;
 };
 
 /**
@@ -29,7 +31,7 @@ type Props = {
 export function SeatPickerSheet(props: Props) {
 	return (
 		// The sheet rides on top of the keyboard while a seat number is typed, and the grid shrinks to fit.
-		<BottomSheet visible={props.visible} onClose={props.onClose} title={props.title} showClose bottomPadding={24}>
+		<BottomSheet visible={props.visible} onClose={props.onClose} onClosed={props.onClosed} title={props.title} showClose bottomPadding={24}>
 			<SeatPickerContent {...props} />
 		</BottomSheet>
 	);
