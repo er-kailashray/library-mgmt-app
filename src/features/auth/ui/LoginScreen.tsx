@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { setPendingRegistrationToken } from "@/features/auth/logic/auth-register.api";
 import { AuthBrand } from "@/features/auth/ui/AuthBrand";
 import { loginApi, saveAuthData } from "@/services/api/auth.api";
 import { ApiError } from "@/services/api/client";
@@ -47,6 +48,8 @@ export function LoginScreen() {
 		} catch (error) {
 			// Registered but never confirmed the OTP: the backend has sent a code, so finish verification.
 			if (error instanceof ApiError && error.data?.requires_verification) {
+				// The password is proven, so this device may finish the sign-up with the code.
+				setPendingRegistrationToken(error.data.registration_token);
 				router.push({ pathname: "/otp", params: { phone } });
 				return;
 			}

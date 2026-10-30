@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Linking, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -29,6 +29,8 @@ import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Text, TextInput } from "@/shared/ui/Text";
 import { showToast } from "@/shared/ui/Toast";
 import { getInitials } from "@/shared/utils/text";
+
+import { ChangePhoneSheet } from "./ChangePhoneSheet";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -111,13 +113,15 @@ export function SettingsScreen() {
     // --- Edit profile ------------------------------------------------------------------------
     const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
     const [editProfileName, setEditProfileName] = useState("");
-    const [editProfilePhone, setEditProfilePhone] = useState("");
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    // The number is changed in its own sheet (password + a code to the new number), opened once
+    // the profile sheet has slid away.
+    const [isChangePhoneVisible, setIsChangePhoneVisible] = useState(false);
+    const openChangePhoneNext = useRef(false);
 
     const openEditProfile = useCallback(() => {
         if (!user) return;
         setEditProfileName(user.name);
-        setEditProfilePhone(user.phone);
         setIsEditProfileVisible(true);
     }, [user]);
 
@@ -126,13 +130,10 @@ export function SettingsScreen() {
             showToast({ message: "Please enter your name.", tone: "error" });
             return;
         }
-        if (editProfilePhone.trim().length < 10) {
-            showToast({ message: "Please enter a valid 10-digit phone number.", tone: "error" });
-            return;
-        }
+        if (!user) return;
         try {
             setIsSavingProfile(true);
-            const response = await updateProfileApi({ name: editProfileName.trim(), phone: editProfilePhone.trim() });
+            const response = await updateProfileApi({ name: editProfileName.trim(), phone: user.phone });
             await updateStoredAuthUser(response.user);
             setUser(response.user);
             setIsEditProfileVisible(false);
@@ -141,7 +142,7 @@ export function SettingsScreen() {
         } finally {
             setIsSavingProfile(false);
         }
-    }, [editProfileName, editProfilePhone]);
+    }, [editProfileName, user]);
 
     // Confirmations and the blocked-notifications prompt, as sheets rather than system alerts.
     const actionSheet = useActionSheet();
@@ -429,7 +430,17 @@ export function SettingsScreen() {
                     </View>
                 </BottomSheet>
 
-                <BottomSheet visible={isEditProfileVisible} onClose={() => setIsEditProfileVisible(false)} title="Edit profile">
+                <BottomSheet
+                    visible={isEditProfileVisible}
+                    onClose={() => setIsEditProfileVisible(false)}
+                    onClosed={() => {
+                        if (openChangePhoneNext.current) {
+                            openChangePhoneNext.current = false;
+                            setIsChangePhoneVisible(true);
+                        }
+                    }}
+                    title="Edit profile"
+                >
                     <Text style={styles.inputLabel}>Your name</Text>
                     <TextInput
                         style={styles.input}
@@ -441,21 +452,36 @@ export function SettingsScreen() {
                     />
 
                     <Text style={styles.inputLabel}>Phone number</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={editProfilePhone}
-                        onChangeText={setEditProfilePhone}
-                        keyboardType="phone-pad"
-                        maxLength={15}
-                        placeholder="10-digit mobile number"
-                        placeholderTextColor={theme.mutedForeground + "80"}
-                    />
-                    <Text style={styles.inputHint}>This is the number you sign in with.</Text>
+                    <View style={styles.phoneRow}>
+                        <Text style={styles.phoneValue}>{user?.phone}</Text>
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Change phone number"
+                            hitSlop={8}
+                            onPress={() => {
+                                openChangePhoneNext.current = true;
+                                setIsEditProfileVisible(false);
+                            }}
+                        >
+                            <Text style={styles.phoneChange}>Change</Text>
+                        </Pressable>
+                    </View>
+                    <Text style={styles.inputHint}>This is the number you sign in with. Changing it needs your password and a code sent to the new number.</Text>
 
                     <Pressable style={({ pressed }) => [styles.saveBtn, (pressed || isSavingProfile) && styles.pressed]} onPress={handleSaveProfile} disabled={isSavingProfile}>
                         {isSavingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save changes</Text>}
                     </Pressable>
                 </BottomSheet>
+
+                <ChangePhoneSheet
+                    visible={isChangePhoneVisible}
+                    currentPhone={user?.phone ?? ""}
+                    onClose={() => setIsChangePhoneVisible(false)}
+                    onChanged={(updated) => {
+                        setUser(updated);
+                        setIsChangePhoneVisible(false);
+                    }}
+                />
             </SafeAreaView>
         </ScreenBackground>
     );
@@ -767,6 +793,25 @@ const createStyles = (theme: Theme) =>
             fontFamily: "sans-regular",
             fontSize: 15,
             color: theme.primary,
+        },
+        phoneRow: {
+            height: 48,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 14,
+            borderRadius: RADIUS.md,
+            backgroundColor: theme.muted,
+        },
+        phoneValue: {
+            fontFamily: "sans-regular",
+            fontSize: 15,
+            color: theme.primary,
+        },
+        phoneChange: {
+            fontFamily: "sans-semibold",
+            fontSize: 14,
+            color: theme.accent,
         },
         inputHint: {
             fontFamily: "sans-regular",

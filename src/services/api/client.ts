@@ -3,6 +3,13 @@ import { notifyIfSubscriptionExpired } from "./subscription-guard";
 
 const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
+// Passwords, codes and tokens travel in these requests: a release build never talks plain http.
+// (Development on the LAN uses http://192.168.x.x, so this only applies outside __DEV__.)
+const insecureInRelease = !__DEV__ && baseUrl.startsWith("http://");
+if (insecureInRelease) {
+	console.error("EXPO_PUBLIC_API_URL must be https:// in a release build; requests are blocked.");
+}
+
 /** How long a request may take before it's abandoned with a "took too long" error. */
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -71,6 +78,9 @@ async function parseJsonResponse<T>(response: Response, hadToken: boolean): Prom
 }
 
 export async function apiFetch<T = unknown>(path: string, init?: ApiInit): Promise<T> {
+	if (insecureInRelease) {
+		throw new ApiError("This app version can't connect securely. Please update the app.", 0, null);
+	}
 	const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
 	const controller = new AbortController();
 	let timedOut = false;

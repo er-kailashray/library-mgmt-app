@@ -75,6 +75,11 @@ export function OtpScreen() {
             await saveAuthData(response.token, response.user);
             router.replace("/home");
         } catch (err: any) {
+            // Registered again elsewhere (or the app restarted): this sign-up can't be finished here.
+            if (err instanceof ApiError && err.data?.restart_registration) {
+                setError("This sign-up was started again on another device. Sign in with your password, or register again.");
+                return;
+            }
             setError(err.message || "Could not verify the code. Please try again.");
         } finally {
             setIsVerifying(false);
