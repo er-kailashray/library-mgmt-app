@@ -8,8 +8,10 @@ type NotificationsModule = typeof import("expo-notifications");
  * `expo-notifications` can't even be loaded: its entry asks for ExpoTopicSubscriptionModule,
  * which Expo Go doesn't ship, and throws "Cannot find native module". A development build or
  * store build has it, so push works there.
+ * Also false on web (the PWA): the package's web side is a partial stub whose
+ * getLastNotificationResponse throws, and Expo push tokens don't reach browsers anyway.
  */
-export const isPushAvailable = !(Platform.OS === "android" && isRunningInExpoGo());
+export const isPushAvailable = Platform.OS !== "web" && !(Platform.OS === "android" && isRunningInExpoGo());
 
 /**
  * expo-notifications, or null where it can't load. Always import it from here, never directly:

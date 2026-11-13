@@ -1,0 +1,2 @@
+# Cloudflare Pages / Netlify: a member's page is one exported file for every id.
+/members/:id  /members/[id].html  200

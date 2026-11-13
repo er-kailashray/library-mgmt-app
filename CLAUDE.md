@@ -46,6 +46,15 @@ Cross-feature/shared API helpers live in `src/services/api/` (`client.ts` for th
 
 Path aliases (`tsconfig.json`): `@/*` → repo root, `@/features/*` → `src/features/*`, `@/services/*` → `src/services/*`, `@/shared/*` → `src/shared/*`.
 
+### Web app (PWA)
+
+iPhone owners use the web build installed to the home screen (no App Store). `npm run build:web` exports static files to `dist/`; hosting steps are in the backend's `DEPLOY.md`. The pieces:
+- `app/+html.tsx` is the page shell: install/iOS meta tags, and it **must render `headNodes`/`bodyNodes` from `useServerDocumentContext()`** — without them the export has no scripts and every page is blank.
+- `public/` is copied as-is: `manifest.webmanifest`, `icons/` (from `assets/images/icon.png`), `sw.js` (network-first pages, cache-first hashed bundles; registered from `app/_layout.tsx` in production only), and `_redirects`/`_headers` for Cloudflare Pages/Netlify (`/members/:id` → the one exported `members/[id].html`).
+- Web takes the Android branches: the JS tab bar (`AndroidTabBar`) instead of native tabs (whose icons can't render on web), and `useScreenBottomInset` returns 0 in the tabs. `Notifications` is null on web (no push yet). Image uploads use browser `fetch` + `FormData` there (`image-upload.ts`). Plan checkout navigates the page to Razorpay and back to `/subscription?result=…`; the backend only accepts that return address when it's under `WEB_APP_URL`.
+- Avoid a `Pressable` inside another `Pressable`: on web that's a `<button>` inside a `<button>`.
+- Test it with `npx expo start --web`, or serve a `build:web` export over localhost to check the service worker. On web the token falls back to `localStorage`.
+
 ### Push notifications (`src/services/push/`)
 
 **Never `import * as Notifications from "expo-notifications"` directly — use `Notifications` from `src/services/push/notifications-module.ts`** (null where unavailable; `import type` from the package is fine). Expo Go on Android has had no remote push since SDK 53, and there the package's entry throws "Cannot find native module 'ExpoTopicSubscriptionModule'" as soon as it's loaded. The wrapper skips loading it in that one environment, so the app runs without push in Expo Go on Android; iOS Expo Go and development/store builds get push as normal. To test push on Android, use a development build (`npx expo run:android` or an EAS development build).

@@ -1,38 +1,50 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
+import { ScrollViewStyleReset, useServerDocumentContext } from "expo-router/html";
 
-// This file is web-only and used to configure the root HTML for every
-// web page during static rendering.
-// The contents of this function only run in Node.js environments and
-// do not have access to the DOM or browser APIs.
+// Web-only: the HTML shell around every page of the web build (the PWA iPhone users add to their
+// home screen). Runs in Node during export, with no DOM. The server document context carries the
+// app's scripts and styles; without headNodes/bodyNodes the page renders blank.
 export default function Root({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+	const { bodyAttributes, bodyNodes, htmlAttributes, headNodes } = useServerDocumentContext();
 
-        {/* 
-          Disable body scrolling on web. This makes ScrollView components work closer to how they do on native. 
-          However, body scrolling is often nice to have for mobile web. If you want to enable it, remove this line.
-        */}
-        <ScrollViewStyleReset />
+	return (
+		<html lang="en" {...htmlAttributes}>
+			<head>
+				<meta charSet="utf-8" />
+				<meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+				{/* viewport-fit=cover hands the notch/home-bar insets to safe-area-context; maximum-scale
+				    stops iOS zooming in on every focused text field. */}
+				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+				<title>Librum</title>
+				<meta name="description" content="Run your library: members, seats, batches, attendance and fees." />
 
-        {/* Using raw CSS styles as an escape-hatch to ensure the background color never flickers in dark-mode. */}
-        <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
-        {/* Add any additional <head> elements that you want globally available on web... */}
-      </head>
-      <body>{children}</body>
-    </html>
-  );
+				{/* Installable app: Android/desktop read the manifest, iOS reads the apple-* tags. */}
+				<link rel="manifest" href="/manifest.webmanifest" />
+				<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FDFCF9" />
+				<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0C0A09" />
+				<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+				<meta name="apple-mobile-web-app-capable" content="yes" />
+				<meta name="mobile-web-app-capable" content="yes" />
+				<meta name="apple-mobile-web-app-title" content="Librum" />
+				<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+				<meta name="format-detection" content="telephone=no" />
+
+				<ScrollViewStyleReset />
+				<style dangerouslySetInnerHTML={{ __html: webStyles }} />
+				{headNodes}
+			</head>
+			<body {...bodyAttributes}>
+				{children}
+				{bodyNodes}
+			</body>
+		</html>
+	);
 }
 
-const responsiveBackground = `
-body {
-  background-color: #fff;
-}
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #000;
-  }
-}`;
+// Matches the app background so there's no white flash before the app paints, and keeps the page
+// from rubber-banding or highlighting taps like a web page.
+const webStyles = `
+html, body { background-color: #FDFCF9; overscroll-behavior: none; }
+@media (prefers-color-scheme: dark) { html, body { background-color: #0C0A09; } }
+body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-text-size-adjust: 100%; }
+input, textarea { -webkit-user-select: text; }
+`;

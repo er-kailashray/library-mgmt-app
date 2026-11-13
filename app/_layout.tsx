@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -21,6 +21,12 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+// Web production build (the PWA): the service worker in public/sw.js makes it open fast and
+// survive a weak connection. Never in development, where it would hold on to old bundles.
+if (Platform.OS === "web" && !__DEV__ && typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+	void navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 // Text ignores the phone's system text size so Android matches iOS: see src/shared/ui/Text.tsx.
 
@@ -83,6 +89,17 @@ export default function RootLayout() {
 
 function RootContent({ onboardingComplete }: { onboardingComplete: boolean }) {
 	const { theme, isDark } = useTheme();
+
+	// Web (the PWA): the browser bar follows the theme picked in the app, not just the phone's
+	// setting that the static tags in app/+html.tsx start from.
+	useEffect(() => {
+		if (Platform.OS !== "web") return;
+		document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+			meta.setAttribute("content", theme.background);
+			meta.removeAttribute("media");
+		});
+		document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+	}, [theme.background, isDark]);
 
 	return (
 		<BootstrapProvider onboardingComplete={onboardingComplete}>

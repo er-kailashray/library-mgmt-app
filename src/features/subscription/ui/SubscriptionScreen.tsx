@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatSubscriptionDate, getSubscriptionApi, getSubscriptionInvoicesApi, startCheckoutApi } from "@/features/subscription/logic/subscription-api";
@@ -49,6 +49,15 @@ function describeState(info: SubscriptionInfo): { title: string; detail: string;
     return byState[info.state];
 }
 
+/** The toast for how the checkout ended; a cancelled checkout needs none. */
+function showPaymentResult(result: unknown, planName?: string) {
+    if (result === "success") {
+        showToast({ message: "Payment successful", detail: `Your ${planName ? `${planName} ` : ""}plan is active. Thank you!`, durationMs: 4500 });
+    } else if (result === "failed") {
+        showToast({ message: "Payment failed", detail: "No money was taken for this attempt. Please try again or use another payment method.", tone: "error" });
+    }
+}
+
 export function SubscriptionScreen() {
     const router = useRouter();
     const { theme, isDark } = useTheme();
@@ -59,6 +68,14 @@ export function SubscriptionScreen() {
     const [isPaying, setIsPaying] = useState(false);
     // Blocks a second tap before the disabled button has re-rendered.
     const payingRef = useRef(false);
+
+    // Web: the checkout page sent the whole app back here with ?result=…; report it once.
+    const { result: returnedResult } = useLocalSearchParams<{ result?: string }>();
+    useEffect(() => {
+        if (!returnedResult) return;
+        showPaymentResult(returnedResult);
+        router.setParams({ result: undefined });
+    }, [returnedResult, router]);
 
     useFocusEffect(
         useCallback(() => {
@@ -87,6 +104,8 @@ export function SubscriptionScreen() {
 
     // Razorpay Checkout runs on a signed page in the in-app browser, which redirects back to this
     // deep link with ?result=success|failed|cancelled. The server verifies the payment itself.
+    // On web the page itself goes to checkout (a popup is unreliable in an installed iPhone web
+    // app) and comes back to /subscription?result=…, handled above.
     const handleContinue = async () => {
         if (!selectedPlan || payingRef.current) return;
         payingRef.current = true;
@@ -94,15 +113,15 @@ export function SubscriptionScreen() {
         try {
             setIsPaying(true);
             const { data } = await startCheckoutApi(selectedPlan.code, returnUrl);
+            if (Platform.OS === "web") {
+                window.location.assign(data.pay_url);
+                return;
+            }
             const session = await WebBrowser.openAuthSessionAsync(data.pay_url, returnUrl);
             const result = session.type === "success" ? Linking.parse(session.url).queryParams?.result : null;
 
             await Promise.all([refetch(), refetchInvoices()]);
-            if (result === "success") {
-                showToast({ message: "Payment successful", detail: `Your ${selectedPlan.name} plan is active. Thank you!`, durationMs: 4500 });
-            } else if (result === "failed") {
-                showToast({ message: "Payment failed", detail: "No money was taken for this attempt. Please try again or use another payment method.", tone: "error" });
-            }
+            showPaymentResult(result, selectedPlan.name);
         } catch (err: any) {
             showToast({ message: "Couldn't start payment", detail: err.message || "Please try again.", tone: "error" });
         } finally {

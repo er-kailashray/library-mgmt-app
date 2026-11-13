@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Switch, View } from "react-native";
 import { SEAT_BLOCK_SIZE, seatBlocks } from "@/features/admission/logic/seat-picking";
 import { SeatMatrixSeat } from "@/features/seats/types/seats.types";
 import { RADIUS } from "@/shared/constants/layout";
+import { webWhiteThumb } from "@/shared/constants/switch";
 import { ScaledSheet } from "@/shared/constants/ui-scale";
 import { useTheme } from "@/shared/providers/ThemeProvider";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -135,7 +136,7 @@ function SeatPickerContent({ visible, seats, isFree, selectedSeatId, onPick }: P
 
 			<View style={styles.toggleRow}>
 				<Text style={styles.toggleLabel}>Free seats only</Text>
-				<Switch value={freeOnly} onValueChange={setFreeOnly} trackColor={{ true: theme.accent, false: theme.muted }} thumbColor="#fff" />
+				<Switch value={freeOnly} onValueChange={setFreeOnly} trackColor={{ true: theme.accent, false: theme.muted }} thumbColor="#fff" {...webWhiteThumb} />
 			</View>
 
 			<ScrollView style={styles.gridScroll} contentContainerStyle={styles.grid} keyboardShouldPersistTaps="handled" onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>

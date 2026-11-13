@@ -14,6 +14,7 @@ import { getMeApi, getStoredAuthUser, updateProfileApi, updateStoredAuthUser } f
 import { updateNotificationSettingsApi } from "@/services/api/push.api";
 import { registerForPushNotifications } from "@/services/push/push-notifications";
 import { FLOATING_SHADOW, RADIUS } from "@/shared/constants/layout";
+import { webWhiteThumb } from "@/shared/constants/switch";
 import { Theme } from "@/shared/constants/theme";
 import { BUTTON_TEXT } from "@/shared/constants/typography";
 import { ScaledSheet, TEXT_SCALE } from "@/shared/constants/ui-scale";
@@ -218,14 +219,15 @@ export function SettingsScreen() {
                 <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + bottomInset }]} showsVerticalScrollIndicator={false}>
                     {/* Profile: photo (tap to view, camera to change), who you are, and Edit. */}
                     <View style={styles.profileCard}>
-                        <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={hasPhoto ? "View profile photo" : "Add profile photo"}
-                            onPress={hasPhoto ? () => setIsPhotoPreviewVisible(true) : handleChangePhoto}
-                            disabled={isUploadingPhoto}
-                            style={styles.avatarWrap}
-                        >
-                            <View style={styles.avatar}>
+                        {/* Photo and camera badge are siblings, not nested buttons (invalid HTML on web). */}
+                        <View style={styles.avatarWrap}>
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={hasPhoto ? "View profile photo" : "Add profile photo"}
+                                onPress={hasPhoto ? () => setIsPhotoPreviewVisible(true) : handleChangePhoto}
+                                disabled={isUploadingPhoto}
+                                style={styles.avatar}
+                            >
                                 {hasPhoto ? (
                                     <Image source={{ uri: user!.profile_photo_url! }} style={styles.avatarImage} transition={150} />
                                 ) : (
@@ -236,7 +238,7 @@ export function SettingsScreen() {
                                         <ActivityIndicator color="#fff" />
                                     </View>
                                 )}
-                            </View>
+                            </Pressable>
                             <Pressable
                                 accessibilityRole="button"
                                 accessibilityLabel="Change profile photo"
@@ -247,7 +249,7 @@ export function SettingsScreen() {
                             >
                                 <Ionicons name="camera" size={12} color={theme.background} />
                             </Pressable>
-                        </Pressable>
+                        </View>
                         <View style={styles.profileText}>
                             <Text style={styles.profileName} numberOfLines={1}>
                                 {user?.name ?? " "}
@@ -348,6 +350,7 @@ export function SettingsScreen() {
                                         disabled={!user}
                                         trackColor={{ false: theme.muted, true: theme.accent }}
                                         thumbColor="#fff"
+                                        {...webWhiteThumb}
                                         accessibilityLabel="Push notifications"
                                     />
                                 )

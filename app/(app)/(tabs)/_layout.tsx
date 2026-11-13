@@ -50,7 +50,9 @@ export default function TabsLayout() {
 		};
 	}, []);
 
-	if (Platform.OS === "android") {
+	// Web (the installed PWA) has no native tab bar and its vector icons can't render to images, so
+	// it gets the same JS bar as Android.
+	if (Platform.OS !== "ios") {
 		return (
 			// Lets ScreenHeader and useScreenBottomInset know they're on a tab screen.
 			<InTabsContext.Provider value={true}>
