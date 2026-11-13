@@ -49,6 +49,8 @@ export interface CreatePaymentRequest {
     notes?: string;
     /** Back after a break: restart on this date ("YYYY-MM-DD"); the days in between aren't charged. */
     start_date?: string;
+    /** One per save attempt, resent on retry so the payment is recorded once. */
+    idempotency_key?: string;
 }
 
 export interface CreatePaymentResponse {

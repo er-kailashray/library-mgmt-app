@@ -324,7 +324,7 @@ export function SettingsScreen() {
                         <Row
                             icon="contrast"
                             tint={TINTS.appearance}
-                            label="Appearance"
+                            label="Theme"
                             value={THEME_MODES.find((m) => m.key === mode)?.label}
                             onPress={() => setIsAppearanceVisible(true)}
                             styles={styles}
@@ -401,7 +401,7 @@ export function SettingsScreen() {
                 {/* Appearance: pick System / Light / Dark; the app switches as soon as one is tapped. */}
                 {actionSheet.sheet}
 
-                <BottomSheet visible={isAppearanceVisible} onClose={() => setIsAppearanceVisible(false)} title="Appearance">
+                <BottomSheet visible={isAppearanceVisible} onClose={() => setIsAppearanceVisible(false)} title="Theme">
                     <View style={[styles.groupCard, styles.optionList]}>
                         {THEME_MODES.map((option, index) => {
                             const selected = option.key === mode;

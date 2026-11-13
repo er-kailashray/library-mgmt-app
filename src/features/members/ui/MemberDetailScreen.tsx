@@ -24,6 +24,7 @@ import { useActionSheet } from "@/shared/ui/ActionSheet";
 import { MemberAvatar } from "@/shared/ui/MemberAvatar";
 import { ChoiceChips } from "@/shared/ui/ChoiceChips";
 import { formatRupee } from "@/shared/utils/currency";
+import { newIdempotencyKey } from "@/shared/utils/idempotency";
 import { openWhatsAppMessage } from "@/shared/utils/whatsapp";
 import { CalendarPicker } from "@/shared/ui/CalendarPicker";
 import { addDays, addMonths, durationSince, toIsoDate } from "@/shared/utils/dates";
@@ -219,6 +220,12 @@ export function MemberDetailScreen() {
     const [restartMode, setRestartMode] = useState(false);
     const [restartDate, setRestartDate] = useState<string | null>(null);
     const [isRestarting, setIsRestarting] = useState(false);
+    // Blocks a second tap before the disabled button has re-rendered.
+    const savingPaymentRef = useRef(false);
+    // The key for this payment attempt. If saving fails (say a timeout after the server had saved
+    // it) and the owner taps Save again with the same details, the same key goes again and the
+    // server returns the first payment instead of recording a second one.
+    const paymentAttemptRef = useRef<{ key: string; details: string } | null>(null);
 
     const openPaymentSheet = useCallback(() => {
         if (!member) return;
@@ -228,6 +235,7 @@ export function MemberDetailScreen() {
         setPaymentMode("cash");
         setRestartMode(false);
         setRestartDate(null);
+        paymentAttemptRef.current = null;
         setIsPaymentSheetVisible(true);
     }, [member]);
 
@@ -275,14 +283,23 @@ export function MemberDetailScreen() {
             showToast({ message: "Please enter the amount received.", tone: "error" });
             return;
         }
+        if (savingPaymentRef.current) return;
+        const details = JSON.stringify([member.id, paymentAmountValue, paymentMode, restartMode ? restartDate : null]);
+        // Changed details are a different payment, so they get a new key.
+        if (paymentAttemptRef.current?.details !== details) {
+            paymentAttemptRef.current = { key: newIdempotencyKey(), details };
+        }
         try {
+            savingPaymentRef.current = true;
             setIsSavingPayment(true);
             const { data: payment } = await createPaymentApi({
                 member_id: member.id,
                 amount: paymentAmountValue,
                 payment_mode: paymentMode,
                 ...(restartMode && restartDate ? { start_date: restartDate } : {}),
+                idempotency_key: paymentAttemptRef.current.key,
             });
+            paymentAttemptRef.current = null;
             setIsPaymentSheetVisible(false);
             await refetch();
             const covers = payment.period_start && payment.period_end ? `${formatShortDate(payment.period_start, true)} – ${formatShortDate(payment.period_end, true)}` : "";
@@ -297,6 +314,7 @@ export function MemberDetailScreen() {
         } catch (err: any) {
             showToast({ message: err.message || "Failed to record payment.", tone: "error" });
         } finally {
+            savingPaymentRef.current = false;
             setIsSavingPayment(false);
         }
     }, [member, paymentAmountValue, paymentMode, remainingAfterPayment, restartMode, restartDate, refetch]);

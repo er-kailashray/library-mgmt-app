@@ -3,7 +3,7 @@ import * as Linking from "expo-linking";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -57,6 +57,8 @@ export function SubscriptionScreen() {
     const { data: info, isLoading, error, refetch } = useApiData(getSubscriptionApi, []);
     const { data: invoices, refetch: refetchInvoices } = useApiData(getSubscriptionInvoicesApi, []);
     const [isPaying, setIsPaying] = useState(false);
+    // Blocks a second tap before the disabled button has re-rendered.
+    const payingRef = useRef(false);
 
     useFocusEffect(
         useCallback(() => {
@@ -86,7 +88,8 @@ export function SubscriptionScreen() {
     // Razorpay Checkout runs on a signed page in the in-app browser, which redirects back to this
     // deep link with ?result=success|failed|cancelled. The server verifies the payment itself.
     const handleContinue = async () => {
-        if (!selectedPlan) return;
+        if (!selectedPlan || payingRef.current) return;
+        payingRef.current = true;
         const returnUrl = Linking.createURL("subscription");
         try {
             setIsPaying(true);
@@ -103,6 +106,7 @@ export function SubscriptionScreen() {
         } catch (err: any) {
             showToast({ message: "Couldn't start payment", detail: err.message || "Please try again.", tone: "error" });
         } finally {
+            payingRef.current = false;
             setIsPaying(false);
         }
     };
